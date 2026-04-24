@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <cstdio>
 
+namespace {
+    inline Font::ClipRect toFontClip(const Rect& r)
+    { return { r.x, r.y, r.w, r.h }; }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  CurveEditor
 // ═════════════════════════════════════════════════════════════════════════════
@@ -452,7 +457,7 @@ void CurveEditor::paint(PaintContext& ctx)
 
     // Background
     ctx.fill.SetColor(bgColor_.r, bgColor_.g, bgColor_.b, bgColor_.a);
-    ctx.fill.Rectangle(b.x, b.y, b.w, b.h, true);
+    ctx.fillRect(b.x, b.y, b.w, b.h);
 
     paintGrid(ctx, b);
     paintCurves(ctx, b);
@@ -461,10 +466,10 @@ void CurveEditor::paint(PaintContext& ctx)
 
     // Border
     ctx.fill.SetColor(50, 52, 58, 255);
-    ctx.fill.Rectangle((int)b.x,           (int)b.y,            (int)b.w, 1,       true);
-    ctx.fill.Rectangle((int)b.x,           (int)(b.y + b.h - 1),(int)b.w, 1,       true);
-    ctx.fill.Rectangle((int)b.x,           (int)b.y,            1,        (int)b.h, true);
-    ctx.fill.Rectangle((int)(b.x + b.w -1),(int)b.y,            1,        (int)b.h, true);
+    ctx.fillRect(b.x,           b.y,            b.w, 1);
+    ctx.fillRect(b.x,           b.y + b.h - 1,  b.w, 1);
+    ctx.fillRect(b.x,           b.y,            1,   b.h);
+    ctx.fillRect(b.x + b.w - 1, b.y,            1,   b.h);
 
     ctx.popClip();
 
@@ -495,14 +500,15 @@ void CurveEditor::paintGrid(PaintContext& ctx, const Rect& b)
 
         bool isZero = std::fabs(t) < tStep * 0.01f;
         ctx.fill.SetColor(isZero ? 80 : 45, isZero ? 80 : 47, isZero ? 80 : 52, 255);
-        ctx.fill.Rectangle((int)x, (int)b.y, 1, (int)(b.h - 24), true);
+        ctx.fillRect(x, b.y, 1, b.h - 24);
 
         char buf[16];
         snprintf(buf, sizeof(buf), "%.2g", t);
         ctx.font.SetFontSize(10.0f);
         ctx.font.SetColor(Color(120, 122, 128, 200));
         ctx.font.SetBatch(&ctx.text);
-        ctx.font.Print(buf, x - 8, b.y + b.h - 10);
+        auto fc1 = toFontClip(ctx.clipRect());
+        ctx.font.Print(buf, x - 8, b.y + b.h - 10, &fc1);
     }
 
     // Value grid (horizontal lines)
@@ -513,14 +519,15 @@ void CurveEditor::paintGrid(PaintContext& ctx, const Rect& b)
 
         bool isZero = std::fabs(v) < vStep * 0.01f;
         ctx.fill.SetColor(isZero ? 80 : 45, isZero ? 80 : 47, isZero ? 80 : 52, 255);
-        ctx.fill.Rectangle((int)(b.x + 40), (int)y, (int)(b.w - 80), 1, true);
+        ctx.fillRect(b.x + 40, y, b.w - 80, 1);
 
         char buf[16];
         snprintf(buf, sizeof(buf), "%.2g", v);
         ctx.font.SetFontSize(10.0f);
         ctx.font.SetColor(Color(120, 122, 128, 200));
         ctx.font.SetBatch(&ctx.text);
-        ctx.font.Print(buf, b.x + 4, y - 5);
+        auto fc2 = toFontClip(ctx.clipRect());
+        ctx.font.Print(buf, b.x + 4, y - 5, &fc2);
     }
 }
 
@@ -550,8 +557,8 @@ void CurveEditor::paintCurves(PaintContext& ctx, const Rect& b)
                     float nx = -dy / len * thick * 0.5f;
                     float ny =  dx / len * thick * 0.5f;
                     ctx.fill.SetColor(col.r, col.g, col.b, col.a);
-                    ctx.fill.Triangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, x-nx, y-ny, true);
-                    ctx.fill.Triangle(prevX+nx, prevY+ny, x-nx, y-ny, x+nx, y+ny, true);
+                    ctx.fillTriangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, x-nx, y-ny);
+                    ctx.fillTriangle(prevX+nx, prevY+ny, x-nx, y-ny, x+nx, y+ny);
                 }
             }
             prevX = x; prevY = y; first = false;
@@ -579,15 +586,15 @@ void CurveEditor::paintKeys(PaintContext& ctx, const Rect& b)
 
                 // Tangent lines as thin fill quads
                 ctx.fill.SetColor(c.color.r, c.color.g, c.color.b, 120);
-                ctx.fill.Triangle(tix - 0.5f, tiy, tix + 0.5f, tiy, kx + 0.5f, ky, true);
-                ctx.fill.Triangle(tix - 0.5f, tiy, kx - 0.5f,  ky,  kx + 0.5f, ky, true);
-                ctx.fill.Triangle(kx - 0.5f, ky, kx + 0.5f, ky, tox + 0.5f, toy, true);
-                ctx.fill.Triangle(kx - 0.5f, ky, tox - 0.5f, toy, tox + 0.5f, toy, true);
+                ctx.fillTriangle(tix - 0.5f, tiy, tix + 0.5f, tiy, kx + 0.5f, ky);
+                ctx.fillTriangle(tix - 0.5f, tiy, kx - 0.5f,  ky,  kx + 0.5f, ky);
+                ctx.fillTriangle(kx - 0.5f, ky, kx + 0.5f, ky, tox + 0.5f, toy);
+                ctx.fillTriangle(kx - 0.5f, ky, tox - 0.5f, toy, tox + 0.5f, toy);
 
                 // Tangent dots
                 ctx.fill.SetColor(c.color.r, c.color.g, c.color.b, 200);
-                ctx.fill.Circle(tix, tiy, 3, true);
-                ctx.fill.Circle(tox, toy, 3, true);
+                ctx.fillCircle(tix, tiy, 3);
+                ctx.fillCircle(tox, toy, 3);
             }
 
             // Key diamond — outline first (larger), fill on top
@@ -595,13 +602,13 @@ void CurveEditor::paintKeys(PaintContext& ctx, const Rect& b)
             float ods = ds + 1.0f;
             Color oc(255, 255, 255, k.selected ? 255 : 80);
             ctx.fill.SetColor(oc.r, oc.g, oc.b, oc.a);
-            ctx.fill.Triangle(kx, ky - ods, kx + ods, ky, kx, ky + ods, true);
-            ctx.fill.Triangle(kx, ky - ods, kx, ky + ods, kx - ods, ky, true);
+            ctx.fillTriangle(kx, ky - ods, kx + ods, ky, kx, ky + ods);
+            ctx.fillTriangle(kx, ky - ods, kx, ky + ods, kx - ods, ky);
 
             Color kc = k.selected ? Color(255, 200, 60, 255) : c.color;
             ctx.fill.SetColor(kc.r, kc.g, kc.b, kc.a);
-            ctx.fill.Triangle(kx, ky - ds, kx + ds, ky, kx, ky + ds, true);
-            ctx.fill.Triangle(kx, ky - ds, kx, ky + ds, kx - ds, ky, true);
+            ctx.fillTriangle(kx, ky - ds, kx + ds, ky, kx, ky + ds);
+            ctx.fillTriangle(kx, ky - ds, kx, ky + ds, kx - ds, ky);
         }
     }
 }
@@ -611,9 +618,9 @@ void CurveEditor::paintPlayhead(PaintContext& ctx, const Rect& b)
     float x = timeToX(playhead_);
     if (x < b.x + 40 || x > b.x + b.w - 40) return;
 
-    // Playhead as 1px fill rect + triangle
+    // Playhead
     ctx.fill.SetColor(255, 80, 80, 200);
-    ctx.fill.Rectangle((int)x, (int)b.y, 1, (int)(b.h - 24), true);
+    ctx.fillRect(x, b.y, 1, b.h - 24);
     ctx.fill.SetColor(255, 80, 80, 220);
-    ctx.fill.Triangle(x - 5, b.y, x + 5, b.y, x, b.y + 8, true);
+    ctx.fillTriangle(x - 5, b.y, x + 5, b.y, x, b.y + 8);
 }

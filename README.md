@@ -15,21 +15,79 @@ Designed for  creative applications where performance and simplicity matter.
 - **Event bubbling** with consumed flag — mouse/key events walk up the parent chain
 
 ### Widgets
+
+#### Layout & Containers
+| Widget | Description |
+|---|---|
+| **BoxLayout** | Vertical/horizontal layout with spacing, padding, alignment |
+| **Panel** | Container with background and border, clips children |
+| **ScrollView** | Clipping container with automatic scrollbars, mouse wheel |
+| **Canvas** | Custom paint callback + child clipping |
+
+#### Basic Controls
 | Widget | Description |
 |---|---|
 | **Label** | Text display with alignment (left, center, right) |
 | **Button** | Click-able with hover/press/focus states |
-| **Panel** | Container with background and border, clips children |
 | **CheckBox** | Toggle with visual check mark |
 | **Slider** | Horizontal + vertical, thumb drag with fill track |
 | **ProgressBar** | Non-interactive bar with optional text overlay, H/V |
 | **ScrollBar** | Proportional thumb, drag + click-on-track page jump |
-| **ScrollView** | Clipping container with automatic scrollbars, mouse wheel |
-| **Canvas** | Custom paint callback + child clipping |
 | **ImageView** | Texture display with offset and rotation |
 | **Spacer** | Invisible spacing (fixed or stretch) |
 | **Line** | Visual separator, auto-adapts to parent layout direction |
-| **BoxLayout** | Vertical/horizontal layout with spacing, padding, alignment |
+
+#### Lists & Trees
+| Widget | Description |
+|---|---|
+| **ListView** | Selectable list with keyboard navigation |
+| **TreeView** | Hierarchical node tree, expand/collapse |
+| **DataGrid** | Table with sortable columns and row selection |
+| **TreeGrid** | Combined tree + column grid |
+| **PropertyGrid** | Grouped key/value inspector with inline editors (float, vec2/3/4, bool, color, combo, string) |
+
+#### Dialogs & Menus
+| Widget | Description |
+|---|---|
+| **MenuBar** | Top-level menu bar with drop-down submenus |
+| **ContextMenu** | Right-click popup menu |
+| **Dialog** | Modal/non-modal window overlay |
+| **FileDialog** | Open/Save file picker with directory browser |
+| **ColorPicker** | HSV wheel + RGB/hex sliders |
+
+#### Views
+| Widget | Description |
+|---|---|
+| **TabBar** | Clickable tabs with add/close buttons |
+| **ScrollView** | Nested scroll with independent X/Y |
+| **Viewport3D** | 3D render target view with camera orbit |
+| **Gizmo2D** | 2D transform handles (translate, scale, rotate) |
+| **Gizmo3D** | 3D axis-aligned transform gizmo |
+| **CurveEditor** | Bézier/linear curve editor with key editing |
+| **NodeEditor** | Node graph editor (add/remove nodes, connect pins) |
+
+#### Audio & Data
+| Widget | Description |
+|---|---|
+| **Knob** | Circular knob (225°→270° arc sweep), drag up/down |
+| **LinearKnob** | Linear track + thumb, horizontal or vertical, click-to-jump |
+| **ADSRWidget** | Draggable ADSR envelope with fill and dashed sustain divider |
+| **VUMeter** | Vertical peak/RMS level meter |
+| **WaveformView** | Scrollable PCM waveform display |
+| **SpectrumAnalyzer** | FFT bar spectrum visualiser |
+| **PianoRoll** | Piano roll with note/velocity editing |
+
+#### Charts & Visualisation
+| Widget | Description |
+|---|---|
+| **PlotWidget** | Line/bar/scatter chart with grid and legend |
+| **HistogramWidget** | Colour histogram (R/G/B/A channels) |
+| **GradientEditor** | Multi-stop gradient editor with RGBA stops |
+
+#### Asset Management
+| Widget | Description |
+|---|---|
+| **AssetBrowser** | Grid/list asset browser with icons, double-click open, scroll |
 
 ### Transitions & Easing
 - **15 transition types**: Slide, Cover, Reveal (4 directions each), ZoomIn/Out, None
@@ -126,15 +184,17 @@ BuGUI/
 │   ├── include/        # Public headers
 │   └── src/            # Implementation
 ├── widgets/            # UI framework: Widget, Widgets, WidgetApp, Serializer
-│   ├── include/        # Public headers
+│   ├── include/        # Public headers (one header per widget group)
 │   └── src/            # Implementation
 ├── vendor/             # Third-party: SDL2, stb, poly2tri, nlohmann, glm
-├── app/                # Test application with demo stages
+├── app/                # Demo stages (one .hpp per stage)
 │   ├── main.cpp
 │   ├── StageLayout.hpp
-│   ├── StageCanvas.hpp
 │   ├── StageWidgets.hpp
 │   ├── StageScroll.hpp
+│   ├── StageSoundWidgets.hpp   # Knob + LinearKnob + ADSR demo
+│   ├── StageAssetInspector.hpp # AssetBrowser + PropertyGrid demo
+│   ├── StageCharts.hpp         # Plot / Histogram / Gradient demo
 │   └── StageCommon.hpp
 └── bin/                # Build output
 ```

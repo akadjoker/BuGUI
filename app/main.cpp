@@ -20,6 +20,9 @@
 #include "StageViewport.hpp"
 #include "StageGizmo.hpp"
 #include "StageEditorWidgets.hpp"
+#include "StageCharts.hpp"
+#include "StageSoundWidgets.hpp"
+#include "StageAssetInspector.hpp"
 #include "Batch.hpp"
 #include "Font.hpp"
 #include <cstdio>
@@ -87,7 +90,7 @@ static void setupOverlay(WidgetApp& app)
 int main(int /*argc*/, char* /*argv*/[])
 {
     auto& app = WidgetApp::instance();
-    if (!app.init("BuGUI", 1024, 768,0))
+    if (!app.init("BuGUI", 1024, 768,1))
         return 1;
 
     Texture* tex = makeCheckerTexture();
@@ -117,6 +120,9 @@ int main(int /*argc*/, char* /*argv*/[])
     buildViewportStage(app);
     buildGizmoStage(app);
     buildEditorWidgetsStage(app);
+    buildChartsStage(app);
+    buildSoundStage(app);
+    buildAssetInspectorStage(app);
     setupOverlay(app);
 
     app.setStage("home");

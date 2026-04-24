@@ -7,7 +7,11 @@
 
 class Menu;
 
+struct MenuAction;
+
 // ═════════════════════════════════════════════════════════════════════════════
+//  Menu — popup list of MenuActions (shown via popup overlay)
+//    Used by MenuBar and ContextMenu.
 
 class Menu : public Widget
 {
@@ -87,6 +91,7 @@ private:
     float computeItemWidth(const std::string& title) const;
 };
 
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  ContextMenu — right-click popup menu
 //    Attach to any widget: widget->setContextMenu(menu);
@@ -101,56 +106,22 @@ public:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TreeView — hierarchical tree with expand/collapse nodes
-//    auto* tree = parent->createChild<TreeView>();
-//    auto* root = tree->addRoot("Project");
-//    auto* src  = root->addChild("src");
-//    src->addChild("main.cpp");
-//    tree->selectionChanged.connect([](TreeNode* n){ ... });
+//  MenuItem — a single entry in a Menu
+//    Can be a normal item, separator, or submenu header.
 // ═════════════════════════════════════════════════════════════════════════════
 
-class TreeNode
+struct MenuAction
 {
-public:
-    explicit TreeNode(const std::string& text = "");
-    ~TreeNode();
+    std::string label;
+    std::string shortcut;    // display text, e.g. "Ctrl+S"
+    bool        enabled = true;
+    bool        separator = false;  // if true, draws a horizontal line
+    bool        checkable = false;  // if true, draws a check mark
+    bool        checked = false;    // state of check mark
+    Menu*       submenu = nullptr;  // if non-null, opens submenu on hover
+    std::function<void()> callback;
 
-    TreeNode* addChild(const std::string& text);
-    void removeChild(int index);
-    void clear();
-
-    const std::string& text() const { return text_; }
-    void setText(const std::string& t) { text_ = t; }
-
-    bool isExpanded() const { return expanded_; }
-    void setExpanded(bool e) { expanded_ = e; }
-
-    TreeNode* parent() const { return parent_; }
-    const std::vector<TreeNode*>& children() const { return children_; }
-    bool hasChildren() const { return !children_.empty(); }
-
-    // User data
-    void setUserData(void* d) { userData_ = d; }
-    void* userData() const { return userData_; }
-
-    // Icon from atlas
-    void setIcon(IconId id) { iconId_ = id; }
-    IconId iconId() const { return iconId_; }
-
-    // Legacy string icon (for backward compat — mapped to IconId internally)
-    void setIcon(const std::string& name);
-    const std::string& icon() const { return iconStr_; }
-
-private:
-    friend class TreeView;
-    std::string text_;
-    std::string iconStr_;
-    IconId iconId_ = IconId::None;
-    bool expanded_ = false;
-    TreeNode* parent_ = nullptr;
-    std::vector<TreeNode*> children_;
-    void* userData_ = nullptr;
+    // Convenience constructors
+    static MenuAction Separator() { MenuAction m; m.separator = true; return m; }
 };
 
-class TreeView : public Widget
-{

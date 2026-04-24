@@ -22,6 +22,16 @@ set(SOURCES
     src/NodeEditor.cpp
     src/Timeline.cpp
     src/ConsoleWidget.cpp
+    src/GradientEditor.cpp
+    src/PlotWidget.cpp
+    src/HistogramWidget.cpp
+    src/VUMeter.cpp
+    src/WaveformView.cpp
+    src/SpectrumAnalyzer.cpp
+    src/ADSRWidget.cpp
+    src/PianoRoll.cpp
+    src/Knob.cpp
+    src/AssetBrowser.cpp
     src/UIApp.cpp
     src/WidgetApp.cpp
     src/WidgetSerializer.cpp

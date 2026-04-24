@@ -107,7 +107,7 @@ float Gizmo3D::computeScale() const
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Hit testing — axes FIRST, center LAST (like ImGuizmo)
+//  Hit testing — center FIRST (small exclusive zone), then axes
 // ─────────────────────────────────────────────────────────────────────────────
 
 GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
@@ -118,6 +118,10 @@ GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
 
     glm::vec3 axes[3] = { {1,0,0}, {0,1,0}, {0,0,1} };
     GizmoAxis3D axisIds[3] = { GizmoAxis3D::X, GizmoAxis3D::Y, GizmoAxis3D::Z };
+
+    // 0) Center always wins within 12px — tested FIRST so axes don't steal it
+    float centerDist = glm::length(glm::vec2(mx, my) - center);
+    if (centerDist < 12.0f) return GizmoAxis3D::XYZ;
 
     // 1) Individual axes (point-to-segment distance)
     float bestDist = 9999.0f;
@@ -203,10 +207,7 @@ GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
         }
     }
 
-    // 4) Center (tested LAST, small radius)
-    float centerDist = glm::length(glm::vec2(mx, my) - center);
-    if (centerDist < 10.0f) return GizmoAxis3D::XYZ;
-
+    // 4) Nothing hit
     return GizmoAxis3D::None;
 }
 
@@ -314,19 +315,25 @@ void Gizmo3D::onMouseMove(MouseEvent& e)
         onRotate3D.emit(rot);
     }
     else if (mode_ == GizmoMode3D::Scale) {
-        float factor = 1.0f + dx * 0.005f;
         glm::vec3 s = dragStartScale_;
 
-        bool hasX = (activeAxis_ == GizmoAxis3D::X || activeAxis_ == GizmoAxis3D::XY ||
-                     activeAxis_ == GizmoAxis3D::XZ || activeAxis_ == GizmoAxis3D::XYZ);
-        bool hasY = (activeAxis_ == GizmoAxis3D::Y || activeAxis_ == GizmoAxis3D::XY ||
-                     activeAxis_ == GizmoAxis3D::YZ || activeAxis_ == GizmoAxis3D::XYZ);
-        bool hasZ = (activeAxis_ == GizmoAxis3D::Z || activeAxis_ == GizmoAxis3D::XZ ||
-                     activeAxis_ == GizmoAxis3D::YZ || activeAxis_ == GizmoAxis3D::XYZ);
+        if (activeAxis_ == GizmoAxis3D::XYZ) {
+            // Center handle → uniform scale
+            float uniform = 1.0f + (dx - dy) * 0.005f;
+            s *= uniform;
+        } else {
+            float factor = 1.0f + dx * 0.005f;
+            bool hasX = (activeAxis_ == GizmoAxis3D::X || activeAxis_ == GizmoAxis3D::XY ||
+                         activeAxis_ == GizmoAxis3D::XZ);
+            bool hasY = (activeAxis_ == GizmoAxis3D::Y || activeAxis_ == GizmoAxis3D::XY ||
+                         activeAxis_ == GizmoAxis3D::YZ);
+            bool hasZ = (activeAxis_ == GizmoAxis3D::Z || activeAxis_ == GizmoAxis3D::XZ ||
+                         activeAxis_ == GizmoAxis3D::YZ);
 
-        if (hasX) s.x *= factor;
-        if (hasY) s.y *= (1.0f + (-dy) * 0.005f);
-        if (hasZ) s.z *= factor;
+            if (hasX) s.x *= factor;
+            if (hasY) s.y *= (1.0f + (-dy) * 0.005f);
+            if (hasZ) s.z *= factor;
+        }
 
         if (snapS_ > 0) {
             s.x = snap(s.x, snapS_);

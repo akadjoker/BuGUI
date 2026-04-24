@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <cstdio>
 
+namespace {
+    inline Font::ClipRect toFontClip(const Rect& r)
+    { return { r.x, r.y, r.w, r.h }; }
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  NodeEditor
 // ═════════════════════════════════════════════════════════════════════════════
@@ -173,7 +178,7 @@ Color NodeEditor::pinColor(PinType t) const
 
 NodeEditor::NodeHit NodeEditor::hitTest(float mx, float my) const
 {
-    float pinR = kPinRadius * zoom_ + 4;
+    float pinR = std::max(8.0f, kPinRadius * zoom_ + 4.0f);
 
     // Check nodes in reverse (topmost first)
     for (int i = (int)nodes_.size() - 1; i >= 0; --i) {
@@ -205,7 +210,7 @@ NodeEditor::NodeHit NodeEditor::hitTest(float mx, float my) const
 
 void NodeEditor::onMousePress(MouseEvent& e)
 {
-    if (e.button == 1) { // middle → pan
+    if (e.button == 2) { // middle → pan
         dragMode_   = DragMode::Pan;
         dragStartX_ = e.x;  dragStartY_ = e.y;
         panStartX_  = panX_; panStartY_ = panY_;
@@ -213,8 +218,29 @@ void NodeEditor::onMousePress(MouseEvent& e)
         return;
     }
 
-    if (e.button == 2) { // right-click on link → delete
-        // Check if near a link bezier
+    if (e.button == 1) { // right-click → delete link near cursor
+        float best = 12.0f * 12.0f;
+        int   del  = -1;
+        for (int li = 0; li < (int)links_.size(); ++li) {
+            float x0, y0, x1, y1;
+            getPinPos(links_[li].srcNode, links_[li].srcPin, x0, y0);
+            getPinPos(links_[li].dstNode, links_[li].dstPin, x1, y1);
+            float dist = std::fabs(x1 - x0) * 0.5f;
+            if (dist < 30) dist = 30;
+            float cx0 = x0 + dist, cy0 = y0;
+            float cx1 = x1 - dist, cy1 = y1;
+            for (int si = 1; si <= 16; ++si) {
+                float t  = float(si) / 16.f, it = 1 - t;
+                float bx = it*it*it*x0 + 3*it*it*t*cx0 + 3*it*t*t*cx1 + t*t*t*x1;
+                float by = it*it*it*y0 + 3*it*it*t*cy0 + 3*it*t*t*cy1 + t*t*t*y1;
+                float d2 = (e.x-bx)*(e.x-bx) + (e.y-by)*(e.y-by);
+                if (d2 < best) { best = d2; del = li; }
+            }
+        }
+        if (del >= 0) {
+            removeLink(del);
+            markDirty();
+        }
         e.consumed = true;
         return;
     }
@@ -224,7 +250,28 @@ void NodeEditor::onMousePress(MouseEvent& e)
     auto hit = hitTest(e.x, e.y);
 
     if (hit.pin >= 0) {
-        // Start connection drag from pin
+        auto& hitPin = nodes_[hit.node].pins[hit.pin];
+
+        // If dragging an Input pin that already has a link → detach and re-drag from the src Output
+        if (hitPin.dir == PinDir::Input) {
+            for (int li = 0; li < (int)links_.size(); ++li) {
+                if (links_[li].dstNode == hit.node && links_[li].dstPin == hit.pin) {
+                    // Remember src, remove link, start drag from src Output
+                    int srcNode = links_[li].srcNode;
+                    int srcPin  = links_[li].srcPin;
+                    removeLink(li);
+                    dragMode_    = DragMode::ConnectPin;
+                    connSrcNode_ = srcNode;
+                    connSrcPin_  = srcPin;
+                    connEndX_    = e.x;
+                    connEndY_    = e.y;
+                    e.consumed   = true;
+                    return;
+                }
+            }
+        }
+
+        // No existing link — normal drag from this pin
         dragMode_    = DragMode::ConnectPin;
         connSrcNode_ = hit.node;
         connSrcPin_  = hit.pin;
@@ -344,7 +391,7 @@ void NodeEditor::paint(PaintContext& ctx)
 
     // Background
     ctx.fill.SetColor(bgColor_.r, bgColor_.g, bgColor_.b, bgColor_.a);
-    ctx.fill.Rectangle(b.x, b.y, b.w, b.h, true);
+    ctx.fillRect(b.x, b.y, b.w, b.h);
 
     paintGrid(ctx, b);
     paintLinks(ctx);
@@ -353,10 +400,10 @@ void NodeEditor::paint(PaintContext& ctx)
 
     // Border
     ctx.fill.SetColor(50, 52, 58, 255);
-    ctx.fill.Rectangle((int)b.x,           (int)b.y,            (int)b.w, 1,      true);
-    ctx.fill.Rectangle((int)b.x,           (int)(b.y + b.h - 1),(int)b.w, 1,      true);
-    ctx.fill.Rectangle((int)b.x,           (int)b.y,            1,       (int)b.h, true);
-    ctx.fill.Rectangle((int)(b.x + b.w -1),(int)b.y,            1,       (int)b.h, true);
+    ctx.fillRect(b.x,           b.y,            b.w, 1);
+    ctx.fillRect(b.x,           b.y + b.h - 1,  b.w, 1);
+    ctx.fillRect(b.x,           b.y,            1,   b.h);
+    ctx.fillRect(b.x + b.w - 1, b.y,            1,   b.h);
 
     ctx.popClip();
 
@@ -375,10 +422,10 @@ void NodeEditor::paintGrid(PaintContext& ctx, const Rect& b)
 
     ctx.fill.SetColor(40, 42, 48, 255);
     for (float x = b.x + offX; x < b.x + b.w; x += step) {
-        ctx.fill.Rectangle((int)x, (int)b.y, 1, (int)b.h, true);
+        ctx.fillRect(x, b.y, 1, b.h);
     }
     for (float y = b.y + offY; y < b.y + b.h; y += step) {
-        ctx.fill.Rectangle((int)b.x, (int)y, (int)b.w, 1, true);
+        ctx.fillRect(b.x, y, b.w, 1);
     }
 
     // Major grid
@@ -390,10 +437,10 @@ void NodeEditor::paintGrid(PaintContext& ctx, const Rect& b)
 
     ctx.fill.SetColor(50, 52, 58, 255);
     for (float x = b.x + mOffX; x < b.x + b.w; x += major) {
-        ctx.fill.Rectangle((int)x, (int)b.y, 1, (int)b.h, true);
+        ctx.fillRect(x, b.y, 1, b.h);
     }
     for (float y = b.y + mOffY; y < b.y + b.h; y += major) {
-        ctx.fill.Rectangle((int)b.x, (int)y, (int)b.w, 1, true);
+        ctx.fillRect(b.x, y, b.w, 1);
     }
 }
 
@@ -429,8 +476,8 @@ void NodeEditor::paintLinks(PaintContext& ctx)
                 float nx = -dy/len * thick * 0.5f;
                 float ny =  dx/len * thick * 0.5f;
                 ctx.fill.SetColor(col.r, col.g, col.b, 200);
-                ctx.fill.Triangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, bx-nx, by-ny, true);
-                ctx.fill.Triangle(prevX+nx, prevY+ny, bx-nx, by-ny, bx+nx, by+ny, true);
+                ctx.fillTriangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, bx-nx, by-ny);
+                ctx.fillTriangle(prevX+nx, prevY+ny, bx-nx, by-ny, bx+nx, by+ny);
             }
             prevX = bx; prevY = by;
         }
@@ -448,32 +495,35 @@ void NodeEditor::paintNodes(PaintContext& ctx)
 
         // Shadow
         ctx.fill.SetColor(0, 0, 0, 50);
-        ctx.fill.Rectangle(nx + 3, ny + 3, nw, nhz, true);
+        ctx.fillRect(nx + 3, ny + 3, nw, nhz);
 
         // Body
         Color body = n.selected ? Color(50, 55, 65, 240) : Color(40, 42, 48, 240);
         ctx.fill.SetColor(body.r, body.g, body.b, body.a);
-        ctx.fill.Rectangle(nx, ny, nw, nhz, true);
+        ctx.fillRect(nx, ny, nw, nhz);
 
         // Header
         Color hdr = n.headerColor;
         if (n.selected) { hdr.r = std::min(255, hdr.r + 30); hdr.g = std::min(255, hdr.g + 30); hdr.b = std::min(255, hdr.b + 30); }
         ctx.fill.SetColor(hdr.r, hdr.g, hdr.b, hdr.a);
-        ctx.fill.Rectangle(nx, ny, nw, hdrH, true);
+        ctx.fillRect(nx, ny, nw, hdrH);
 
         // Title
         ctx.font.SetFontSize(11.0f * zoom_);
         ctx.font.SetBatch(&ctx.text);
         ctx.font.SetColor(Color(230, 232, 240, 255));
-        ctx.font.Print(n.title.c_str(), nx + 8 * zoom_, ny + 5 * zoom_);
+        {
+            auto fc = toFontClip(ctx.clipRect());
+            ctx.font.Print(n.title.c_str(), nx + 8 * zoom_, ny + 5 * zoom_, &fc);
+        }
 
-        // Border (4 thin fill rects)
+        // Border
         Color border = n.selected ? Color(255, 200, 60, 255) : Color(60, 62, 70, 255);
         ctx.fill.SetColor(border.r, border.g, border.b, border.a);
-        ctx.fill.Rectangle((int)nx,          (int)ny,           (int)nw, 1,        true);
-        ctx.fill.Rectangle((int)nx,          (int)(ny + nhz -1),(int)nw, 1,        true);
-        ctx.fill.Rectangle((int)nx,          (int)ny,           1,       (int)nhz, true);
-        ctx.fill.Rectangle((int)(nx + nw -1),(int)ny,           1,       (int)nhz, true);
+        ctx.fillRect(nx,           ny,            nw, 1);
+        ctx.fillRect(nx,           ny + nhz - 1,  nw, 1);
+        ctx.fillRect(nx,           ny,            1,  nhz);
+        ctx.fillRect(nx + nw - 1,  ny,            1,  nhz);
 
         // Pins
         int inputIdx = 0, outputIdx = 0;
@@ -484,17 +534,18 @@ void NodeEditor::paintNodes(PaintContext& ctx)
 
             // Circle (outline = larger circle behind, both in fill)
             ctx.fill.SetColor(220, 222, 230, 200);
-            ctx.fill.Circle(px, py, kPinRadius * zoom_ + 1.0f, true);
+            ctx.fillCircle(px, py, kPinRadius * zoom_ + 1.0f);
             ctx.fill.SetColor(pc.r, pc.g, pc.b, 255);
-            ctx.fill.Circle(px, py, kPinRadius * zoom_, true);
+            ctx.fillCircle(px, py, kPinRadius * zoom_);
 
             // Label
             ctx.font.SetFontSize(10.0f * zoom_);
             ctx.font.SetColor(Color(190, 192, 200, 220));
+            auto fc = toFontClip(ctx.clipRect());
             if (n.pins[pi].dir == PinDir::Input)
-                ctx.font.Print(n.pins[pi].name.c_str(), px + (kPinRadius + 4) * zoom_, py - 5 * zoom_);
+                ctx.font.Print(n.pins[pi].name.c_str(), px + (kPinRadius + 4) * zoom_, py - 5 * zoom_, &fc);
             else
-                ctx.font.Print(n.pins[pi].name.c_str(), px - (kPinRadius + 30) * zoom_, py - 5 * zoom_);
+                ctx.font.Print(n.pins[pi].name.c_str(), px - (kPinRadius + 30) * zoom_, py - 5 * zoom_, &fc);
         }
     }
 }
@@ -530,8 +581,8 @@ void NodeEditor::paintDragLink(PaintContext& ctx)
             float nx = -dy/len * thick * 0.5f;
             float ny =  dx/len * thick * 0.5f;
             ctx.fill.SetColor(col.r, col.g, col.b, 180);
-            ctx.fill.Triangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, bx-nx, by-ny, true);
-            ctx.fill.Triangle(prevX+nx, prevY+ny, bx-nx, by-ny, bx+nx, by+ny, true);
+            ctx.fillTriangle(prevX+nx, prevY+ny, prevX-nx, prevY-ny, bx-nx, by-ny);
+            ctx.fillTriangle(prevX+nx, prevY+ny, bx-nx, by-ny, bx+nx, by+ny);
         }
         prevX = bx; prevY = by;
     }

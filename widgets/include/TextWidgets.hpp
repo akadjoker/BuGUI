@@ -6,6 +6,10 @@
 #include <string>
 #include <functional>
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  TextInput — single-line text input field
+//  Modes: Normal, Password (●), NumberOnly (digits/-.+), ReadOnly
+// ═════════════════════════════════════════════════════════════════════════════
 
 class TextInput : public Widget
 {
@@ -218,26 +222,4 @@ private:
     void  mergeWithNextLine();
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  MenuItem — a single entry in a Menu
-//    Can be a normal item, separator, or submenu header.
-// ═════════════════════════════════════════════════════════════════════════════
 
-struct MenuAction
-{
-    std::string label;
-    std::string shortcut;    // display text, e.g. "Ctrl+S"
-    bool        enabled = true;
-    bool        separator = false;  // if true, draws a horizontal line
-    bool        checkable = false;  // if true, draws a check mark
-    bool        checked = false;    // state of check mark
-    Menu*       submenu = nullptr;  // if non-null, opens submenu on hover
-    std::function<void()> callback;
-
-    // Convenience constructors
-    static MenuAction Separator() { MenuAction m; m.separator = true; return m; }
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  Menu — popup list of MenuActions (shown via popup overlay)
-//    Used by MenuBar and ContextMenu.

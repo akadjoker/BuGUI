@@ -78,10 +78,10 @@ typedef double    f64;    // 64-bit float (IEEE 754)
 
 // ── Batch buffer sizes (vertices per batch) ──────────────────────────────
 #ifndef BUGUI_FILL_BUFFER_SIZE
-#define BUGUI_FILL_BUFFER_SIZE  4096
+#define BUGUI_FILL_BUFFER_SIZE  8192
 #endif
 #ifndef BUGUI_LINE_BUFFER_SIZE
-#define BUGUI_LINE_BUFFER_SIZE  2048
+#define BUGUI_LINE_BUFFER_SIZE  4096
 #endif
 #ifndef BUGUI_TEXT_BUFFER_SIZE
 #define BUGUI_TEXT_BUFFER_SIZE  4096

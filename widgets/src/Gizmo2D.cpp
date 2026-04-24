@@ -168,13 +168,18 @@ void Gizmo2D::onMouseMove(MouseEvent& e)
         onRotate.emit(rotation_);
     }
     else if (mode_ == GizmoMode::Scale) {
-        float factor = 1.0f + dx * 0.01f; // 100px drag = 2x
         float fx = 1.0f, fy = 1.0f;
 
-        if (activeAxis_ == GizmoAxis::X || activeAxis_ == GizmoAxis::XY)
-            fx = factor;
-        if (activeAxis_ == GizmoAxis::Y || activeAxis_ == GizmoAxis::XY)
-            fy = 1.0f + (-dy) * 0.01f; // negative dy = scale up
+        if (activeAxis_ == GizmoAxis::XY) {
+            // Center handle → uniform scale driven by diagonal drag
+            float uniform = 1.0f + (dx - dy) * 0.01f;
+            fx = fy = uniform;
+        } else {
+            if (activeAxis_ == GizmoAxis::X)
+                fx = 1.0f + dx * 0.01f;
+            if (activeAxis_ == GizmoAxis::Y)
+                fy = 1.0f + (-dy) * 0.01f; // negative dy = scale up
+        }
 
         if (snapScale_ > 0) {
             fx = snap(fx, snapScale_);

@@ -7,6 +7,12 @@
 
 struct Texture;
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  GridLayout — uniform grid with N columns, rows auto-calculated
+//    Children flow left-to-right, top-to-bottom. Each child = 1 cell.
+//    Cell sizes are equal: cellW = (width - padding - gaps) / cols
+//    Children can use setStretch() for row-span (like BoxLayout vertical).
+// ═════════════════════════════════════════════════════════════════════════════
 
 class GridLayout : public Widget
 {

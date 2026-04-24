@@ -40,6 +40,9 @@ static const DemoEntry kDemos[] = {
     {"Viewport",      "viewport",     "RenderTexture (FBO)",       Color(220, 180,  60, 255)},
     {"Gizmo",          "gizmo",         "2D + 3D transform gizmos",  Color(180, 220,  60, 255)},
     {"Editors",        "editorwidgets", "Curve, Node, Timeline",    Color( 60, 180, 200, 255)},
+    {"Charts",         "charts",        "Gradient, Plot, Histogram", Color(200, 120, 220, 255)},
+    {"Sound",          "sound",         "VUMeter, Waveform, Spectrum, ADSR, PianoRoll", Color(80, 180, 200, 255)},
+    {"Assets",         "assetinspector","AssetBrowser + InspectorPanel",              Color(180, 200,  80, 255)},
 };
 
 // Draw a card button for a demo entry

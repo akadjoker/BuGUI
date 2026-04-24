@@ -9,6 +9,13 @@
 class BoxLayout;
 class Label;
 class TextInput;
+// ═════════════════════════════════════════════════════════════════════════════
+//  MessageBox — modal-style alert/confirm dialog
+//    auto* mb = app.addFloat<MessageBox>("Confirm", "Delete this file?",
+//                                         MessageBox::YesNo, MessageBox::Question);
+//    mb->result.connect([](MessageBox::Result r) { ... });
+// ═════════════════════════════════════════════════════════════════════════════
+
 
 class MessageBox : public FloatWindow
 {

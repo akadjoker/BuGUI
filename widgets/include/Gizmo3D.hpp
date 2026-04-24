@@ -110,7 +110,7 @@ private:
     // Visual
     float screenScale_ = 80.0f; // pixel size of gizmo on screen
 
-    // Colors (muted like ImGuizmo, with orange hover)
+    // Colors (with orange hover)
     static inline const Color kRed   {170,  50,  50, 255};
     static inline const Color kGreen { 50, 170,  50, 255};
     static inline const Color kBlue  { 50,  80, 180, 255};

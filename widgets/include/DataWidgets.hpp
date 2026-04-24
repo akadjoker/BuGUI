@@ -5,6 +5,103 @@
 #include <string>
 #include <functional>
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  DataGrid — spreadsheet/database-style table widget
+//    auto* grid = parent->createChild<DataGrid>();
+//    grid->addColumn("Name",  200);
+//    grid->addColumn("Age",    60);
+//    grid->addColumn("Email", 250);
+//    grid->addRow({"Alice", "30", "alice@example.com"});
+//    grid->addRow({"Bob",   "25", "bob@example.com"});
+//
+//  Features:
+//    - Clickable headers with sort (asc/desc/none)
+//    - Drag-resizable columns
+//    - Single or multi-select rows (Ctrl+click, Shift+click)
+//    - Inline cell editing (double-click)
+//    - Optional checkbox column
+//    - Alternating row colors (zebra stripes)
+//    - Vertical + horizontal scroll
+// ═════════════════════════════════════════════════════════════════════════════
+
+class DataGrid : public Widget
+
+{
+public:
+    DataGrid();
+
+    // ── Column definition ────────────────────────────────────────────────
+    struct Column {
+        std::string name;
+        float width = 100.0f;
+        float minWidth = 40.0f;
+        bool  sortable = true;
+        bool  readOnly = false;
+    };
+
+    enum class SortOrder { None, Ascending, Descending };
+
+    int  addColumn(const std::string& name, float width = 100.0f, bool sortable = true);
+    int  columnCount() const { return static_cast<int>(columns_.size()); }
+    void setColumnWidth(int col, float w);
+
+    // ── Row data ─────────────────────────────────────────────────────────
+    int  addRow(const std::vector<std::string>& cells);
+    void setCell(int row, int col, const std::string& value);
+    std::string cell(int row, int col) const;
+    void removeRow(int row);
+    void clearRows();
+    int  rowCount() const { return static_cast<int>(rows_.size()); }
+
+    // ── Checkbox column ──────────────────────────────────────────────────
+    void setShowCheckboxes(bool s) { showCheckboxes_ = s; markDirty(); }
+    bool showCheckboxes() const { return showCheckboxes_; }
+    bool isRowChecked(int row) const;
+    void setRowChecked(int row, bool checked);
+    std::vector<int> checkedRows() const;
+
+    // ── Selection ────────────────────────────────────────────────────────
+    void setMultiSelect(bool m) { multiSelect_ = m; }
+    bool multiSelect() const { return multiSelect_; }
+    int  selectedRow() const { return selectedRow_; }
+    const std::vector<int>& selectedRows() const { return selectedRows_; }
+    void setSelectedRow(int row);
+    void clearSelection();
+
+    // ── Appearance ───────────────────────────────────────────────────────
+    void  setRowHeight(float h) { rowHeight_ = h; markDirty(); }
+    float rowHeight() const { return rowHeight_; }
+    void  setHeaderHeight(float h) { headerHeight_ = h; markDirty(); }
+    float headerHeight() const { return headerHeight_; }
+    void  setZebraStripes(bool z) { zebraStripes_ = z; markDirty(); }
+    bool  zebraStripes() const { return zebraStripes_; }
+    void  setReadOnly(bool ro) { readOnly_ = ro; }
+    bool  readOnly() const { return readOnly_; }
+    void  setColumnReadOnly(int col, bool ro);
+
+    // ── Signals ──────────────────────────────────────────────────────────
+    Signal<int>       selectionChanged;   // row index
+    Signal<int, int>  cellEdited;         // row, col
+    Signal<int>       columnSorted;       // col index
+    Signal<int, bool> rowCheckChanged;    // row, checked
+
+    Vec2f sizeHint() const override;
+    void paint(PaintContext& ctx) override;
+    void onMousePress(MouseEvent& e) override;
+    void onMouseRelease(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onMouseScroll(MouseEvent& e) override;
+    void onKeyPress(KeyEvent& e) override;
+    void onTextInput(KeyEvent& e) override;
+
+private:
+    struct Row {
+        std::vector<std::string> cells;
+        bool checked = false;
+    };
+
+    std::vector<Column> columns_;
+
 // NOTE: TreeGrid uses DataGrid::SortOrder — both in same header
     std::vector<Row>    rows_;
 
@@ -214,23 +311,4 @@ private:
     // Cleanup
     void deleteNodes(Node* n);
 };
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  FileDialog — cross-platform file/folder picker as a FloatWindow popup
-//
-//    auto* fd = app.addFloat<FileDialog>("Open File");
-//    fd->setMode(FileDialog::Mode::Open);
-//    fd->setFilter("*.cpp;*.hpp");
-//    fd->accepted.connect([](const std::string& path) { ... });
-//
-//  Features:
-//    - Open / Save / SelectFolder modes
-//    - Breadcrumb path navigation
-//    - Sort by name / size / date (click headers)
-//    - Hidden files toggle
-//    - File extension filter
-//    - Bookmarks sidebar (Home, Desktop, /, custom)
-//    - Recent files list
-//    - Icons from IconAtlas
-// ═════════════════════════════════════════════════════════════════════════════
 

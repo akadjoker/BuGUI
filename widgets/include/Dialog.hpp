@@ -5,6 +5,21 @@
 #include <string>
 #include <functional>
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Dialog — modal dialog shown via the popup layer
+//    Draws a scrim + centered card with title, content area, and button row.
+//    Shown via WidgetApp::instance().showPopup(dialog).
+//
+//    auto* dlg = new Dialog("Save Changes?", 360, 180);
+//    dlg->setMessage("Do you want to save before closing?");
+//    dlg->addButton("Cancel", Dialog::Default);
+//    dlg->addButton("Save",   Dialog::Primary);
+//    dlg->buttonClicked.connect([](int idx){ ... });
+//    WidgetApp::instance().showPopup(dlg);
+// ═════════════════════════════════════════════════════════════════════════════
+
+
 class Dialog : public Widget
 {
 public:
@@ -101,7 +116,3 @@ public:
     Signal<> cancelled;   // Cancel clicked
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  TextInput — single-line text input field
-//  Modes: Normal, Password (●), NumberOnly (digits/-.+), ReadOnly
-// ═════════════════════════════════════════════════════════════════════════════

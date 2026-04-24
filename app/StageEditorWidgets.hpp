@@ -69,8 +69,40 @@ inline void buildEditorWidgetsStage(WidgetApp& app)
         curveEd->addKey(c2, 4.0f, 360.0f);
     }
 
-    auto* nodeEd = topRow->createChild<NodeEditor>();
+    // ── NodeEditor wrapper (toolbar + editor) ────────────────────────────
+    auto* nodeCol = topRow->createChild<BoxLayout>(LayoutDir::Vertical);
+    nodeCol->setStretch(1);
+    nodeCol->setSpacing(1);
+    nodeCol->setPadding(0);
+
+    // Toolbar: nome + Add + node counter
+    auto* nodeToolbar = nodeCol->createChild<BoxLayout>(LayoutDir::Horizontal);
+    nodeToolbar->setSize(0, 28);
+    nodeToolbar->setPadding(4, 4, 2, 2);
+    nodeToolbar->setSpacing(4);
+    nodeToolbar->createChild<Label>("Node:")->setSize(36, 20);
+    auto* nodeNameEdit = nodeToolbar->createChild<TextInput>();
+    nodeNameEdit->setSize(110, 20);
+    nodeNameEdit->setPlaceholder("name...");
+    auto* nodeAddBtn = nodeToolbar->createChild<Button>("+ Add");
+    nodeAddBtn->setSize(52, 20);
+
+    auto* nodeEd = nodeCol->createChild<NodeEditor>();
     nodeEd->setStretch(1);
+
+    // Add node on button click or Enter
+    auto doAddNode = [nodeEd, nodeNameEdit]() {
+        std::string name = nodeNameEdit->text();
+        if (name.empty()) name = "Node";
+        float cx = nodeEd->panX() + 200.0f;
+        float cy = nodeEd->panY() + 100.0f;
+        int n = nodeEd->addNode(name, cx, cy);
+        nodeEd->addPin(n, "In",  PinDir::Input,  PinType::Any);
+        nodeEd->addPin(n, "Out", PinDir::Output, PinType::Any);
+        nodeNameEdit->setText("");
+    };
+    nodeAddBtn->clicked.connect(doAddNode);
+    nodeNameEdit->submitted.connect([doAddNode](const std::string&) { doAddNode(); });
 
     // Populate demo node graph
     {
@@ -91,14 +123,61 @@ inline void buildEditorWidgetsStage(WidgetApp& app)
         int nVal = nodeEd->addNode("Value", 50, 200);
         nodeEd->addPin(nVal, "Value",  PinDir::Output, PinType::Float);
 
-        nodeEd->addLink(nTex, 1, nMix, 0);  // Texture.Color -> Mix.A
-        nodeEd->addLink(nVal, 0, nMix, 2);  // Value.Value   -> Mix.Factor
-        nodeEd->addLink(nMix, 3, nOut, 0);  // Mix.Result    -> Output.Surface
+        int nMath = nodeEd->addNode("Math", 280, 250);
+        nodeEd->addPin(nMath, "A",      PinDir::Input,  PinType::Float);
+        nodeEd->addPin(nMath, "B",      PinDir::Input,  PinType::Float);
+        nodeEd->addPin(nMath, "Result", PinDir::Output, PinType::Float);
+
+        int nClamp = nodeEd->addNode("Clamp", 480, 250);
+        nodeEd->addPin(nClamp, "Value", PinDir::Input,  PinType::Float);
+        nodeEd->addPin(nClamp, "Min",   PinDir::Input,  PinType::Float);
+        nodeEd->addPin(nClamp, "Max",   PinDir::Input,  PinType::Float);
+        nodeEd->addPin(nClamp, "Out",   PinDir::Output, PinType::Float);
+
+        nodeEd->addLink(nTex, 1, nMix, 0);
+        nodeEd->addLink(nVal, 0, nMix, 2);
+        nodeEd->addLink(nMix, 3, nOut, 0);
     }
 
-    // ── Timeline ─────────────────────────────────────────────────────────
-    auto* timeline = outer->createChild<Timeline>();
+    // ── Timeline wrapper (toolbar + timeline) ────────────────────────────
+    auto* tlCol = outer->createChild<BoxLayout>(LayoutDir::Vertical);
+    tlCol->setStretch(1);
+    tlCol->setSpacing(1);
+    tlCol->setPadding(0);
+
+    // Toolbar: nome + cor aleatória + Add Track
+    auto* tlToolbar = tlCol->createChild<BoxLayout>(LayoutDir::Horizontal);
+    tlToolbar->setSize(0, 28);
+    tlToolbar->setPadding(4, 4, 2, 2);
+    tlToolbar->setSpacing(4);
+    tlToolbar->createChild<Label>("Track:")->setSize(38, 20);
+    auto* tlNameEdit = tlToolbar->createChild<TextInput>();
+    tlNameEdit->setSize(110, 20);
+    tlNameEdit->setPlaceholder("name...");
+    auto* tlAddBtn = tlToolbar->createChild<Button>("+ Add");
+    tlAddBtn->setSize(52, 20);
+
+    auto* timeline = tlCol->createChild<Timeline>();
     timeline->setStretch(1);
+
+    // Cycling track colors
+    static const Color kTrackColors[] = {
+        Color(220,100,100,255), Color(100,200,100,255),
+        Color(100,140,220,255), Color(200,180,80,255),
+        Color(180,100,220,255), Color(80,200,200,255),
+    };
+    static int s_trackColorIdx = 0;
+
+    auto doAddTrack = [timeline, tlNameEdit]() {
+        std::string name = tlNameEdit->text();
+        if (name.empty()) name = "Track";
+        Color col = kTrackColors[s_trackColorIdx % 6];
+        s_trackColorIdx++;
+        timeline->addTrack(name, col);
+        tlNameEdit->setText("");
+    };
+    tlAddBtn->clicked.connect(doAddTrack);
+    tlNameEdit->submitted.connect([doAddTrack](const std::string&) { doAddTrack(); });
 
     {
         int t0 = timeline->addTrack("Position", Color(220, 100, 100, 255));

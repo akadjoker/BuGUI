@@ -14,6 +14,26 @@ class TextInput;
 class Button;
 class ImageButton;
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  FileDialog — cross-platform file/folder picker as a FloatWindow popup
+//
+//    auto* fd = app.addFloat<FileDialog>("Open File");
+//    fd->setMode(FileDialog::Mode::Open);
+//    fd->setFilter("*.cpp;*.hpp");
+//    fd->accepted.connect([](const std::string& path) { ... });
+//
+//  Features:
+//    - Open / Save / SelectFolder modes
+//    - Breadcrumb path navigation
+//    - Sort by name / size / date (click headers)
+//    - Hidden files toggle
+//    - File extension filter
+//    - Bookmarks sidebar (Home, Desktop, /, custom)
+//    - Recent files list
+//    - Icons from IconAtlas
+// ═════════════════════════════════════════════════════════════════════════════
+
+
 class FileDialog : public FloatWindow
 {
 public:
@@ -185,11 +205,4 @@ private:
     void onMouseScroll(MouseEvent& e) override;
     void onKeyPress(KeyEvent& e) override;
 };
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  MessageBox — modal-style alert/confirm dialog
-//    auto* mb = app.addFloat<MessageBox>("Confirm", "Delete this file?",
-//                                         MessageBox::YesNo, MessageBox::Question);
-//    mb->result.connect([](MessageBox::Result r) { ... });
-// ═════════════════════════════════════════════════════════════════════════════
 

@@ -8,6 +8,64 @@
 class ColorPickerPopup_;
 class PropComboPopup_;
 
+
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TreeView — hierarchical tree with expand/collapse nodes
+//    auto* tree = parent->createChild<TreeView>();
+//    auto* root = tree->addRoot("Project");
+//    auto* src  = root->addChild("src");
+//    src->addChild("main.cpp");
+//    tree->selectionChanged.connect([](TreeNode* n){ ... });
+// ═════════════════════════════════════════════════════════════════════════════
+
+class TreeNode
+{
+public:
+    explicit TreeNode(const std::string& text = "");
+    ~TreeNode();
+
+    TreeNode* addChild(const std::string& text);
+    void removeChild(int index);
+    void clear();
+
+    const std::string& text() const { return text_; }
+    void setText(const std::string& t) { text_ = t; }
+
+    bool isExpanded() const { return expanded_; }
+    void setExpanded(bool e) { expanded_ = e; }
+
+    TreeNode* parent() const { return parent_; }
+    const std::vector<TreeNode*>& children() const { return children_; }
+    bool hasChildren() const { return !children_.empty(); }
+
+    // User data
+    void setUserData(void* d) { userData_ = d; }
+    void* userData() const { return userData_; }
+
+    // Icon from atlas
+    void setIcon(IconId id) { iconId_ = id; }
+    IconId iconId() const { return iconId_; }
+
+    // Legacy string icon (for backward compat — mapped to IconId internally)
+    void setIcon(const std::string& name);
+    const std::string& icon() const { return iconStr_; }
+
+private:
+    friend class TreeView;
+    std::string text_;
+    std::string iconStr_;
+    IconId iconId_ = IconId::None;
+    bool expanded_ = false;
+    TreeNode* parent_ = nullptr;
+    std::vector<TreeNode*> children_;
+    void* userData_ = nullptr;
+};
+
+class TreeView : public Widget
+{
+
 public:
     TreeView();
     ~TreeView() override;
@@ -226,78 +284,3 @@ private:
     std::vector<int> visibleRows() const;
     float visibleTotalHeight() const;
 };
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  ColorPicker — HSV color wheel + brightness slider + hex input
-//    auto* picker = parent->createChild<ColorPicker>();
-//    picker->setColor(Color(255, 128, 0, 255));
-//    picker->colorChanged.connect([](const Color& c){ ... });
-// ═════════════════════════════════════════════════════════════════════════════
-
-class ColorPicker : public Widget
-{
-public:
-    ColorPicker();
-
-    void setColor(const Color& c);
-    Color color() const;
-
-    // Show alpha slider
-    void setShowAlpha(bool s) { showAlpha_ = s; markDirty(); }
-    bool showAlpha() const { return showAlpha_; }
-
-    Signal<const Color&> colorChanged;
-
-    Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
-
-private:
-    // HSV representation (0..1 each)
-    float hue_ = 0, sat_ = 0, val_ = 1;
-    float alpha_ = 1.0f;
-    bool showAlpha_ = true;
-
-    enum DragTarget { None, Wheel, ValueBar, AlphaBar };
-    DragTarget dragTarget_ = None;
-
-    // Geometry helpers
-    float wheelRadius(const Rect& abs) const;
-    float wheelCenterX(const Rect& abs) const;
-    float wheelCenterY(const Rect& abs) const;
-    Rect valueBarRect(const Rect& abs) const;
-    Rect alphaBarRect(const Rect& abs) const;
-    Rect previewRect(const Rect& abs) const;
-    Rect hexRect(const Rect& abs) const;
-
-    void updateFromWheel(float mx, float my, const Rect& abs);
-    void updateFromValueBar(float my, const Rect& abs);
-    void updateFromAlphaBar(float my, const Rect& abs);
-
-    // HSV ↔ RGB conversion
-    static Color hsvToRgb(float h, float s, float v, float a);
-    static void rgbToHsv(const Color& c, float& h, float& s, float& v);
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  DataGrid — spreadsheet/database-style table widget
-//    auto* grid = parent->createChild<DataGrid>();
-//    grid->addColumn("Name",  200);
-//    grid->addColumn("Age",    60);
-//    grid->addColumn("Email", 250);
-//    grid->addRow({"Alice", "30", "alice@example.com"});
-//    grid->addRow({"Bob",   "25", "bob@example.com"});
-//
-//  Features:
-//    - Clickable headers with sort (asc/desc/none)
-//    - Drag-resizable columns
-//    - Single or multi-select rows (Ctrl+click, Shift+click)
-//    - Inline cell editing (double-click)
-//    - Optional checkbox column
-//    - Alternating row colors (zebra stripes)
-//    - Vertical + horizontal scroll
-// ═════════════════════════════════════════════════════════════════════════════
-
-class DataGrid : public Widget
