@@ -8,7 +8,7 @@
 struct Texture;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Canvas — panel that clips children + custom paint callback
+//  Canvas - panel that clips children + custom paint callback
 // ═════════════════════════════════════════════════════════════════════════════
 
 class Canvas : public Widget
@@ -19,7 +19,7 @@ public:
     void setBgColor(const Color& c) { bgColor_ = c; }
     const Color& bgColor() const { return bgColor_; }
 
-    // User-supplied paint callback — called inside the canvas clip region
+    // User-supplied paint callback - called inside the canvas clip region
     using PaintCallback = std::function<void(PaintContext& ctx, const Rect& bounds)>;
     void setOnPaint(PaintCallback cb) { onPaint_ = std::move(cb); }
 
@@ -32,7 +32,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ImageView — draws a texture with offset and rotation (pure display)
+//  ImageView - draws a texture with offset and rotation (pure display)
 // ═════════════════════════════════════════════════════════════════════════════
 
 class ImageView : public Widget

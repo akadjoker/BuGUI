@@ -164,7 +164,7 @@ json WidgetSerializer::serializeBase(const Widget* w)
     if (!w->isEnabled())
         j["enabled"] = false;
 
-    // Layout props — only if non-default
+    // Layout props - only if non-default
     const auto& m = w->margins();
     if (m.top != 0 || m.right != 0 || m.bottom != 0 || m.left != 0)
         j["margins"] = edgesToJson(m);
@@ -343,7 +343,7 @@ json WidgetSerializer::save(const Widget* root)
             j["text"] = w->text();
         if (w->textAlign() != TextAlign::CENTER)
             j["textAlign"] = textAlignToStr(w->textAlign());
-        // barColor — only if non-default
+        // barColor - only if non-default
         const Color defBar(140, 140, 145, 255);
         if (w->barColor().r != defBar.r || w->barColor().g != defBar.g ||
             w->barColor().b != defBar.b || w->barColor().a != defBar.a)
@@ -376,7 +376,7 @@ json WidgetSerializer::save(const Widget* root)
             j["offset"] = json::array({w->offsetX(), w->offsetY()});
         if (w->angle() != 0)
             j["angle"] = w->angle();
-        // texture path would need a name/path system — skip for now
+        // texture path would need a name/path system - skip for now
     }
     else if (type == "GridLayout") {
         auto* w = static_cast<const GridLayout*>(root);

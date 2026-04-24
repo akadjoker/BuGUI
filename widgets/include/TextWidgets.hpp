@@ -7,7 +7,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TextInput — single-line text input field
+//  TextInput - single-line text input field
 //  Modes: Normal, Password (●), NumberOnly (digits/-.+), ReadOnly
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -76,7 +76,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TextEdit — multi-line text editor
+//  TextEdit - multi-line text editor
 //  Features: line numbers, cursor 2D, selection, scroll, word wrap (opt),
 //            tab-to-spaces, clipboard, ready for syntax highlight callback
 // ═════════════════════════════════════════════════════════════════════════════

@@ -409,7 +409,7 @@ void Collapsible::paint(PaintContext& ctx)
         ctx.font.Print(title_.c_str(), textX, textY, &fc);
     }
 
-    // ── Content (children) — only if expanded ────────────────────────────
+    // ── Content (children) - only if expanded ────────────────────────────
     if (expanded_)
     {
         ctx.pushClip(abs);
@@ -489,7 +489,7 @@ void StatusBar::paint(PaintContext& ctx)
         ctx.font.Print(text_.c_str(), abs.x + t.padding, ty, &fc);
     }
 
-    // Resize grip — only when resizable AND not maximized
+    // Resize grip - only when resizable AND not maximized
     if (WidgetApp::instance().isResizable() && !WidgetApp::instance().isMaximized())
     {
         float gs = abs.h * 0.65f;  // grip area size
@@ -517,7 +517,7 @@ void StatusBar::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  StackLayout — shows one child at a time
+//  StackLayout - shows one child at a time
 // ═════════════════════════════════════════════════════════════════════════════
 
 void StackLayout::setCurrentIndex(int idx)
@@ -587,7 +587,7 @@ void StackLayout::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FormLayout — two-column label:widget
+//  FormLayout - two-column label:widget
 //  Children are in pairs: [label0, widget0, label1, widget1, ...]
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -676,7 +676,7 @@ void FormLayout::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FlowLayout — wraps children like text
+//  FlowLayout - wraps children like text
 // ═════════════════════════════════════════════════════════════════════════════
 
 Widget::Vec2f FlowLayout::sizeHint() const
@@ -752,7 +752,7 @@ void FlowLayout::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Overlay — children stacked in Z-order, all full area
+//  Overlay - children stacked in Z-order, all full area
 // ═════════════════════════════════════════════════════════════════════════════
 
 Widget::Vec2f Overlay::sizeHint() const
@@ -795,7 +795,7 @@ void Overlay::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Splitter — two children with draggable divider
+//  Splitter - two children with draggable divider
 // ═════════════════════════════════════════════════════════════════════════════
 
 Splitter::Splitter(LayoutDir dir) : dir_(dir)
@@ -1028,7 +1028,7 @@ void Splitter::onMouseLeave()
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TabLayout — tabbed container
+//  TabLayout - tabbed container
 // ═════════════════════════════════════════════════════════════════════════════
 
 static const std::string kEmptyTabLabel;
@@ -1386,7 +1386,7 @@ void TabLayout::onMousePress(MouseEvent& e)
     Rect absBar = {abs.x + barR.x, abs.y + barR.y, barR.w, barR.h};
     if (!absBar.contains(e.x, e.y))
     {
-        // Click in content area — let children handle it
+        // Click in content area - let children handle it
         return;
     }
 
@@ -1420,7 +1420,7 @@ void TabLayout::onMousePress(MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  AnchorLayout — children positioned by anchors relative to parent
+//  AnchorLayout - children positioned by anchors relative to parent
 // ═════════════════════════════════════════════════════════════════════════════
 
 static const char* kAnchorKey = "__anchor_rule__";

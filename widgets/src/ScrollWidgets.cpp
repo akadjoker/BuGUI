@@ -171,7 +171,7 @@ void ScrollBar::onMouseMove(MouseEvent& e)
 
 ScrollView::ScrollView()
 {
-    // Create scroll bars as children — they live in the widget tree
+    // Create scroll bars as children - they live in the widget tree
     vBar_ = createChild<ScrollBar>(LayoutDir::Vertical);
     hBar_ = createChild<ScrollBar>(LayoutDir::Horizontal);
     hBar_->setVisible(false);
@@ -238,14 +238,14 @@ void ScrollView::layout()
     content_->setRect({0, 0, vpW1, vpH1});
     content_->layout();
 
-    // Now ask for the natural size — height may exceed viewport
+    // Now ask for the natural size - height may exceed viewport
     auto hint = content_->sizeHint();
     float contentH = (hint.y > 0) ? hint.y : vpH1;
 
     // Determine if we need vertical scrollbar
     bool needV = contentH > rect_.h;
 
-    // With V bar, viewport width shrinks — re-layout content at real width
+    // With V bar, viewport width shrinks - re-layout content at real width
     float vpW = rect_.w - (needV ? barWidth_ : 0);
     float vpH = rect_.h;
 
@@ -258,7 +258,7 @@ void ScrollView::layout()
     contentH = (hint.y > 0) ? hint.y : vpH;
     needV = contentH > vpH;
 
-    // Now check horizontal — only if content's min width exceeds viewport
+    // Now check horizontal - only if content's min width exceeds viewport
     float contentW = (hint.x > 0) ? hint.x : vpW;
     bool needH = contentW > vpW;
 

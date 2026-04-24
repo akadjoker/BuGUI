@@ -1,6 +1,6 @@
 #pragma once
 // ═════════════════════════════════════════════════════════════════════════════
-//  BuGUI — Umbrella header (includes all widget headers)
+//  BuGUI - Umbrella header (includes all widget headers)
 //  For faster builds, include only the specific headers you need instead.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -35,3 +35,4 @@
 #include "PianoRoll.hpp"
 #include "Knob.hpp"
 #include "AssetBrowser.hpp"
+#include "DockPanel.hpp"

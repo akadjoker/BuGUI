@@ -7,7 +7,7 @@
 #include <string>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ConsoleWidget — Scrollable log with severity filters + command input
+//  ConsoleWidget - Scrollable log with severity filters + command input
 //
 //  Usage:
 //    auto* con = parent->createChild<ConsoleWidget>();
@@ -22,7 +22,7 @@ enum class LogLevel { Info, Warn, Error };
 struct LogEntry {
     LogLevel    level = LogLevel::Info;
     std::string message;
-    float       timestamp = 0;   // optional — seconds since start
+    float       timestamp = 0;   // optional - seconds since start
 };
 
 class ConsoleWidget : public Widget

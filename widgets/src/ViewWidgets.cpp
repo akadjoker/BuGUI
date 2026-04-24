@@ -474,7 +474,7 @@ void Carousel::onMouseLeave()
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FloatWindow — draggable floating panel
+//  FloatWindow - draggable floating panel
 // ═════════════════════════════════════════════════════════════════════════════
 
 FloatWindow::FloatWindow(const std::string& title)
@@ -626,7 +626,7 @@ void FloatWindow::paint(PaintContext& ctx)
             ctx.fill.Rectangle(static_cast<int>(mb.x), static_cast<int>(mb.y),
                                static_cast<int>(mb.w), static_cast<int>(mb.h), true);
         }
-        // — icon (minimize) or ▢ icon (restore)
+        // - icon (minimize) or ▢ icon (restore)
         float mx = mb.x + mb.w * 0.5f, my = mb.y + mb.h * 0.5f;
         float s = 5.0f;
         ctx.line.SetColor(t.floatTitleText.r, t.floatTitleText.g,
@@ -639,12 +639,12 @@ void FloatWindow::paint(PaintContext& ctx)
         }
         else
         {
-            // — minimize icon
+            // - minimize icon
             ctx.line.Line2D(mx - s, my, mx + s, my);
         }
     }
 
-    // Content — flush before+after so float chrome and content
+    // Content - flush before+after so float chrome and content
     // are in separate draw calls (correct Z-order)
     if (content_ && !minimized_)
     {
@@ -770,7 +770,7 @@ void FloatWindow::onMouseMove(MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SidePanel — slide-in drawer
+//  SidePanel - slide-in drawer
 // ═════════════════════════════════════════════════════════════════════════════
 
 SidePanel::SidePanel(Side side, float panelWidth)
@@ -921,20 +921,20 @@ void SidePanel::onMousePress(MouseEvent& e)
 
     if (panelRect.contains(e.x, e.y))
     {
-        // Inside panel — forward to content
+        // Inside panel - forward to content
         if (content_) content_->onMousePress(e);
         e.consumed = true;
     }
     else
     {
-        // Click on scrim — close
+        // Click on scrim - close
         close();
         e.consumed = true;
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PageView — shows one child ("page") at a time
+//  PageView - shows one child ("page") at a time
 // ═════════════════════════════════════════════════════════════════════════════
 
 void PageView::addPageImpl(Widget* w)
@@ -1120,7 +1120,7 @@ void PageView::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Dialog — modal dialog shown via the popup layer
+//  Dialog - modal dialog shown via the popup layer
 // ═════════════════════════════════════════════════════════════════════════════
 
 Dialog::Dialog(const std::string& title, float width, float height)

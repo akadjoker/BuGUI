@@ -4,7 +4,7 @@
 #include <vector>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SpectrumAnalyzer — frequency spectrum bar display
+//  SpectrumAnalyzer - frequency spectrum bar display
 //
 //  Usage:
 //    auto* sa = parent->createChild<SpectrumAnalyzer>();
@@ -32,7 +32,7 @@ public:
     // magnitudes[i] in 0..1 (linear), count must match binCount()
     void setMagnitudes(const float* magnitudes, int count);
 
-    // Smooth decay — call each frame
+    // Smooth decay - call each frame
     void update(float dt);
 
     // ── Optional axis labels ──────────────────────────────────────────────

@@ -5,7 +5,7 @@
 #include <algorithm>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  VUMeter — Volume Unit meter, one or more channels
+//  VUMeter - Volume Unit meter, one or more channels
 //
 //  Usage:
 //    auto* vu = parent->createChild<VUMeter>();

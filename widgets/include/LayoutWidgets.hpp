@@ -8,7 +8,7 @@
 struct Texture;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  GridLayout — uniform grid with N columns, rows auto-calculated
+//  GridLayout - uniform grid with N columns, rows auto-calculated
 //    Children flow left-to-right, top-to-bottom. Each child = 1 cell.
 //    Cell sizes are equal: cellW = (width - padding - gaps) / cols
 //    Children can use setStretch() for row-span (like BoxLayout vertical).
@@ -47,7 +47,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  BorderLayout — 5-region layout: Top, Bottom, Left, Right, Center
+//  BorderLayout - 5-region layout: Top, Bottom, Left, Right, Center
 //    Top/Bottom span full width. Left/Right fill remaining height.
 //    Center gets whatever space is left.
 //    Each region holds at most one widget. Unset regions take 0 space.
@@ -56,7 +56,7 @@ private:
 //    - Positive value (e.g. 200)  → fixed pixels
 //    - Negative value (e.g. -0.2) → percentage of total (abs value, 0..1)
 //    - Zero (default)             → use widget's sizeHint
-//    Center region ignores size — always fills remaining space.
+//    Center region ignores size - always fills remaining space.
 // ═════════════════════════════════════════════════════════════════════════════
 
 enum class BorderRegion { Top, Bottom, Left, Right, Center };
@@ -110,7 +110,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Collapsible — clickable header that shows/hides content
+//  Collapsible - clickable header that shows/hides content
 //  Draws a triangle indicator (▶ collapsed / ▼ expanded) via fillBatch.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -154,7 +154,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  StatusBar — horizontal bar (typically at bottom) with auto resize grip
+//  StatusBar - horizontal bar (typically at bottom) with auto resize grip
 //  Shows resize grip triangle when window is resizable.
 //  Children are laid out horizontally (left-aligned).
 // ═════════════════════════════════════════════════════════════════════════════
@@ -185,7 +185,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  StackLayout — shows one child at a time (like QStackedLayout)
+//  StackLayout - shows one child at a time (like QStackedLayout)
 //  All children occupy the full area; only the active one is visible/painted.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -212,7 +212,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FormLayout — two-column label:widget layout (like QFormLayout)
+//  FormLayout - two-column label:widget layout (like QFormLayout)
 //  Add rows with addRow(label, widget). Labels auto-right-aligned.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -256,7 +256,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FlowLayout — wraps children like text (CSS flex-wrap)
+//  FlowLayout - wraps children like text (CSS flex-wrap)
 // ═════════════════════════════════════════════════════════════════════════════
 
 class FlowLayout : public Widget
@@ -286,7 +286,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Overlay — children stacked in Z-order, all occupy full area
+//  Overlay - children stacked in Z-order, all occupy full area
 //  First child = bottom, last = top. For popups, floating panels.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -301,7 +301,7 @@ public:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Splitter — two children with draggable divider (like QSplitter/GtkPaned)
+//  Splitter - two children with draggable divider (like QSplitter/GtkPaned)
 //  Horizontal: left | right.  Vertical: top | bottom.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -352,7 +352,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TabLayout — tabbed container (like QTabWidget)
+//  TabLayout - tabbed container (like QTabWidget)
 //  Tab bar can be Top, Bottom, Left or Right.
 //  Each tab has a label and optional close button (X).
 //
@@ -440,7 +440,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  AnchorLayout — children positioned by anchors relative to parent
+//  AnchorLayout - children positioned by anchors relative to parent
 //  Each child's position/size is defined by anchor rules.
 //  Anchors are 0..1 fractions of parent size + pixel offsets.
 //
@@ -494,7 +494,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Carousel — animated page viewer with arrows, dots, auto-play
+//  Carousel - animated page viewer with arrows, dots, auto-play
 //
 //    auto* car = parent->createChild<Carousel>();
 //    car->addPage<Panel>();  // page 0

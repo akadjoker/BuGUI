@@ -103,8 +103,8 @@ void WaveformView::paint(PaintContext& ctx)
                 ctx.fillRect(lx0, chY0, lx1 - lx0, chH);
             }
 
-            // Envelope — draw vertical lines via line batch (2 verts each, not 6)
-            // Cap at 512 columns — line batch is 2048*4=8192 verts, 512*2ch*2=2048 fits
+            // Envelope - draw vertical lines via line batch (2 verts each, not 6)
+            // Cap at 512 columns - line batch is 2048*4=8192 verts, 512*2ch*2=2048 fits
             const int maxCols = 512;
             int pw = std::min(maxCols, (int)b.w);
             float colW = b.w / pw;
@@ -118,7 +118,7 @@ void WaveformView::paint(PaintContext& ctx)
                 ctx.drawLine(cx, top, cx, bottom);
             }
         } else {
-            // No data — show placeholder
+            // No data - show placeholder
             ctx.fill.SetColor(50, 55, 60, 255);
             ctx.fillRect(b.x, mid, b.w, 1);
         }

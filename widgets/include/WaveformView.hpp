@@ -4,7 +4,7 @@
 #include <vector>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  WaveformView — audio waveform display
+//  WaveformView - audio waveform display
 //
 //  Usage:
 //    auto* wv = parent->createChild<WaveformView>();

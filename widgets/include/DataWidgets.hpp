@@ -6,7 +6,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  DataGrid — spreadsheet/database-style table widget
+//  DataGrid - spreadsheet/database-style table widget
 //    auto* grid = parent->createChild<DataGrid>();
 //    grid->addColumn("Name",  200);
 //    grid->addColumn("Age",    60);
@@ -102,7 +102,7 @@ private:
 
     std::vector<Column> columns_;
 
-// NOTE: TreeGrid uses DataGrid::SortOrder — both in same header
+// NOTE: TreeGrid uses DataGrid::SortOrder  both in same header
     std::vector<Row>    rows_;
 
     // Sort state
@@ -160,7 +160,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TreeGrid — hierarchical table (tree + columns)
+//  TreeGrid - hierarchical table (tree + columns)
 //    auto* tg = parent->createChild<TreeGrid>();
 //    tg->addColumn("Name",  250);
 //    tg->addColumn("Type",   80);

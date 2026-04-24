@@ -6,7 +6,7 @@
 #include <string>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  HistogramWidget — Value distribution display
+//  HistogramWidget - Value distribution display
 //
 //  Usage:
 //    auto* h = parent->createChild<HistogramWidget>();

@@ -13,7 +13,7 @@ namespace {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ColorPickerPopup_ — popup wrapper for PropertyGrid color editing
+//  ColorPickerPopup_ - popup wrapper for PropertyGrid color editing
 // ─────────────────────────────────────────────────────────────────────────────
 class ColorPickerPopup_ : public Widget
 {
@@ -107,7 +107,7 @@ private:
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PropComboPopup_ — dropdown list for PropertyGrid combo properties
+//  PropComboPopup_ - dropdown list for PropertyGrid combo properties
 // ─────────────────────────────────────────────────────────────────────────────
 class PropComboPopup_ : public Widget
 {
@@ -404,7 +404,7 @@ void TreeView::paint(PaintContext& ctx)
             indentX += 11.0f; // align with nodes that have triangles
         }
 
-        // Icon (if set) — draw from atlas texture
+        // Icon (if set) - draw from atlas texture
         if (row.node->iconId() != IconId::None) {
             float iconSz = t.fontSize;
             float iconX = indentX;
@@ -926,7 +926,7 @@ void PropertyGrid::paintRow(PaintContext& ctx, const Rect& abs, int idx, float y
     float valueW = abs.w - labelW;
 
     if (row.type == PropType::Section) {
-        // Section header — full width bg
+        // Section header - full width bg
         Color bg = t.collapsibleHeaderBg;
         if (hoveredRow_ == idx) {
             bg.r = std::min(255, bg.r + 12);
@@ -1191,9 +1191,9 @@ void PropertyGrid::paintRow(PaintContext& ctx, const Rect& abs, int idx, float y
         // Border
         ctx.line.SetColor(t.inputBorder.r, t.inputBorder.g, t.inputBorder.b, t.inputBorder.a);
         ctx.lineRect(valTextX, barY, valW, barH);
-        // Text: "lo — hi"
+        // Text: "lo - hi"
         char buf[48];
-        snprintf(buf, sizeof(buf), "%.1f — %.1f", row.rangeLo, row.rangeHi);
+        snprintf(buf, sizeof(buf), "%.1f - %.1f", row.rangeLo, row.rangeHi);
         ctx.font.SetColor(Color(230, 230, 230, 255));
         ctx.font.Print(buf, valTextX + 3, textY, &fc);
         break;
@@ -1222,7 +1222,7 @@ void PropertyGrid::paintDescPanel(PaintContext& ctx, const Rect& abs)
 
     const auto& row = rows_[selectedRow_];
 
-    // Property name (bold-like — just brighter)
+    // Property name (bold-like - just brighter)
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(Color(220, 220, 225, 255));
     ctx.font.SetBatch(&ctx.text);
@@ -1306,7 +1306,7 @@ void PropertyGrid::onMousePress(MouseEvent& e)
         return;
     }
 
-    // Separator — ignore
+    // Separator - ignore
     if (row.type == PropType::Separator) return;
 
     // Select row
@@ -1337,7 +1337,7 @@ void PropertyGrid::onMousePress(MouseEvent& e)
     case PropType::Float: {
         // If already editing, stay in edit mode
         if (editing_ && activeRow_ == idx) break;
-        // Start slider drag — set value to click position immediately
+        // Start slider drag - set value to click position immediately
         draggingSlider_ = true;
         activeRow_ = idx;
         dragStartX_ = e.x;
@@ -1725,7 +1725,7 @@ void PropertyGrid::onTextInput(KeyEvent& e)
         }
     }
 
-    // String — accept anything
+    // String - accept anything
     for (int i = 0; e.text[i]; ++i) {
         editBuf_.insert(editCursor_, 1, e.text[i]);
         editCursor_++;

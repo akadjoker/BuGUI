@@ -8,7 +8,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  CurveEditor — Bezier/Hermite animation curve editing
+//  CurveEditor - Bezier/Hermite animation curve editing
 //
 //  Features:
 //  - Multiple named curves with independent colors

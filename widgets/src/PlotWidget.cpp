@@ -222,7 +222,7 @@ void PlotWidget::paintSeries(PaintContext& ctx, const Rect& pa)
                 ctx.fillCircle(sx, sy, 3);
             }
         } else {
-            // Line — draw thick line segments
+            // Line - draw thick line segments
             for (int i = 0; i < n - 1; ++i) {
                 float sx0 = dataToScreenX((float)i,   pa);
                 float sy0 = dataToScreenY(s.values[i], pa);

@@ -32,6 +32,7 @@ set(SOURCES
     src/PianoRoll.cpp
     src/Knob.cpp
     src/AssetBrowser.cpp
+    src/DockPanel.cpp
     src/UIApp.cpp
     src/WidgetApp.cpp
     src/WidgetSerializer.cpp

@@ -12,7 +12,7 @@ class PropComboPopup_;
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TreeView — hierarchical tree with expand/collapse nodes
+//  TreeView - hierarchical tree with expand/collapse nodes
 //    auto* tree = parent->createChild<TreeView>();
 //    auto* root = tree->addRoot("Project");
 //    auto* src  = root->addChild("src");
@@ -48,7 +48,7 @@ public:
     void setIcon(IconId id) { iconId_ = id; }
     IconId iconId() const { return iconId_; }
 
-    // Legacy string icon (for backward compat — mapped to IconId internally)
+    // Legacy string icon (for backward compat - mapped to IconId internally)
     void setIcon(const std::string& name);
     const std::string& icon() const { return iconStr_; }
 
@@ -119,7 +119,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PropertyGrid — two-column name/value editor (like Qt Property Browser)
+//  PropertyGrid - two-column name/value editor (like Qt Property Browser)
 //    auto* grid = parent->createChild<PropertyGrid>();
 //    grid->addString("Name", "Player1", [](const std::string& v){ ... });
 //    grid->addFloat("Speed", 5.0f, 0, 100, [](float v){ ... });
@@ -138,7 +138,7 @@ public:
     enum class PropType { Section, String, Float, Int, Bool, Color, Combo,
                           Vec2, Vec3, Vec4, Button, Separator, Range };
 
-    // Add properties — returns row index
+    // Add properties - returns row index
     int addSection(const std::string& title);
     int addString(const std::string& name, const std::string& value,
                   std::function<void(const std::string&)> onChange = nullptr,

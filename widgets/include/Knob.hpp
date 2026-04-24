@@ -6,7 +6,7 @@
 #include <string>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Knob — rotary knob control (circular arc style)
+//  Knob - rotary knob control (circular arc style)
 //
 //  Usage:
 //    auto* k = parent->createChild<Knob>();
@@ -83,9 +83,9 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  LinearKnob — horizontal slider styled as a "linear pot"
+//  LinearKnob - horizontal slider styled as a "linear pot"
 //
-//  Looks like a guitar volume slider — a narrow track with a
+//  Looks like a guitar volume slider - a narrow track with a
 //  prominent thumb that shows the current position.
 // ═════════════════════════════════════════════════════════════════════════════
 

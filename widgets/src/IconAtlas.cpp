@@ -50,7 +50,7 @@ FloatRect IconAtlas::srcRect(IconId id) const
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Master draw — iterate all icon IDs
+//  Master draw - iterate all icon IDs
 // ═════════════════════════════════════════════════════════════════════════════
 
 void IconAtlas::drawAllIcons(Pixmap& pm)

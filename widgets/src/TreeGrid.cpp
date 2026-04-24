@@ -27,7 +27,7 @@ TreeGrid::Node* TreeGrid::Node::addChild(const std::vector<std::string>& cellDat
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TreeGrid — constructor / destructor helpers
+//  TreeGrid - constructor / destructor helpers
 // ═════════════════════════════════════════════════════════════════════════════
 
 TreeGrid::TreeGrid()

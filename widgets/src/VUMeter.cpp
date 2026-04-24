@@ -177,7 +177,7 @@ void VUMeter::paint(PaintContext& ctx)
     const float areaW   = b.w - scaleW - 8;
     const float areaH   = b.h - scaleH - 8;
 
-    // Draw dB scale labels — only show marks that fit (min 12px apart)
+    // Draw dB scale labels - only show marks that fit (min 12px apart)
     if (showScale_) {
         auto fc = toFc(b);
         ctx.fill.SetColor(140, 140, 140, 255);

@@ -241,7 +241,7 @@ void InputBox::onKeyPress(KeyEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Toast — Android-style notifications
+//  Toast - Android-style notifications
 // ═════════════════════════════════════════════════════════════════════════════
 
 std::vector<Toast::Entry>& Toast::entries()

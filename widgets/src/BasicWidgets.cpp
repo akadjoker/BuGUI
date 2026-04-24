@@ -515,7 +515,7 @@ void Panel::paint(PaintContext& ctx)
     Rect clipped;
     if (ctx.clipRectIntersect(abs, clipped))
     {
-        // Background (fill) — draw only the clipped portion
+        // Background (fill) - draw only the clipped portion
         ctx.fill.SetColor(bgColor_.r, bgColor_.g, bgColor_.b, bgColor_.a);
         ctx.fill.RoundedRectangle(
             static_cast<int>(clipped.x), static_cast<int>(clipped.y),
@@ -530,7 +530,7 @@ void Panel::paint(PaintContext& ctx)
             t.borderRadius, 6, false);
     }
 
-    // Push clip rect for children — they must stay inside panel bounds
+    // Push clip rect for children - they must stay inside panel bounds
     ctx.pushClip(abs);
     for (auto& c : children_)
         c->paint(ctx);
@@ -581,13 +581,13 @@ void CheckBox::paint(PaintContext& ctx)
     Rect clippedBox;
     if (ctx.clipRectIntersect(boxRect, clippedBox))
     {
-        // Box background (fill) — hover-aware
+        // Box background (fill) - hover-aware
         Color bg = hovered_ ? t.inputBgHover : t.inputBg;
         ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
         ctx.fill.Rectangle(static_cast<int>(clippedBox.x), static_cast<int>(clippedBox.y),
                             static_cast<int>(clippedBox.w), static_cast<int>(clippedBox.h), true);
 
-        // Box border (line) — hover/focus-aware
+        // Box border (line) - hover/focus-aware
         Color border = focused_ ? t.focusColor : (hovered_ ? t.inputBorderHover : t.inputBorder);
         ctx.line.SetColor(border.r, border.g, border.b, border.a);
         ctx.line.Rectangle(static_cast<int>(clippedBox.x), static_cast<int>(clippedBox.y),
@@ -744,7 +744,7 @@ void RadioButton::paint(PaintContext& ctx)
     float cx = abs.x + t.padding + r;
     float cy = abs.y + abs.h * 0.5f;
 
-    // Outer circle — border
+    // Outer circle - border
     Color border = focused_ ? t.focusColor : (hovered_ ? t.inputBorderHover : t.inputBorder);
     ctx.line.SetColor(border.r, border.g, border.b, border.a);
     ctx.lineCircle(cx, cy, r);
@@ -779,7 +779,7 @@ void RadioButton::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Switch — on/off toggle
+//  Switch - on/off toggle
 // ═════════════════════════════════════════════════════════════════════════════
 
 Switch::Switch(const std::string& text) : text_(text)

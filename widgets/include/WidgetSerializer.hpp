@@ -9,7 +9,7 @@
 using json = nlohmann::json;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  WidgetSerializer — save / load widget trees to/from JSON
+//  WidgetSerializer - save / load widget trees to/from JSON
 // ═════════════════════════════════════════════════════════════════════════════
 
 class WidgetSerializer

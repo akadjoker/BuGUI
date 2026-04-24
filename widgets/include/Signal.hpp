@@ -5,7 +5,7 @@
 #include <algorithm>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Signal<Args...>  — lightweight signal/slot (like Qt, but std::function)
+//  Signal<Args...>  - lightweight signal/slot (like Qt, but std::function)
 //
 //  Usage:
 //      Signal<int> onValueChanged;

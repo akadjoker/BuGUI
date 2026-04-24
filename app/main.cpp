@@ -23,6 +23,7 @@
 #include "StageCharts.hpp"
 #include "StageSoundWidgets.hpp"
 #include "StageAssetInspector.hpp"
+#include "StageDock.hpp"
 #include "Batch.hpp"
 #include "Font.hpp"
 #include <cstdio>
@@ -123,6 +124,7 @@ int main(int /*argc*/, char* /*argv*/[])
     buildChartsStage(app);
     buildSoundStage(app);
     buildAssetInspectorStage(app);
+    buildDockStage(app);
     setupOverlay(app);
 
     app.setStage("home");

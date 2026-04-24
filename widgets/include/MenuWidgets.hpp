@@ -10,7 +10,7 @@ class Menu;
 struct MenuAction;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Menu — popup list of MenuActions (shown via popup overlay)
+//  Menu - popup list of MenuActions (shown via popup overlay)
 //    Used by MenuBar and ContextMenu.
 
 class Menu : public Widget
@@ -55,7 +55,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  MenuBar — horizontal bar of menu buttons (File, Edit, View, ...)
+//  MenuBar - horizontal bar of menu buttons (File, Edit, View, ...)
 //    Each button opens a Menu popup below it.
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -93,7 +93,7 @@ private:
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ContextMenu — right-click popup menu
+//  ContextMenu - right-click popup menu
 //    Attach to any widget: widget->setContextMenu(menu);
 //    Or show programmatically: ContextMenu::show(menu, x, y);
 // ═════════════════════════════════════════════════════════════════════════════
@@ -106,7 +106,7 @@ public:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  MenuItem — a single entry in a Menu
+//  MenuItem - a single entry in a Menu
 //    Can be a normal item, separator, or submenu header.
 // ═════════════════════════════════════════════════════════════════════════════
 

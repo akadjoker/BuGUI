@@ -3,7 +3,7 @@
 #include "Color.hpp"
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Theme — centralized colors/sizes for all widgets
+//  Theme - centralized colors/sizes for all widgets
 // ═════════════════════════════════════════════════════════════════════════════
 
 struct Theme

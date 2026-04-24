@@ -10,7 +10,7 @@ class BoxLayout;
 class Label;
 class TextInput;
 // ═════════════════════════════════════════════════════════════════════════════
-//  MessageBox — modal-style alert/confirm dialog
+//  MessageBox - modal-style alert/confirm dialog
 //    auto* mb = app.addFloat<MessageBox>("Confirm", "Delete this file?",
 //                                         MessageBox::YesNo, MessageBox::Question);
 //    mb->result.connect([](MessageBox::Result r) { ... });
@@ -44,7 +44,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  InputBox — simple text input dialog
+//  InputBox - simple text input dialog
 //    auto* ib = app.addFloat<InputBox>("Rename", "Enter new name:");
 //    ib->setText("old_name.txt");
 //    ib->accepted.connect([](const std::string& text) { ... });
@@ -78,11 +78,11 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Toast — Android-style notification that auto-dismisses
+//  Toast - Android-style notification that auto-dismisses
 //    Toast::show("File saved!", Toast::Success);
 //    Toast::show("Network error", Toast::Error, 5.0f);  // 5 sec
 //
-//  Managed by WidgetApp — no manual cleanup needed.
+//  Managed by WidgetApp - no manual cleanup needed.
 // ═════════════════════════════════════════════════════════════════════════════
 
 class Toast

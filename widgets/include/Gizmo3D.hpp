@@ -7,10 +7,10 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Gizmo3D — interactive 3D transform handles (Move / Rotate / Scale)
+//  Gizmo3D - interactive 3D transform handles (Move / Rotate / Scale)
 //
 //  Drawn as a 2D overlay but uses view/projection matrices to project
-//  3D axis handles to screen space. Like ImGuizmo — everything is rendered
+//  3D axis handles to screen space. Like ImGuizmo - everything is rendered
 //  with 2D primitives (lines, triangles, circles).
 //
 //  Usage:

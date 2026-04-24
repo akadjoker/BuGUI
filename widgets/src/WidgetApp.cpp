@@ -13,7 +13,7 @@
 #include <cstring>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  GL state backup — modelled after Dear ImGui's ImGui_ImplOpenGL3_*
+//  GL state backup - modelled after Dear ImGui's ImGui_ImplOpenGL3_*
 //
 //  Saves every piece of GL state that BuGUI touches during render(), then
 //  restores it at the end.  This lets an application mix its own 3D
@@ -118,7 +118,7 @@ void WidgetApp::shutdown()
     if (!inited_) return;
     inited_ = false;
 
-    // Clean up popups BEFORE root — non-owned popups (e.g. MenuBar menus)
+    // Clean up popups BEFORE root - non-owned popups (e.g. MenuBar menus)
     // live inside the root tree and will be freed by their owners.
     if (popupOwned_)
         delete popup_;
@@ -396,7 +396,7 @@ void WidgetApp::fireEvent(const std::string& event, Widget* w)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  notifyWidgetRemoved — clear dangling pointers before widget deletion
+//  notifyWidgetRemoved - clear dangling pointers before widget deletion
 // ═════════════════════════════════════════════════════════════════════════════
 
 static bool isDescendantOf(Widget* candidate, Widget* root)
@@ -447,7 +447,7 @@ void WidgetApp::removeFloat(FloatWindow* fw)
     if (!fw) return;
     notifyWidgetRemoved(fw);
     floats_.erase(std::remove(floats_.begin(), floats_.end(), fw), floats_.end());
-    // Defer delete — may be called during signal/bubble handling
+    // Defer delete - may be called during signal/bubble handling
     pendingFloatDeletes_.push_back(fw);
 }
 
@@ -539,7 +539,7 @@ void WidgetApp::fillLocal(Widget* target, MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Event bubbling — call handler on target, then walk up parents
+//  Event bubbling - call handler on target, then walk up parents
 // ═════════════════════════════════════════════════════════════════════════════
 
 template <typename Func>
@@ -555,7 +555,7 @@ void WidgetApp::bubble(Widget* target, MouseEvent& e, Func handler)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Hover chain — track enter/leave for the full widget path
+//  Hover chain - track enter/leave for the full widget path
 // ═════════════════════════════════════════════════════════════════════════════
 
 std::vector<Widget*> WidgetApp::buildChain(Widget* w)
@@ -630,7 +630,7 @@ void WidgetApp::handleMouseMotion(SDL_Event& event)
     mouseX_ = static_cast<float>(event.motion.x);
     mouseY_ = static_cast<float>(event.motion.y);
 
-    // During drag (pressed_), skip hover updates — other widgets
+    // During drag (pressed_), skip hover updates - other widgets
     // should not get enter/leave while dragging a splitter/slider/etc.
     if (pressed_)
     {
@@ -649,7 +649,7 @@ void WidgetApp::handleMouseMotion(SDL_Event& event)
         hit = popup_;
     if (!hit && popup_)
     {
-        // Popup is open but mouse is outside it — don't hover root widgets
+        // Popup is open but mouse is outside it - don't hover root widgets
         // (prevents I-beam cursor on TextEdit while context menu is open)
         if (hovered_)
             updateHover(nullptr);
@@ -669,7 +669,7 @@ void WidgetApp::handleMouseMotion(SDL_Event& event)
     if (!hit)
         hit = hitTest(root_, mouseX_, mouseY_);
 
-    // Enter / Leave — full chain tracking
+    // Enter / Leave - full chain tracking
     if (hit != hovered_)
         updateHover(hit);
 
@@ -941,7 +941,7 @@ int WidgetApp::fps() const
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Debug layout overlay — recursive wireframe drawing
+//  Debug layout overlay - recursive wireframe drawing
 // ═════════════════════════════════════════════════════════════════════════════
 
 namespace {
@@ -1270,7 +1270,7 @@ void WidgetApp::render()
             textBatch_->Render();
         }
 
-        // Paint popup in separate pass — always renders on top
+        // Paint popup in separate pass - always renders on top
         if (popup_)
         {
             popup_->paint(ctx);

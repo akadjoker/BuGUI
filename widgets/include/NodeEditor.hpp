@@ -8,7 +8,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  NodeEditor — Visual node graph (for shaders, AI, scripting)
+//  NodeEditor - Visual node graph (for shaders, AI, scripting)
 //
 //  Features:
 //  - Nodes with typed input/output pins

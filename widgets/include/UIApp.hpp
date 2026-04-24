@@ -6,7 +6,7 @@ class RenderBatch;
 class Font;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  UIApp — manages the widget tree, event dispatch, and rendering
+//  UIApp - manages the widget tree, event dispatch, and rendering
 // ═════════════════════════════════════════════════════════════════════════════
 
 class UIApp
@@ -19,7 +19,7 @@ public:
     void setRoot(Widget* root) { delete root_; root_ = root; }
     Widget* root() const { return root_; }
 
-    // Call once per frame — dispatches input events to widget tree
+    // Call once per frame - dispatches input events to widget tree
     void processInput();
 
     // Layout + paint the entire tree

@@ -5,7 +5,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PianoRoll — mini piano keyboard + note grid
+//  PianoRoll - mini piano keyboard + note grid
 //
 //  Usage:
 //    auto* pr = parent->createChild<PianoRoll>();

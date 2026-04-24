@@ -15,7 +15,7 @@ class Font;
 class Menu;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Rect — axis-aligned rectangle (float)
+//  Rect - axis-aligned rectangle (float)
 // ═════════════════════════════════════════════════════════════════════════════
 
 struct Rect
@@ -37,7 +37,7 @@ struct Rect
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PaintContext — 3 batches for 3-pass rendering + clip stack
+//  PaintContext - 3 batches for 3-pass rendering + clip stack
 //    fill:  filled shapes (backgrounds, rects, circles)
 //    line:  outlines, borders (unfilled shapes, lines)
 //    text:  font quads (text rendering via Font)
@@ -152,7 +152,7 @@ enum class CursorType
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Widget — base class for all UI elements (retained mode)
+//  Widget - base class for all UI elements (retained mode)
 // ═════════════════════════════════════════════════════════════════════════════
 
 class Widget
@@ -231,7 +231,7 @@ public:
     virtual bool popupContains(float x, float y) const
     { return absoluteRect().contains(x, y); }
 
-    // Called when popup is closed — override to reset internal state.
+    // Called when popup is closed - override to reset internal state.
     virtual void resetPopupState() {}
 
     // Whether this widget is affected by parent's scroll offset
@@ -378,7 +378,7 @@ protected:
     std::string tooltip_;
     float tooltipDelay_ = 0.6f;  // seconds before tooltip appears
     CursorType cursor_ = CursorType::Arrow;
-    Menu* contextMenu_ = nullptr;  // not owned — user manages lifetime
+    Menu* contextMenu_ = nullptr;  // not owned - user manages lifetime
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

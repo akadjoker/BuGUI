@@ -68,7 +68,7 @@ enum WindowFlags : unsigned int
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  WidgetApp — singleton that manages window, rendering, events, widget tree
+//  WidgetApp - singleton that manages window, rendering, events, widget tree
 //
 //  Usage:
 //      auto& app = WidgetApp::instance();
@@ -108,11 +108,11 @@ public:
     void quit() { running_ = false; }
 
     // ── Lifecycle callbacks ───────────────────────────────────────────────
-    // Called once after init, GL context is alive — create textures, shaders, etc.
+    // Called once after init, GL context is alive - create textures, shaders, etc.
     void setOnCreate(std::function<void()> cb)  { onCreate_  = std::move(cb); }
-    // Called before shutdown, GL context still alive — free user GL resources.
+    // Called before shutdown, GL context still alive - free user GL resources.
     void setOnDestroy(std::function<void()> cb) { onDestroy_ = std::move(cb); }
-    // Called every frame before render — update logic, animations, etc.
+    // Called every frame before render - update logic, animations, etc.
     void setOnIdle(std::function<void(float dt)> cb) { onIdle_ = std::move(cb); }
 
     // ── Input event callbacks ──────────────────────────────────────────────
@@ -268,7 +268,7 @@ private:
     WidgetApp(const WidgetApp&) = delete;
     WidgetApp& operator=(const WidgetApp&) = delete;
 
-    // Event handling — called per SDL event
+    // Event handling - called per SDL event
     void handleEvent(union SDL_Event& event);
     void handleMouseButton(union SDL_Event& event, bool down);
     void handleMouseMotion(union SDL_Event& event);
@@ -276,7 +276,7 @@ private:
     void handleKey(union SDL_Event& event, bool down);
     void handleTextInput(union SDL_Event& event);
 
-    // Hit test — find deepest widget under (x,y)
+    // Hit test - find deepest widget under (x,y)
     Widget* hitTest(Widget* w, float x, float y);
 
     // Fill localX/localY on a MouseEvent for a target widget

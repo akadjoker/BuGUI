@@ -22,7 +22,7 @@ void ConsoleWidget::log(LogLevel level, const std::string& message, float timest
     entries_.push_back({level, message, timestamp});
     if (autoScroll_) {
         // Compute total visible height to scroll to bottom (done in paint)
-        scrollY_ = 1e9f;   // sentinel — paint will clamp
+        scrollY_ = 1e9f;   // sentinel - paint will clamp
     }
     markDirty();
 }
@@ -88,7 +88,7 @@ void ConsoleWidget::onMousePress(MouseEvent& e)
 {
     Rect b = absoluteRect();
 
-    // Toolbar buttons — toggle filters
+    // Toolbar buttons - toggle filters
     if (e.y < b.y + kToolbarH && e.button == 0) {
         float bx = b.x + 4;
         float bw = 40;
@@ -112,7 +112,7 @@ void ConsoleWidget::onMousePress(MouseEvent& e)
         return;
     }
 
-    // Input area — focus
+    // Input area - focus
     float inputY = b.y + b.h - kInputH;
     if (e.y >= inputY) {
         inputFocused_ = true;

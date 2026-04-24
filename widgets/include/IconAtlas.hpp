@@ -51,7 +51,7 @@ enum class IconId
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  IconAtlas — renders all icons into a single RGBA Pixmap at startup,
+//  IconAtlas - renders all icons into a single RGBA Pixmap at startup,
 //  uploads as one GL texture.  Widgets draw icons as textured quads.
 //
 //  Usage:

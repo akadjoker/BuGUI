@@ -43,6 +43,7 @@ static const DemoEntry kDemos[] = {
     {"Charts",         "charts",        "Gradient, Plot, Histogram", Color(200, 120, 220, 255)},
     {"Sound",          "sound",         "VUMeter, Waveform, Spectrum, ADSR, PianoRoll", Color(80, 180, 200, 255)},
     {"Assets",         "assetinspector","AssetBrowser + InspectorPanel",              Color(180, 200,  80, 255)},
+    {"Dock",           "dock",          "DockPanel — drag tabs to split/merge",       Color( 80, 200, 160, 255)},
 };
 
 // Draw a card button for a demo entry

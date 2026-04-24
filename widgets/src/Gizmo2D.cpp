@@ -12,7 +12,7 @@ static constexpr float kPi = 3.14159265f;
 
 Gizmo2D::Gizmo2D()
 {
-    // Gizmo doesn't draw a background — it's a transparent overlay
+    // Gizmo doesn't draw a background - it's a transparent overlay
     setSize(0, 0);
 }
 
@@ -262,7 +262,7 @@ void Gizmo2D::paintTranslate(PaintContext& ctx, float cx, float cy)
     bool hY  = (hoverAxis_ == GizmoAxis::Y  || activeAxis_ == GizmoAxis::Y);
     bool hXY = (hoverAxis_ == GizmoAxis::XY || activeAxis_ == GizmoAxis::XY);
 
-    // X axis — thick line + filled arrow
+    // X axis - thick line + filled arrow
     Color cX = hX ? kHover : kAxisX;
     thickLine(ctx, xsX, xsY, xeX, xeY, 3.0f, cX);
     float ahLen = 14.0f, ahW = 6.0f;
@@ -273,7 +273,7 @@ void Gizmo2D::paintTranslate(PaintContext& ctx, float cx, float cy)
         xeX - xyD * ahW,  xeY + xxD * ahW,
         true);
 
-    // Y axis — thick line + filled arrow
+    // Y axis - thick line + filled arrow
     Color cY = hY ? kHover : kAxisY;
     thickLine(ctx, ysX, ysY, yeX, yeY, 3.0f, cY);
     ctx.fill.SetColor(cY.r, cY.g, cY.b, cY.a);
@@ -299,7 +299,7 @@ void Gizmo2D::paintRotate(PaintContext& ctx, float cx, float cy)
     bool hover = (hoverAxis_ == GizmoAxis::XY || activeAxis_ == GizmoAxis::XY);
     Color cR = hover ? kHover : Color(100, 160, 240, 255);
 
-    // Ring — draw as thick line segments
+    // Ring - draw as thick line segments
     for (int i = 0; i < segments; ++i) {
         float a0 = (static_cast<float>(i) / segments) * 2.0f * kPi;
         float a1 = (static_cast<float>(i + 1) / segments) * 2.0f * kPi;
@@ -308,7 +308,7 @@ void Gizmo2D::paintRotate(PaintContext& ctx, float cx, float cy)
         thickLine(ctx, x0, y0, x1, y1, 2.5f, cR);
     }
 
-    // Filled pie wedge during drag — rotation feedback
+    // Filled pie wedge during drag - rotation feedback
     if (dragging_) {
         float startRad = dragStartAngle_ * kPi / 180.0f;
         float curRad   = rotation_ * kPi / 180.0f;
@@ -360,13 +360,13 @@ void Gizmo2D::paintScale(PaintContext& ctx, float cx, float cy)
     bool hY  = (hoverAxis_ == GizmoAxis::Y  || activeAxis_ == GizmoAxis::Y);
     bool hXY = (hoverAxis_ == GizmoAxis::XY || activeAxis_ == GizmoAxis::XY);
 
-    // X axis — thick line + circle tip (like ImGuizmo)
+    // X axis - thick line + circle tip (like ImGuizmo)
     Color cX = hX ? kHover : kAxisX;
     thickLine(ctx, xsX, xsY, xeX, xeY, 3.0f, cX);
     ctx.fill.SetColor(cX.r, cX.g, cX.b, cX.a);
     ctx.fill.Circle(static_cast<int>(xeX), static_cast<int>(xeY), 5, true);
 
-    // Y axis — thick line + circle tip
+    // Y axis - thick line + circle tip
     Color cY = hY ? kHover : kAxisY;
     thickLine(ctx, ysX, ysY, yeX, yeY, 3.0f, cY);
     ctx.fill.SetColor(cY.r, cY.g, cY.b, cY.a);

@@ -419,10 +419,5 @@ private:
     Color textColor_ = Color(220, 220, 220, 255);
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  ListBox — scrollable list of selectable text items
-//    auto* lb = parent->createChild<ListBox>();
-//    lb->addItem("Alpha"); lb->addItem("Beta");
-//    lb->selectionChanged.connect([](int idx) { ... });
-// ═════════════════════════════════════════════════════════════════════════════
+
 

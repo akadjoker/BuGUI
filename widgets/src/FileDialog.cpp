@@ -862,7 +862,7 @@ void FileDialog::paintPreview(PaintContext& ctx, const Rect& area)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Mouse — helper to compute index from position per view mode
+//  Mouse - helper to compute index from position per view mode
 // ═════════════════════════════════════════════════════════════════════════════
 
 static int hitIndexForView(FileDialog::ViewMode vm, const Rect& area,

@@ -7,7 +7,7 @@
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Dialog — modal dialog shown via the popup layer
+//  Dialog - modal dialog shown via the popup layer
 //    Draws a scrim + centered card with title, content area, and button row.
 //    Shown via WidgetApp::instance().showPopup(dialog).
 //
@@ -89,7 +89,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Convenience: AlertDialog — message + OK
+//  Convenience: AlertDialog - message + OK
 // ═════════════════════════════════════════════════════════════════════════════
 
 class AlertDialog : public Dialog
@@ -101,7 +101,7 @@ public:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Convenience: ConfirmDialog — message + Cancel/OK
+//  Convenience: ConfirmDialog - message + Cancel/OK
 // ═════════════════════════════════════════════════════════════════════════════
 
 class ConfirmDialog : public Dialog

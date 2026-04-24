@@ -84,7 +84,7 @@ Color GradientEditor::sample(float t) const
     if (stops_.size() == 1) return stops_[0].color;
     t = std::clamp(t, 0.0f, 1.0f);
 
-    // Clamp to stop range boundaries — prevents negative lerp factor
+    // Clamp to stop range boundaries - prevents negative lerp factor
     if (t <= stops_.front().pos) return stops_.front().color;
     if (t >= stops_.back().pos)  return stops_.back().color;
 
@@ -182,7 +182,7 @@ void GradientEditor::paint(PaintContext& ctx)
         }
     }
 
-    // ── Gradient bar — one segment per stop pair, overlap by 1px ─────────
+    // ── Gradient bar - one segment per stop pair, overlap by 1px ─────────
     if (stops_.size() >= 2) {
         for (int i = 0; i < (int)stops_.size() - 1; ++i) {
             const Color& ca = stops_[i].color;

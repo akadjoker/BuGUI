@@ -7,7 +7,7 @@
 #include <algorithm>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  GradientEditor — horizontal color gradient with draggable stops
+//  GradientEditor - horizontal color gradient with draggable stops
 //
 //  Usage:
 //    auto* g = parent->createChild<GradientEditor>();

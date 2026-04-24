@@ -56,7 +56,7 @@ void ViewportWidget::paint(PaintContext& ctx)
     GLuint displayTex = 0;
 
     if (renderCb_) {
-        // Mode 1: Managed FBO — ensure it exists and is the right size
+        // Mode 1: Managed FBO - ensure it exists and is the right size
         if (!rt_.valid() || rt_.width() != w || rt_.height() != h) {
             rt_.create(w, h, hasDepth_, hasStencil_);
         }
@@ -100,7 +100,7 @@ void ViewportWidget::paint(PaintContext& ctx)
         float x2 = abs.x + abs.w, y2 = abs.y + abs.h;
 
         if (flipY_) {
-            // FBO has Y-flipped content — flip UVs vertically
+            // FBO has Y-flipped content - flip UVs vertically
             ctx.fill.DrawQuad(x1, y1, x2, y2,
                               0.0f, 1.0f, 1.0f, 0.0f);
         } else {

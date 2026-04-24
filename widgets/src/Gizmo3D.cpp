@@ -6,7 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Gizmo3D — ImGuizmo-quality 3D transform handles
+//  Gizmo3D - ImGuizmo-quality 3D transform handles
 // ═════════════════════════════════════════════════════════════════════════════
 
 static constexpr float kPi = 3.14159265f;
@@ -107,7 +107,7 @@ float Gizmo3D::computeScale() const
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Hit testing — center FIRST (small exclusive zone), then axes
+//  Hit testing - center FIRST (small exclusive zone), then axes
 // ─────────────────────────────────────────────────────────────────────────────
 
 GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
@@ -119,7 +119,7 @@ GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
     glm::vec3 axes[3] = { {1,0,0}, {0,1,0}, {0,0,1} };
     GizmoAxis3D axisIds[3] = { GizmoAxis3D::X, GizmoAxis3D::Y, GizmoAxis3D::Z };
 
-    // 0) Center always wins within 12px — tested FIRST so axes don't steal it
+    // 0) Center always wins within 12px - tested FIRST so axes don't steal it
     float centerDist = glm::length(glm::vec2(mx, my) - center);
     if (centerDist < 12.0f) return GizmoAxis3D::XYZ;
 
@@ -151,7 +151,7 @@ GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
 
     if (bestAxis != GizmoAxis3D::None) return bestAxis;
 
-    // 2) Plane quadrants (for translate/scale) — XY, XZ, YZ
+    // 2) Plane quadrants (for translate/scale) - XY, XZ, YZ
     if (mode_ != GizmoMode3D::Rotate) {
         GizmoAxis3D planeIds[3] = { GizmoAxis3D::XY, GizmoAxis3D::XZ, GizmoAxis3D::YZ };
         int planeAxes[3][2] = { {0,1}, {0,2}, {1,2} };
@@ -183,7 +183,7 @@ GizmoAxis3D Gizmo3D::hitTest(float mx, float my) const
         }
     }
 
-    // 3) Rotation rings — per-axis
+    // 3) Rotation rings - per-axis
     if (mode_ == GizmoMode3D::Rotate) {
         for (int i = 0; i < 3; ++i) {
             glm::vec3 normal = axes[i];

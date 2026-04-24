@@ -6,7 +6,7 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FloatWindow — draggable floating panel with title bar, close & minimize
+//  FloatWindow - draggable floating panel with title bar, close & minimize
 //    auto* fw = new FloatWindow("Inspector");
 //    fw->setContent<BoxLayout>(BoxLayout::Vertical);
 //    fw->setFloatPos(100, 100);
@@ -60,7 +60,7 @@ public:
     Signal<> closed;     // emitted when close button clicked
     Signal<bool> minimizedChanged;
 
-    // Overrides — called by WidgetApp float layer
+    // Overrides - called by WidgetApp float layer
     void layout() override;
     void paint(PaintContext& ctx) override;
     void onMousePress(MouseEvent& e) override;
@@ -101,7 +101,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SidePanel — slide-in drawer (hamburger menu pattern)
+//  SidePanel - slide-in drawer (hamburger menu pattern)
 //    auto* sp = parent->createChild<SidePanel>();
 //    auto* content = sp->setContent<BoxLayout>(BoxLayout::Vertical);
 //    sp->toggle();   // open/close with animation
@@ -165,7 +165,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PageView — shows one child ("page") at a time, with animated transitions
+//  PageView - shows one child ("page") at a time, with animated transitions
 //    Like Qt's QStackedWidget or Android's ViewPager.
 //
 //    auto* pv = parent->createChild<PageView>();

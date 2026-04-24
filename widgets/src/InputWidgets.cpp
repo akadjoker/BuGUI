@@ -324,7 +324,7 @@ void ProgressBar::paint(PaintContext& ctx)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ListBox — scrollable list of selectable items
+//  ListBox - scrollable list of selectable items
 // ═════════════════════════════════════════════════════════════════════════════
 
 static const std::string kEmptyItem;
@@ -633,7 +633,7 @@ void ListBox::onMouseMove(MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ComboBox — dropdown selector
+//  ComboBox - dropdown selector
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ── Internal popup widget ────────────────────────────────────────────────
@@ -912,7 +912,7 @@ void ComboBox::closeDropdown()
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ListWidget — scrollable list with widget rows
+//  ListWidget - scrollable list with widget rows
 // ═════════════════════════════════════════════════════════════════════════════
 
 ListWidget::ListWidget()
@@ -1180,7 +1180,7 @@ void ListWidget::onMouseMove(MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TextInput — single-line text field
+//  TextInput - single-line text field
 // ═════════════════════════════════════════════════════════════════════════════
 
 TextInput::TextInput(const std::string& text, Mode mode)

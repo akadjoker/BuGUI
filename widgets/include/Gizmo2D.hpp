@@ -7,7 +7,7 @@
 #include <cmath>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Gizmo2D — interactive 2D transform handles (Move / Rotate / Scale)
+//  Gizmo2D - interactive 2D transform handles (Move / Rotate / Scale)
 //
 //  Drawn as an overlay inside a ViewportWidget or Canvas.
 //  All coordinates are in the parent's local space (pixels).
@@ -36,11 +36,11 @@ public:
     float positionX() const { return posX_; }
     float positionY() const { return posY_; }
 
-    /// Current rotation (degrees) — used to orient scale/translate axes.
+    /// Current rotation (degrees) - used to orient scale/translate axes.
     void  setRotation(float deg) { rotation_ = deg; }
     float rotation() const       { return rotation_; }
 
-    /// Current scale — used for visual feedback only.
+    /// Current scale - used for visual feedback only.
     void  setScale(float sx, float sy) { scaleX_ = sx; scaleY_ = sy; }
     float scaleX() const { return scaleX_; }
     float scaleY() const { return scaleY_; }

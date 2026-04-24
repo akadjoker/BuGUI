@@ -7,7 +7,7 @@
 #include <string>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Timeline — Multi-track timeline with keyframes, clips, scrubbing, zoom
+//  Timeline - Multi-track timeline with keyframes, clips, scrubbing, zoom
 //
 //  Features:
 //  - Multiple named tracks with independent colors

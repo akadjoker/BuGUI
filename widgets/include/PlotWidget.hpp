@@ -7,7 +7,7 @@
 #include <string>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PlotWidget — Line / Bar / Scatter charts with pan + zoom
+//  PlotWidget - Line / Bar / Scatter charts with pan + zoom
 //
 //  Usage:
 //    auto* plot = parent->createChild<PlotWidget>();

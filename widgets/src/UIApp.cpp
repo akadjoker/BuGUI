@@ -7,7 +7,7 @@
 #include "Opengl.hpp"
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Hit testing — find deepest widget under mouse
+//  Hit testing - find deepest widget under mouse
 // ═════════════════════════════════════════════════════════════════════════════
 
 Widget* UIApp::hitTest(Widget* w, float x, float y)
@@ -39,7 +39,7 @@ void UIApp::dispatchMouse(Widget* target, MouseEvent& e)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Input processing — called once per frame
+//  Input processing - called once per frame
 // ═════════════════════════════════════════════════════════════════════════════
 
 void UIApp::processInput()

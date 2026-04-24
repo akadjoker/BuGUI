@@ -5,6 +5,13 @@
 #include <string>
 #include <functional>
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  ListBox - scrollable list of selectable text items
+//    auto* lb = parent->createChild<ListBox>();
+//    lb->addItem("Alpha"); lb->addItem("Beta");
+//    lb->selectionChanged.connect([](int idx) { ... });
+// ═════════════════════════════════════════════════════════════════════════════
+
 class ListBox : public Widget
 {
 public:
@@ -53,7 +60,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ComboBox — dropdown selector (like HTML <select>)
+//  ComboBox - dropdown selector (like HTML <select>)
 //    auto* cb = parent->createChild<ComboBox>();
 //    cb->addItem("Alpha"); cb->addItem("Beta");
 //    cb->selectionChanged.connect([](int idx) { ... });
@@ -101,7 +108,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ListWidget — scrollable list where each row is an arbitrary widget
+//  ListWidget - scrollable list where each row is an arbitrary widget
 //    auto* lw = parent->createChild<ListWidget>();
 //    lw->addRow<Label>("Row 1");
 //    auto* row = lw->addRow<BoxLayout>(LayoutDir::Horizontal);
@@ -164,7 +171,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ScrollBar — draggable scroll indicator with proportional thumb
+//  ScrollBar - draggable scroll indicator with proportional thumb
 //    - Thumb size = (visibleSize / contentSize) * trackLength
 //    - Click on track = page scroll
 //    - Drag thumb = continuous scroll
@@ -214,7 +221,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ScrollView — clipping container with automatic ScrollBars
+//  ScrollView - clipping container with automatic ScrollBars
 //    Wrap a single content widget. Scrolls it if larger than the viewport.
 // ═════════════════════════════════════════════════════════════════════════════
 

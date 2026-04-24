@@ -15,11 +15,11 @@ ADSRWidget::ADSRWidget() {}
 // The envelope is displayed over the area with padding.
 // Time axis: total = a+d+sustainW+r, normalised to fit the area.
 // Points on screen:
-//   P0 = (left, bottom)           — start (0, 0)
-//   P1 = (left + a_norm, top)     — attack peak  (a, 1)
-//   P2 = (left + a+d_norm, s*h)   — decay knee   (a+d, s)
-//   P3 = (left + a+d+sw_norm, s*h)— sustain end  (a+d+sustainW, s)
-//   P4 = (right, bottom)          — release end  (a+d+sW+r, 0)
+//   P0 = (left, bottom)           - start (0, 0)
+//   P1 = (left + a_norm, top)     - attack peak  (a, 1)
+//   P2 = (left + a+d_norm, s*h)   - decay knee   (a+d, s)
+//   P3 = (left + a+d+sw_norm, s*h)- sustain end  (a+d+sustainW, s)
+//   P4 = (right, bottom)          - release end  (a+d+sW+r, 0)
 
 ADSRWidget::Points ADSRWidget::computePoints(const Rect& area) const
 {
@@ -84,7 +84,7 @@ void ADSRWidget::paint(PaintContext& ctx)
 
     auto p = computePoints(b);
 
-    // Fill under envelope — trapezoid per segment (2 triangles each)
+    // Fill under envelope - trapezoid per segment (2 triangles each)
     float bot = b.y + b.h - 8.0f;
     ctx.fill.SetColor(fillColor_.r, fillColor_.g, fillColor_.b, fillColor_.a);
     auto fillSeg = [&](float ax, float ay, float bx, float by) {
@@ -97,7 +97,7 @@ void ADSRWidget::paint(PaintContext& ctx)
     fillSeg(p.x2, p.y2, p.x3, p.y3);  // sustain
     fillSeg(p.x3, p.y3, p.x4, p.y4);  // release
 
-    // Envelope line — drawLine (line batch, no artefacts)
+    // Envelope line - drawLine (line batch, no artefacts)
     ctx.line.SetColor(lineColor_.r, lineColor_.g, lineColor_.b, lineColor_.a);
     ctx.drawLine(p.x0, p.y0, p.x1, p.y1);  // attack
     ctx.drawLine(p.x1, p.y1, p.x2, p.y2);  // decay
@@ -195,12 +195,12 @@ void ADSRWidget::onMouseMove(MouseEvent& e)
     float x3 = x2  + sustainW;
 
     if (dragging_ == 0) {
-        // Attack — move x1 horizontally, clamped between ax0 and x2
+        // Attack - move x1 horizontally, clamped between ax0 and x2
         float nx = std::clamp(e.x, ax0 + 2, x2 - 2);
         float newA = (nx - ax0) / scale;
         a_ = std::max(0.001f, newA);
     } else if (dragging_ == 1) {
-        // Decay — move x2 horizontally (between x1 and x3)
+        // Decay - move x2 horizontally (between x1 and x3)
         float nx = std::clamp(e.x, x1 + 2, x3 - 2);
         float newD = (nx - x1) / scale;
         d_ = std::max(0.001f, newD);
@@ -209,7 +209,7 @@ void ADSRWidget::onMouseMove(MouseEvent& e)
         s_ = 1.0f - (ny - ay) / ah;
         s_ = std::clamp(s_, 0.0f, 1.0f);
     } else if (dragging_ == 2) {
-        // Release end — x4 = x3 + r_*scale; adjust r_ via x
+        // Release end - x4 = x3 + r_*scale; adjust r_ via x
         float nx = std::clamp(e.x, x3 + 2, ax0 + aw - 2);
         float newR = (nx - x3) / scale;
         r_ = std::max(0.001f, newR);

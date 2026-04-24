@@ -222,7 +222,7 @@ float CurveEditor::evalSegment(const CurveKey& k0, const CurveKey& k1, float t) 
     float u = (t - k0.time) / dt;
     u = std::max(0.0f, std::min(1.0f, u));
 
-    // Control points (value only — time is implicit via u)
+    // Control points (value only - time is implicit via u)
     float p0 = k0.value;
     float p1 = k0.value + k0.tanOutY;
     float p2 = k1.value + k1.tanInY;
@@ -597,7 +597,7 @@ void CurveEditor::paintKeys(PaintContext& ctx, const Rect& b)
                 ctx.fillCircle(tox, toy, 3);
             }
 
-            // Key diamond — outline first (larger), fill on top
+            // Key diamond - outline first (larger), fill on top
             float ds = k.selected ? 6.0f : 5.0f;
             float ods = ds + 1.0f;
             Color oc(255, 255, 255, k.selected ? 255 : 80);

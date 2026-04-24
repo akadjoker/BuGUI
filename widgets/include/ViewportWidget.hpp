@@ -6,22 +6,22 @@
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ViewportWidget — renders a scene into an FBO and displays it as a quad
+//  ViewportWidget - renders a scene into an FBO and displays it as a quad
 //
 //  Two modes:
-//    Mode 1 — Managed (BuGUI creates/manages the FBO):
+//    Mode 1 - Managed (BuGUI creates/manages the FBO):
 //      auto* vp = parent->createChild<ViewportWidget>();
 //      vp->setRenderCallback([](int w, int h) {
 //          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 //          drawMyScene(w, h);
 //      });
 //
-//    Mode 2 — External texture (user manages their own FBO):
+//    Mode 2 - External texture (user manages their own FBO):
 //      auto* vp = parent->createChild<ViewportWidget>();
 //      vp->setExternalTexture(myEngine.getTextureId(), 800, 600);
 //
 //  Signals:
-//    viewportResized(int w, int h) — emitted when the viewport size changes
+//    viewportResized(int w, int h) - emitted when the viewport size changes
 // ═════════════════════════════════════════════════════════════════════════════
 
 class ViewportWidget : public Widget

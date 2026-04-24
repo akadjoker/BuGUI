@@ -15,7 +15,7 @@ class Button;
 class ImageButton;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FileDialog — cross-platform file/folder picker as a FloatWindow popup
+//  FileDialog - cross-platform file/folder picker as a FloatWindow popup
 //
 //    auto* fd = app.addFloat<FileDialog>("Open File");
 //    fd->setMode(FileDialog::Mode::Open);

@@ -10,7 +10,7 @@
 #include <cmath>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  TextEdit — multi-line text editor
+//  TextEdit - multi-line text editor
 // ═════════════════════════════════════════════════════════════════════════════
 
 const std::string TextEdit::emptyLine_;

@@ -11,7 +11,7 @@ namespace {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Menu — popup dropdown list
+//  Menu - popup dropdown list
 // ═════════════════════════════════════════════════════════════════════════════
 
 Menu::Menu()
@@ -390,7 +390,7 @@ void Menu::onMousePress(MouseEvent& e)
         {
             if (a.submenu)
             {
-                // Click on submenu item — just open/keep the submenu
+                // Click on submenu item - just open/keep the submenu
                 openSubmenu(i);
                 e.consumed = true;
                 return;
@@ -493,7 +493,7 @@ bool Menu::popupContains(float x, float y) const
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  MenuBar — horizontal bar of menu titles
+//  MenuBar - horizontal bar of menu titles
 // ═════════════════════════════════════════════════════════════════════════════
 
 MenuBar::MenuBar()
@@ -639,7 +639,7 @@ void MenuBar::openMenu(int index)
 
     activeMenu_ = index;
     armed_ = true;
-    app.showPopup(e.menu, this, false);  // not owned — MenuBar manages lifetime
+    app.showPopup(e.menu, this, false);  // not owned - MenuBar manages lifetime
 }
 
 void MenuBar::closeMenu()
@@ -717,7 +717,7 @@ void MenuBar::onMouseMove(MouseEvent& e)
 
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ContextMenu — show a Menu at an arbitrary position
+//  ContextMenu - show a Menu at an arbitrary position
 // ═════════════════════════════════════════════════════════════════════════════
 
 void ContextMenu::show(Menu* menu, float x, float y, Widget* owner)
@@ -741,5 +741,5 @@ void ContextMenu::show(Menu* menu, float x, float y, Widget* owner)
     menu->setPosition(x, y);
     menu->layout();
 
-    app.showPopup(menu, nullptr, false);  // no owner — left-click anywhere outside closes
+    app.showPopup(menu, nullptr, false);  // no owner - left-click anywhere outside closes
 }
