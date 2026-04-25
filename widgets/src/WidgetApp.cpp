@@ -897,17 +897,32 @@ void WidgetApp::handleEvent(SDL_Event& event)
         handleTextInput(event);
         break;
     case SDL_WINDOWEVENT:
-        if (event.window.event == SDL_WINDOWEVENT_RESIZED ||
-            event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+        if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
             event.window.event == SDL_WINDOWEVENT_MAXIMIZED ||
             event.window.event == SDL_WINDOWEVENT_RESTORED)
         {
             SDL_Window* win = Device::Instance().GetWindow();
-            int nw, nh;
-            SDL_GetWindowSize(win, &nw, &nh);
+            if (!win) break;
+
+            // Prefer event payload to avoid querying transient/intermediate sizes.
+            int nw = event.window.data1;
+            int nh = event.window.data2;
+            if (nw <= 0 || nh <= 0)
+                SDL_GetWindowSize(win, &nw, &nh);
+
+            int newDrawW = drawW_;
+            int newDrawH = drawH_;
+            SDL_GL_GetDrawableSize(win, &newDrawW, &newDrawH);
+
+            // Ignore duplicate resize events that carry no effective change.
+            if (nw == width_ && nh == height_ &&
+                newDrawW == drawW_ && newDrawH == drawH_)
+                break;
+
             width_  = nw;
             height_ = nh;
-            SDL_GL_GetDrawableSize(win, &drawW_, &drawH_);
+            drawW_  = newDrawW;
+            drawH_  = newDrawH;
             Device::Instance().SetSize(width_, height_);
             needsLayout_ = true;
         }
@@ -1118,11 +1133,11 @@ void WidgetApp::render()
     float w = static_cast<float>(width_);
     float h = static_cast<float>(height_);
 
+    glViewport(0, 0, drawW_, drawH_);
+
     rs.setClearColor(bgColor_.r / 255.0f, bgColor_.g / 255.0f,
                      bgColor_.b / 255.0f, bgColor_.a / 255.0f);
     rs.clear(true, true);
-
-    glViewport(0, 0, drawW_, drawH_);
 
     rs.setDepthTest(false);
     rs.setBlend(true);

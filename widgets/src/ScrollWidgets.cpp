@@ -195,6 +195,11 @@ void ScrollView::setContentWidget(Widget* w)
 {
     if (content_ && content_->parent() == this)
         removeChild(content_);
+    if (w && w->parent() && w->parent() != this)
+    {
+        content_ = nullptr;
+        return;
+    }
     content_ = w;
     if (w)
     {

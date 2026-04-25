@@ -92,6 +92,7 @@ bool Device::Create(int width, int height, const char* title, bool vsync, int mo
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "[Device] Window creation failed: %s", SDL_GetError());
+        SDL_Quit();
         return false;
     }
 
@@ -100,6 +101,9 @@ bool Device::Create(int width, int height, const char* title, bool vsync, int mo
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "[Device] GL context creation failed: %s", SDL_GetError());
+        SDL_DestroyWindow(m_window);
+        m_window = nullptr;
+        SDL_Quit();
         return false;
     }
 
@@ -111,6 +115,11 @@ bool Device::Create(int width, int height, const char* title, bool vsync, int mo
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "[Device] Failed to load GL with glad");
+        SDL_GL_DeleteContext(m_context);
+        SDL_DestroyWindow(m_window);
+        m_context = nullptr;
+        m_window = nullptr;
+        SDL_Quit();
         return false;
     }
 #endif

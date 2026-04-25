@@ -172,6 +172,12 @@ public:
     template <typename T>
     T* addChild(T* child)
     {
+        if (!child) return nullptr;
+        if (child->parent_ == this) return child;
+        if (child->parent_ != nullptr)
+        {
+            return child;
+        }
         child->parent_ = this;
         children_.push_back(child);
         markDirty();

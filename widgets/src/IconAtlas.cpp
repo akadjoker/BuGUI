@@ -30,7 +30,7 @@ void IconAtlas::init(int cellSize)
     drawAllIcons(pm);
 
     // Save atlas to file for visual inspection / editing
-    pm.Save("icon_atlas.png");
+   // pm.Save("icon_atlas.png");
 
     tex_ = CreateTextureFromPixmap("icon_atlas", pm);
 }

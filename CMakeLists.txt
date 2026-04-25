@@ -20,3 +20,9 @@ add_subdirectory(vendor/poly2tri)
 add_subdirectory(core)
 add_subdirectory(widgets)
 add_subdirectory(app)
+
+
+option(BUGUI_BUILD_TUTORIALS "Build tutorial executables" OFF)
+if(BUGUI_BUILD_TUTORIALS)
+    add_subdirectory(tutorials)
+endif()
