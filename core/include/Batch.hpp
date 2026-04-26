@@ -176,6 +176,8 @@ public:
     // Stats
     const RenderStats& stats() const { return stats_; }
     void resetStats() { stats_.reset(); }
+    int pendingVertexCount() const { return static_cast<int>(vertices.size()); }
+    int pendingDrawCallCount() const { return static_cast<int>(draws.size()); }
 
     void SetMode(int mode);
 
@@ -190,6 +192,23 @@ public:
 
     // Convenience: set a 2D ortho matrix (0,0 top-left, w,h bottom-right)
     void SetOrtho2D(float width, float height);
+
+    // Soft clip stack (axis-aligned, CPU-side clipping)
+    void PushClipRect(float x, float y, float w, float h);
+    void PopClipRect();
+    void ClearClipRects();
+    bool HasClipRect() const;
+    void GetClipRect(float out[4]) const;
+    bool IsRectOutsideClip(float x, float y, float w, float h) const;
+    bool IntersectClipRect(float x, float y, float w, float h, float out[4]) const;
+
+    // Clip-aware primitives
+    void Line2DClipped(float x0, float y0, float x1, float y1);
+    void RectangleClipped(float x, float y, float w, float h, bool fill);
+    void RoundedRectangleClipped(float x, float y, float w, float h, float roundness,
+                                 int segments = 8, bool fill = true);
+    void CircleClipped(float cx, float cy, float radius, bool fill);
+    void TriangleClipped(float x1, float y1, float x2, float y2, float x3, float y3);
 
 private:
     // Interleaved vertex layout (pos xyz + uv + color rgba)
@@ -238,4 +257,11 @@ private:
     GLuint eboId;
 
     RenderStats stats_;
+
+    struct ClipRectState
+    {
+        float x, y, w, h;
+    };
+    ClipRectState currentClipRect() const;
+    std::vector<ClipRectState> clipStack_;
 };

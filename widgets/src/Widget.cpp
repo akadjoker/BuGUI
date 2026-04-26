@@ -6,397 +6,103 @@
 #include <cmath>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Sutherland-Hodgman polygon clipper (anonymous namespace)
-// ═════════════════════════════════════════════════════════════════════════════
-
-namespace {
-
-static constexpr float kPI = 3.14159265358979323846f;
-
-struct Vec2 { float x, y; };
-
-// Clip polygon against one axis-aligned edge.
-// edge: 0=left(>=val), 1=right(<=val), 2=top(>=val), 3=bottom(<=val)
-static int clipEdge(const Vec2* in, int inCount, Vec2* out, int edge, float val)
-{
-    if (inCount == 0) return 0;
-    int outCount = 0;
-
-    auto inside = [&](const Vec2& v) -> bool {
-        switch (edge) {
-            case 0: return v.x >= val;
-            case 1: return v.x <= val;
-            case 2: return v.y >= val;
-            case 3: return v.y <= val;
-        }
-        return true;
-    };
-
-    auto intersect = [&](const Vec2& a, const Vec2& b) -> Vec2 {
-        float t;
-        if (edge < 2) {
-            float dx = b.x - a.x;
-            t = (dx != 0.0f) ? (val - a.x) / dx : 0.0f;
-        } else {
-            float dy = b.y - a.y;
-            t = (dy != 0.0f) ? (val - a.y) / dy : 0.0f;
-        }
-        return { a.x + t * (b.x - a.x), a.y + t * (b.y - a.y) };
-    };
-
-    const Vec2* prev = &in[inCount - 1];
-    for (int i = 0; i < inCount; ++i) {
-        const Vec2* cur = &in[i];
-        bool curIn  = inside(*cur);
-        bool prevIn = inside(*prev);
-        if (curIn) {
-            if (!prevIn) out[outCount++] = intersect(*prev, *cur);
-            out[outCount++] = *cur;
-        } else if (prevIn) {
-            out[outCount++] = intersect(*prev, *cur);
-        }
-        prev = cur;
-    }
-    return outCount;
-}
-
-// Clip a convex polygon against an axis-aligned rect.
-// Returns clipped vertex count (0 = fully outside). Max output = inCount + 4.
-static int clipPoly(const Vec2* verts, int count,
-                    float cx, float cy, float cw, float ch,
-                    Vec2* result)
-{
-    // Stack buffers: a triangle clipped against 4 edges produces max 7 verts.
-    // For larger polygons (rounded rect fan slice), max = count + 4.
-    Vec2 buf1[12], buf2[12];
-    int n;
-
-    for (int i = 0; i < count && i < 12; ++i) buf1[i] = verts[i];
-    n = count;
-
-    n = clipEdge(buf1, n, buf2, 0, cx);           // left
-    n = clipEdge(buf2, n, buf1, 1, cx + cw);      // right
-    n = clipEdge(buf1, n, buf2, 2, cy);            // top
-    n = clipEdge(buf2, n, result, 3, cy + ch);     // bottom
-
-    return n;
-}
-
-// Check if bounding box is fully contained inside clip rect (fast path)
-static bool isContained(const Rect& bb, const Rect& clip)
-{
-    return bb.x >= clip.x && bb.y >= clip.y &&
-           bb.x + bb.w <= clip.x + clip.w &&
-           bb.y + bb.h <= clip.y + clip.h;
-}
-
-// Emit a clipped convex polygon as a triangle fan into the batch
-static void emitClippedFan(RenderBatch& batch, const Vec2* verts, int count)
-{
-    if (count < 3) return;
-    batch.SetTexture(0u);
-    batch.SetMode(0x0004); // TRIANGLES
-    for (int i = 1; i < count - 1; ++i) {
-        batch.Vertex2f(verts[0].x, verts[0].y);
-        batch.Vertex2f(verts[i].x, verts[i].y);
-        batch.Vertex2f(verts[i+1].x, verts[i+1].y);
-    }
-}
-
-} // anonymous namespace
-
-// ═════════════════════════════════════════════════════════════════════════════
 //  PaintContext — clip stack
 // ═════════════════════════════════════════════════════════════════════════════
 
+PaintContext::PaintContext(RenderBatch& f, RenderBatch& l, RenderBatch& t, Font& fn,
+                           IconAtlas* ico)
+    : fill(f), line(l), text(t), font(fn), icons(ico)
+{
+    fill.ClearClipRects();
+    line.ClearClipRects();
+    text.ClearClipRects();
+}
+
 void PaintContext::pushClip(const Rect& r)
 {
-    // Intersect with current clip
-    const Rect& cur = clipRect();
-    float x0 = std::max(r.x, cur.x);
-    float y0 = std::max(r.y, cur.y);
-    float x1 = std::min(r.x + r.w, cur.x + cur.w);
-    float y1 = std::min(r.y + r.h, cur.y + cur.h);
-    float w  = std::max(0.0f, x1 - x0);
-    float h  = std::max(0.0f, y1 - y0);
-    clipStack_.push_back({x0, y0, w, h});
+    fill.PushClipRect(r.x, r.y, r.w, r.h);
+    line.PushClipRect(r.x, r.y, r.w, r.h);
+    text.PushClipRect(r.x, r.y, r.w, r.h);
 }
 
 void PaintContext::popClip()
 {
-    if (!clipStack_.empty())
-        clipStack_.pop_back();
+    fill.PopClipRect();
+    line.PopClipRect();
+    text.PopClipRect();
 }
 
 const Rect& PaintContext::clipRect() const
 {
-    return clipStack_.empty() ? fullScreen_ : clipStack_.back();
+    float c[4];
+    fill.GetClipRect(c);
+    cachedClip_ = {c[0], c[1], c[2], c[3]};
+    return cachedClip_;
+}
+
+bool PaintContext::hasClip() const
+{
+    return fill.HasClipRect();
 }
 
 bool PaintContext::isClipped(const Rect& r) const
 {
-    const Rect& c = clipRect();
-    return (r.x >= c.x + c.w || r.x + r.w <= c.x ||
-            r.y >= c.y + c.h || r.y + r.h <= c.y);
+    return fill.IsRectOutsideClip(r.x, r.y, r.w, r.h);
 }
 
 bool PaintContext::clipRectIntersect(const Rect& in, Rect& out) const
 {
-    const Rect& c = clipRect();
-    float x0 = std::max(in.x, c.x);
-    float y0 = std::max(in.y, c.y);
-    float x1 = std::min(in.x + in.w, c.x + c.w);
-    float y1 = std::min(in.y + in.h, c.y + c.h);
-    if (x1 <= x0 || y1 <= y0) return false;
-    out = {x0, y0, x1 - x0, y1 - y0};
+    float c[4];
+    if (!fill.IntersectClipRect(in.x, in.y, in.w, in.h, c)) return false;
+    out = {c[0], c[1], c[2], c[3]};
     return true;
 }
 
 void PaintContext::fontClip(float out[4]) const
 {
-    const Rect& c = clipRect();
-    out[0] = c.x; out[1] = c.y; out[2] = c.w; out[3] = c.h;
+    fill.GetClipRect(out);
 }
 
 // ── Clip-aware drawing helpers ────────────────────────────────────────────
 
 void PaintContext::fillRect(float x, float y, float w, float h)
 {
-    Rect in{x, y, w, h};
-    Rect out;
-    if (clipRectIntersect(in, out))
-        fill.Rectangle(static_cast<int>(out.x), static_cast<int>(out.y),
-                        static_cast<int>(out.w), static_cast<int>(out.h), true);
+    fill.RectangleClipped(x, y, w, h, true);
 }
 
 void PaintContext::lineRect(float x, float y, float w, float h)
 {
-    Rect in{x, y, w, h};
-    if (isClipped(in)) return;
-    const Rect& c = clipRect();
-    if (isContained(in, c)) {
-        line.Rectangle(static_cast<int>(x), static_cast<int>(y),
-                        static_cast<int>(w), static_cast<int>(h), false);
-        return;
-    }
-    // Soft clip each edge
-    drawLine(x, y, x + w, y);
-    drawLine(x + w, y, x + w, y + h);
-    drawLine(x + w, y + h, x, y + h);
-    drawLine(x, y + h, x, y);
+    line.RectangleClipped(x, y, w, h, false);
 }
 
 void PaintContext::fillRoundedRect(float x, float y, float w, float h, float r, int seg)
 {
-    Rect bb{x, y, w, h};
-    if (isClipped(bb)) return;
-    const Rect& c = clipRect();
-    // Fast path: fully inside clip → delegate to batch
-    if (isContained(bb, c)) {
-        fill.RoundedRectangle(static_cast<int>(x), static_cast<int>(y),
-                               static_cast<int>(w), static_cast<int>(h), r, seg, true);
-        return;
-    }
-    // Soft clip: generate rounded rect triangles and clip each
-    if (r <= 0.0f) { fillRect(x, y, w, h); return; }
-    r = std::min(r, w * 0.5f);
-    r = std::min(r, h * 0.5f);
-    seg = std::max(2, std::min(seg, 32));
-
-    const float cxTL = x + r,     cyTL = y + r;
-    const float cxTR = x + w - r, cyTR = y + r;
-    const float cxBR = x + w - r, cyBR = y + h - r;
-    const float cxBL = x + r,     cyBL = y + h - r;
-
-    // Generate perimeter points (4 corners × seg points)
-    const int totalPts = seg * 4;
-    Vec2 pts[128]; // seg max 32 → 128 points max
-
-    auto fillCorner = [&](int base, float ccx, float ccy, float startDeg, float endDeg) {
-        const float startRad = startDeg * (kPI / 180.0f);
-        const float step = (endDeg - startDeg) * (kPI / 180.0f) / (float)seg;
-        for (int i = 0; i < seg; ++i) {
-            const float a = startRad + step * (float)i;
-            pts[base + i] = { ccx + cosf(a) * r, ccy + sinf(a) * r };
-        }
-    };
-
-    fillCorner(0 * seg, cxTL, cyTL, 180.0f, 270.0f);
-    fillCorner(1 * seg, cxTR, cyTR, 270.0f, 360.0f);
-    fillCorner(2 * seg, cxBR, cyBR,   0.0f,  90.0f);
-    fillCorner(3 * seg, cxBL, cyBL,  90.0f, 180.0f);
-
-    // Triangle fan from center
-    const float mx = x + w * 0.5f, my = y + h * 0.5f;
-    fill.SetTexture(0u);
-    fill.SetMode(0x0004); // TRIANGLES
-    for (int i = 0; i < totalPts; ++i) {
-        const Vec2& a = pts[i];
-        const Vec2& b = pts[(i + 1) % totalPts];
-        Vec2 tri[3] = { {mx, my}, {a.x, a.y}, {b.x, b.y} };
-        Vec2 clipped[12];
-        int n = clipPoly(tri, 3, c.x, c.y, c.w, c.h, clipped);
-        for (int j = 1; j < n - 1; ++j) {
-            fill.Vertex2f(clipped[0].x, clipped[0].y);
-            fill.Vertex2f(clipped[j].x, clipped[j].y);
-            fill.Vertex2f(clipped[j+1].x, clipped[j+1].y);
-        }
-    }
+    fill.RoundedRectangleClipped(x, y, w, h, r, seg, true);
 }
 
 void PaintContext::lineRoundedRect(float x, float y, float w, float h, float r, int seg)
 {
-    Rect bb{x, y, w, h};
-    if (isClipped(bb)) return;
-    const Rect& c = clipRect();
-    if (isContained(bb, c)) {
-        line.RoundedRectangle(static_cast<int>(x), static_cast<int>(y),
-                               static_cast<int>(w), static_cast<int>(h), r, seg, false);
-        return;
-    }
-    // Soft clip: generate outline segments and clip each via drawLine
-    if (r <= 0.0f) { lineRect(x, y, w, h); return; }
-    r = std::min(r, w * 0.5f);
-    r = std::min(r, h * 0.5f);
-    seg = std::max(2, std::min(seg, 32));
-
-    const float cxTL = x + r,     cyTL = y + r;
-    const float cxTR = x + w - r, cyTR = y + r;
-    const float cxBR = x + w - r, cyBR = y + h - r;
-    const float cxBL = x + r,     cyBL = y + h - r;
-
-    const int totalPts = seg * 4;
-    Vec2 pts[128];
-
-    auto fillCorner = [&](int base, float ccx, float ccy, float startDeg, float endDeg) {
-        const float startRad = startDeg * (kPI / 180.0f);
-        const float step = (endDeg - startDeg) * (kPI / 180.0f) / (float)seg;
-        for (int i = 0; i < seg; ++i) {
-            const float a = startRad + step * (float)i;
-            pts[base + i] = { ccx + cosf(a) * r, ccy + sinf(a) * r };
-        }
-    };
-
-    fillCorner(0 * seg, cxTL, cyTL, 180.0f, 270.0f);
-    fillCorner(1 * seg, cxTR, cyTR, 270.0f, 360.0f);
-    fillCorner(2 * seg, cxBR, cyBR,   0.0f,  90.0f);
-    fillCorner(3 * seg, cxBL, cyBL,  90.0f, 180.0f);
-
-    for (int i = 0; i < totalPts; ++i) {
-        const Vec2& a = pts[i];
-        const Vec2& b = pts[(i + 1) % totalPts];
-        drawLine(a.x, a.y, b.x, b.y);
-    }
+    line.RoundedRectangleClipped(x, y, w, h, r, seg, false);
 }
 
 void PaintContext::fillCircle(float cx, float cy, float radius)
 {
-    if (radius <= 0.0f) return;
-    Rect bb{cx - radius, cy - radius, radius * 2, radius * 2};
-    if (isClipped(bb)) return;
-    const Rect& c = clipRect();
-    // Fast path
-    if (isContained(bb, c)) {
-        fill.Circle(static_cast<int>(cx), static_cast<int>(cy), radius, true);
-        return;
-    }
-    // Soft clip: generate triangle fan and clip each triangle
-    const int segments = std::max(18, std::min(96, (int)(radius * 0.8f)));
-    const float step = (2.0f * kPI) / (float)segments;
-    fill.SetTexture(0u);
-    fill.SetMode(0x0004); // TRIANGLES
-    for (int i = 0; i < segments; ++i) {
-        const float a0 = step * i, a1 = step * (i + 1);
-        Vec2 tri[3] = {
-            {cx, cy},
-            {cx + cosf(a0) * radius, cy + sinf(a0) * radius},
-            {cx + cosf(a1) * radius, cy + sinf(a1) * radius}
-        };
-        Vec2 clipped[12];
-        int n = clipPoly(tri, 3, c.x, c.y, c.w, c.h, clipped);
-        for (int j = 1; j < n - 1; ++j) {
-            fill.Vertex2f(clipped[0].x, clipped[0].y);
-            fill.Vertex2f(clipped[j].x, clipped[j].y);
-            fill.Vertex2f(clipped[j+1].x, clipped[j+1].y);
-        }
-    }
+    fill.CircleClipped(cx, cy, radius, true);
 }
 
 void PaintContext::lineCircle(float cx, float cy, float radius)
 {
-    if (radius <= 0.0f) return;
-    Rect bb{cx - radius, cy - radius, radius * 2, radius * 2};
-    if (isClipped(bb)) return;
-    const Rect& c = clipRect();
-    if (isContained(bb, c)) {
-        line.Circle(static_cast<int>(cx), static_cast<int>(cy), radius, false);
-        return;
-    }
-    // Soft clip: line segments via Cohen-Sutherland
-    const int segments = std::max(18, std::min(96, (int)(radius * 0.8f)));
-    const float step = (2.0f * kPI) / (float)segments;
-    for (int i = 0; i < segments; ++i) {
-        const float a0 = step * i, a1 = step * (i + 1);
-        drawLine(cx + cosf(a0) * radius, cy + sinf(a0) * radius,
-                 cx + cosf(a1) * radius, cy + sinf(a1) * radius);
-    }
+    line.CircleClipped(cx, cy, radius, false);
 }
 
 void PaintContext::drawLine(float x1, float y1, float x2, float y2)
 {
-    // Cohen-Sutherland line clipping
-    const Rect& c = clipRect();
-    float xmin = c.x, ymin = c.y, xmax = c.x + c.w, ymax = c.y + c.h;
-
-    auto outcode = [&](float x, float y) -> int {
-        int code = 0;
-        if (x < xmin) code |= 1;
-        else if (x > xmax) code |= 2;
-        if (y < ymin) code |= 4;
-        else if (y > ymax) code |= 8;
-        return code;
-    };
-
-    int c1 = outcode(x1, y1), c2 = outcode(x2, y2);
-    for (int i = 0; i < 10; ++i) {
-        if (!(c1 | c2)) break;         // both inside
-        if (c1 & c2) return;           // both outside same side
-        int co = c1 ? c1 : c2;
-        float x, y;
-        if      (co & 8) { x = x1 + (x2 - x1) * (ymax - y1) / (y2 - y1); y = ymax; }
-        else if (co & 4) { x = x1 + (x2 - x1) * (ymin - y1) / (y2 - y1); y = ymin; }
-        else if (co & 2) { y = y1 + (y2 - y1) * (xmax - x1) / (x2 - x1); x = xmax; }
-        else             { y = y1 + (y2 - y1) * (xmin - x1) / (x2 - x1); x = xmin; }
-        if (co == c1) { x1 = x; y1 = y; c1 = outcode(x1, y1); }
-        else          { x2 = x; y2 = y; c2 = outcode(x2, y2); }
-    }
-    line.Line2D(static_cast<int>(x1), static_cast<int>(y1),
-                static_cast<int>(x2), static_cast<int>(y2));
+    line.Line2DClipped(x1, y1, x2, y2);
 }
 
 void PaintContext::fillTriangle(float x1, float y1, float x2, float y2, float x3, float y3)
 {
-    float minX = std::min({x1, x2, x3}), maxX = std::max({x1, x2, x3});
-    float minY = std::min({y1, y2, y3}), maxY = std::max({y1, y2, y3});
-    Rect bb{minX, minY, maxX - minX, maxY - minY};
-    if (isClipped(bb)) return;
-    const Rect& c = clipRect();
-    if (isContained(bb, c)) {
-        fill.Triangle(x1, y1, x2, y2, x3, y3, true);
-        return;
-    }
-    // Sutherland-Hodgman clip
-    Vec2 tri[3] = { {x1, y1}, {x2, y2}, {x3, y3} };
-    Vec2 clipped[12];
-    int n = clipPoly(tri, 3, c.x, c.y, c.w, c.h, clipped);
-    if (n < 3) return;
-    fill.SetTexture(0u);
-    fill.SetMode(0x0004); // TRIANGLES
-    for (int j = 1; j < n - 1; ++j) {
-        fill.Vertex2f(clipped[0].x, clipped[0].y);
-        fill.Vertex2f(clipped[j].x, clipped[j].y);
-        fill.Vertex2f(clipped[j+1].x, clipped[j+1].y);
-    }
+    fill.TriangleClipped(x1, y1, x2, y2, x3, y3);
 }
 
 // ── Icon drawing via atlas texture ───────────────────────────────────────

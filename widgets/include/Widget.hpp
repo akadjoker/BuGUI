@@ -52,15 +52,14 @@ struct PaintContext
     IconAtlas*   icons = nullptr;   // optional icon atlas (set by WidgetApp)
 
     PaintContext(RenderBatch& f, RenderBatch& l, RenderBatch& t, Font& fn,
-                 IconAtlas* ico = nullptr)
-        : fill(f), line(l), text(t), font(fn), icons(ico) {}
+                 IconAtlas* ico = nullptr);
 
     // ── Clip stack ────────────────────────────────────────────────────────
     void pushClip(const Rect& r);
     void popClip();
 
     const Rect& clipRect() const;
-    bool hasClip() const { return !clipStack_.empty(); }
+    bool hasClip() const;
 
     bool isClipped(const Rect& r) const;
     bool clipRectIntersect(const Rect& in, Rect& out) const;
@@ -87,8 +86,7 @@ struct PaintContext
     void drawIcon(IconId id, float x, float y, float size, const Color& tint);
 
 private:
-    std::vector<Rect> clipStack_;
-    Rect fullScreen_ = {0, 0, 99999, 99999};
+    mutable Rect cachedClip_ = {0, 0, 99999, 99999};
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

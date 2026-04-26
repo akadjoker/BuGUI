@@ -97,21 +97,24 @@ void Line::paint(PaintContext& ctx)
     auto* p = dynamic_cast<BoxLayout*>(parent());
     bool vertical = p && p->dir() == LayoutDir::Horizontal;
 
-    ctx.fill.SetColor(color_.r, color_.g, color_.b, color_.a);
+    ctx.line.SetColor(color_.r, color_.g, color_.b, color_.a);
+    int t = std::max(1, (int)std::round(thickness_));
 
     if (vertical)
     {
         // Vertical line centered in widget width
-        float lx = abs.x + (abs.w - thickness_) * 0.5f;
-        ctx.fill.Rectangle(static_cast<int>(lx), static_cast<int>(abs.y),
-                           static_cast<int>(thickness_), static_cast<int>(abs.h), true);
+        float cx = abs.x + abs.w * 0.5f;
+        float x0 = cx - (t - 1) * 0.5f;
+        for (int i = 0; i < t; ++i)
+            ctx.drawLine(x0 + i, abs.y, x0 + i, abs.y + abs.h);
     }
     else
     {
         // Horizontal line centered in widget height
-        float ly = abs.y + (abs.h - thickness_) * 0.5f;
-        ctx.fill.Rectangle(static_cast<int>(abs.x), static_cast<int>(ly),
-                           static_cast<int>(abs.w), static_cast<int>(thickness_), true);
+        float cy = abs.y + abs.h * 0.5f;
+        float y0 = cy - (t - 1) * 0.5f;
+        for (int i = 0; i < t; ++i)
+            ctx.drawLine(abs.x, y0 + i, abs.x + abs.w, y0 + i);
     }
 }
 

@@ -21,6 +21,176 @@
 // ---------------------------------------------------------------------------
 namespace
 {
+    struct RBRect
+    {
+        float x, y, w, h;
+    };
+
+    struct RBVec2
+    {
+        float x, y;
+    };
+
+    static RBRect rbFullClip()
+    {
+        return {0.0f, 0.0f, 99999.0f, 99999.0f};
+    }
+
+    static bool rbIsOutside(const RBRect& r, const RBRect& c)
+    {
+        return (r.x >= c.x + c.w || r.x + r.w <= c.x ||
+                r.y >= c.y + c.h || r.y + r.h <= c.y);
+    }
+
+    static bool rbIsContained(const RBRect& r, const RBRect& c)
+    {
+        return r.x >= c.x && r.y >= c.y &&
+               r.x + r.w <= c.x + c.w &&
+               r.y + r.h <= c.y + c.h;
+    }
+
+    static RBRect rbIntersect(const RBRect& a, const RBRect& b)
+    {
+        float x0 = std::max(a.x, b.x);
+        float y0 = std::max(a.y, b.y);
+        float x1 = std::min(a.x + a.w, b.x + b.w);
+        float y1 = std::min(a.y + a.h, b.y + b.h);
+        float w = std::max(0.0f, x1 - x0);
+        float h = std::max(0.0f, y1 - y0);
+        return {x0, y0, w, h};
+    }
+
+    static bool rbClipLine(float& x1, float& y1, float& x2, float& y2, const RBRect& c)
+    {
+        const float xmin = c.x;
+        const float ymin = c.y;
+        const float xmax = c.x + c.w;
+        const float ymax = c.y + c.h;
+
+        auto outcode = [&](float x, float y) -> int {
+            int code = 0;
+            if (x < xmin) code |= 1;
+            else if (x > xmax) code |= 2;
+            if (y < ymin) code |= 4;
+            else if (y > ymax) code |= 8;
+            return code;
+        };
+
+        int c1 = outcode(x1, y1);
+        int c2 = outcode(x2, y2);
+        for (int i = 0; i < 12; ++i)
+        {
+            if (!(c1 | c2)) return true;
+            if (c1 & c2) return false;
+
+            int co = c1 ? c1 : c2;
+            float x, y;
+            if (co & 8)
+            {
+                x = x1 + (x2 - x1) * (ymax - y1) / (y2 - y1);
+                y = ymax;
+            }
+            else if (co & 4)
+            {
+                x = x1 + (x2 - x1) * (ymin - y1) / (y2 - y1);
+                y = ymin;
+            }
+            else if (co & 2)
+            {
+                y = y1 + (y2 - y1) * (xmax - x1) / (x2 - x1);
+                x = xmax;
+            }
+            else
+            {
+                y = y1 + (y2 - y1) * (xmin - x1) / (x2 - x1);
+                x = xmin;
+            }
+
+            if (co == c1) { x1 = x; y1 = y; c1 = outcode(x1, y1); }
+            else          { x2 = x; y2 = y; c2 = outcode(x2, y2); }
+        }
+
+        return false;
+    }
+
+    static int rbClipPolyEdge(const RBVec2* in, int inCount, RBVec2* out, int edge, float val)
+    {
+        if (inCount == 0) return 0;
+        int outCount = 0;
+
+        auto inside = [&](const RBVec2& v) -> bool {
+            switch (edge)
+            {
+                case 0: return v.x >= val;
+                case 1: return v.x <= val;
+                case 2: return v.y >= val;
+                case 3: return v.y <= val;
+                default: return true;
+            }
+        };
+
+        auto intersect = [&](const RBVec2& a, const RBVec2& b) -> RBVec2 {
+            float t;
+            if (edge < 2)
+            {
+                float dx = b.x - a.x;
+                t = (dx != 0.0f) ? (val - a.x) / dx : 0.0f;
+            }
+            else
+            {
+                float dy = b.y - a.y;
+                t = (dy != 0.0f) ? (val - a.y) / dy : 0.0f;
+            }
+            return {a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)};
+        };
+
+        const RBVec2* prev = &in[inCount - 1];
+        for (int i = 0; i < inCount; ++i)
+        {
+            const RBVec2* cur = &in[i];
+            bool curIn = inside(*cur);
+            bool prevIn = inside(*prev);
+            if (curIn)
+            {
+                if (!prevIn) out[outCount++] = intersect(*prev, *cur);
+                out[outCount++] = *cur;
+            }
+            else if (prevIn)
+            {
+                out[outCount++] = intersect(*prev, *cur);
+            }
+            prev = cur;
+        }
+
+        return outCount;
+    }
+
+    static int rbClipPoly(const RBVec2* verts, int count, const RBRect& clip, RBVec2* result)
+    {
+        RBVec2 buf1[128], buf2[128];
+        int n = std::min(count, 128);
+        for (int i = 0; i < n; ++i) buf1[i] = verts[i];
+
+        n = rbClipPolyEdge(buf1, n, buf2, 0, clip.x);
+        n = rbClipPolyEdge(buf2, n, buf1, 1, clip.x + clip.w);
+        n = rbClipPolyEdge(buf1, n, buf2, 2, clip.y);
+        n = rbClipPolyEdge(buf2, n, result, 3, clip.y + clip.h);
+        return n;
+    }
+
+    static void rbEmitFan(RenderBatch& batch, const RBVec2* verts, int count)
+    {
+        if (count < 3) return;
+        batch.SetTexture(0u);
+        batch.SetMode(TRIANGLES);
+        for (int i = 1; i < count - 1; ++i)
+        {
+            batch.Vertex2f(verts[0].x, verts[0].y);
+            batch.Vertex2f(verts[i].x, verts[i].y);
+            batch.Vertex2f(verts[i + 1].x, verts[i + 1].y);
+        }
+    }
+
     static unsigned char floatToU8(float v)
     {
         if (v < 0.0f) v = 0.0f;
@@ -170,6 +340,7 @@ RenderBatch::RenderBatch()
       texcoordx(0.0f), texcoordy(0.0f), colorr(255), colorg(255), colorb(255), colora(255),
       vaoId(0), vboId(0), eboId(0)
 {
+    clipStack_.clear();
 }
 
 RenderBatch::~RenderBatch()
@@ -192,6 +363,7 @@ void RenderBatch::Init(int /*numBuffers*/, int bufferElements)
     use_matrix  = false;
     modelMatrix = glm::mat4(1.0f);
     viewMatrix  = glm::mat4(1.0f);
+    clipStack_.clear();
     createDeviceObjects();
 }
 
@@ -205,6 +377,7 @@ void RenderBatch::Release()
     currentTexture = 0;
     currentMode    = QUAD;
     use_matrix     = false;
+    clipStack_.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +592,274 @@ void RenderBatch::SetMatrix(const glm::mat4 &matrix)
 void RenderBatch::SetOrtho2D(float width, float height)
 {
     viewMatrix = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
+}
+
+RenderBatch::ClipRectState RenderBatch::currentClipRect() const
+{
+    if (clipStack_.empty())
+    {
+        const RBRect full = rbFullClip();
+        return {full.x, full.y, full.w, full.h};
+    }
+    return clipStack_.back();
+}
+
+void RenderBatch::PushClipRect(float x, float y, float w, float h)
+{
+    RBRect in = {x, y, std::max(0.0f, w), std::max(0.0f, h)};
+    ClipRectState cur = currentClipRect();
+    RBRect curRect = {cur.x, cur.y, cur.w, cur.h};
+    RBRect r = rbIntersect(curRect, in);
+    clipStack_.push_back({r.x, r.y, r.w, r.h});
+}
+
+void RenderBatch::PopClipRect()
+{
+    if (!clipStack_.empty())
+        clipStack_.pop_back();
+}
+
+void RenderBatch::ClearClipRects()
+{
+    clipStack_.clear();
+}
+
+bool RenderBatch::HasClipRect() const
+{
+    return !clipStack_.empty();
+}
+
+void RenderBatch::GetClipRect(float out[4]) const
+{
+    const ClipRectState c = currentClipRect();
+    out[0] = c.x;
+    out[1] = c.y;
+    out[2] = c.w;
+    out[3] = c.h;
+}
+
+bool RenderBatch::IsRectOutsideClip(float x, float y, float w, float h) const
+{
+    const ClipRectState c = currentClipRect();
+    RBRect bb = {x, y, w, h};
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    return rbIsOutside(bb, cr);
+}
+
+bool RenderBatch::IntersectClipRect(float x, float y, float w, float h, float out[4]) const
+{
+    const ClipRectState c = currentClipRect();
+    RBRect in = {x, y, w, h};
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    RBRect r = rbIntersect(in, cr);
+    if (r.w <= 0.0f || r.h <= 0.0f) return false;
+    out[0] = r.x;
+    out[1] = r.y;
+    out[2] = r.w;
+    out[3] = r.h;
+    return true;
+}
+
+void RenderBatch::Line2DClipped(float x0, float y0, float x1, float y1)
+{
+    const ClipRectState c = currentClipRect();
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    if (!rbClipLine(x0, y0, x1, y1, cr)) return;
+    SetTexture(0u);
+    SetMode(LINES);
+    Vertex2f(x0, y0);
+    Vertex2f(x1, y1);
+}
+
+void RenderBatch::RectangleClipped(float x, float y, float w, float h, bool fill)
+{
+    if (w <= 0.0f || h <= 0.0f) return;
+    const ClipRectState c = currentClipRect();
+    RBRect bb = {x, y, w, h};
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    if (rbIsOutside(bb, cr)) return;
+
+    if (!fill)
+    {
+        Line2DClipped(x, y, x + w, y);
+        Line2DClipped(x + w, y, x + w, y + h);
+        Line2DClipped(x + w, y + h, x, y + h);
+        Line2DClipped(x, y + h, x, y);
+        return;
+    }
+
+    RBVec2 quad[4] = {
+        {x, y}, {x + w, y}, {x + w, y + h}, {x, y + h}
+    };
+    if (rbIsContained(bb, cr))
+    {
+        rbEmitFan(*this, quad, 4);
+        return;
+    }
+
+    RBVec2 clipped[128];
+    int n = rbClipPoly(quad, 4, cr, clipped);
+    rbEmitFan(*this, clipped, n);
+}
+
+void RenderBatch::RoundedRectangleClipped(float x, float y, float w, float h, float roundness,
+                                          int segments, bool fill)
+{
+    if (w <= 0.0f || h <= 0.0f) return;
+    if (roundness <= 0.0f)
+    {
+        RectangleClipped(x, y, w, h, fill);
+        return;
+    }
+
+    const ClipRectState c = currentClipRect();
+    RBRect bb = {x, y, w, h};
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    if (rbIsOutside(bb, cr)) return;
+
+    float r = std::min(roundness, w * 0.5f);
+    r = std::min(r, h * 0.5f);
+    segments = std::max(2, std::min(segments, 32));
+
+    const float cxTL = x + r,     cyTL = y + r;
+    const float cxTR = x + w - r, cyTR = y + r;
+    const float cxBR = x + w - r, cyBR = y + h - r;
+    const float cxBL = x + r,     cyBL = y + h - r;
+    const int totalPts = segments * 4;
+    RBVec2 pts[128];
+
+    auto fillCorner = [&](int base, float ccx, float ccy, float startDeg, float endDeg)
+    {
+        const float startRad = startDeg * DEG2RAD;
+        const float step = (endDeg - startDeg) * DEG2RAD / (float)segments;
+        for (int i = 0; i < segments; ++i)
+        {
+            const float a = startRad + step * (float)i;
+            pts[base + i] = {ccx + cosf(a) * r, ccy + sinf(a) * r};
+        }
+    };
+
+    fillCorner(0 * segments, cxTL, cyTL, 180.0f, 270.0f);
+    fillCorner(1 * segments, cxTR, cyTR, 270.0f, 360.0f);
+    fillCorner(2 * segments, cxBR, cyBR,   0.0f,  90.0f);
+    fillCorner(3 * segments, cxBL, cyBL,  90.0f, 180.0f);
+
+    if (!fill)
+    {
+        for (int i = 0; i < totalPts; ++i)
+        {
+            const RBVec2& a = pts[i];
+            const RBVec2& b = pts[(i + 1) % totalPts];
+            Line2DClipped(a.x, a.y, b.x, b.y);
+        }
+        return;
+    }
+
+    if (rbIsContained(bb, cr))
+    {
+        const float mx = x + w * 0.5f;
+        const float my = y + h * 0.5f;
+        SetTexture(0u);
+        SetMode(TRIANGLES);
+        for (int i = 0; i < totalPts; ++i)
+        {
+            const RBVec2& a = pts[i];
+            const RBVec2& b = pts[(i + 1) % totalPts];
+            Vertex2f(mx, my);
+            Vertex2f(a.x, a.y);
+            Vertex2f(b.x, b.y);
+        }
+        return;
+    }
+
+    const float mx = x + w * 0.5f;
+    const float my = y + h * 0.5f;
+    RBVec2 tri[3];
+    RBVec2 clipped[128];
+    for (int i = 0; i < totalPts; ++i)
+    {
+        const RBVec2& a = pts[i];
+        const RBVec2& b = pts[(i + 1) % totalPts];
+        tri[0] = {mx, my};
+        tri[1] = a;
+        tri[2] = b;
+        int n = rbClipPoly(tri, 3, cr, clipped);
+        rbEmitFan(*this, clipped, n);
+    }
+}
+
+void RenderBatch::CircleClipped(float cx, float cy, float radius, bool fill)
+{
+    if (radius <= 0.0f) return;
+    const ClipRectState c = currentClipRect();
+    RBRect bb = {cx - radius, cy - radius, radius * 2.0f, radius * 2.0f};
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    if (rbIsOutside(bb, cr)) return;
+
+    const int segments = std::max(18, std::min(96, (int)(radius * 0.8f)));
+    const float step = (2.0f * PI) / (float)segments;
+
+    if (!fill)
+    {
+        for (int i = 0; i < segments; ++i)
+        {
+            const float a0 = step * i;
+            const float a1 = step * (i + 1);
+            Line2DClipped(cx + cosf(a0) * radius, cy + sinf(a0) * radius,
+                          cx + cosf(a1) * radius, cy + sinf(a1) * radius);
+        }
+        return;
+    }
+
+    if (rbIsContained(bb, cr))
+    {
+        SetTexture(0u);
+        SetMode(TRIANGLES);
+        for (int i = 0; i < segments; ++i)
+        {
+            const float a0 = step * i;
+            const float a1 = step * (i + 1);
+            Vertex2f(cx, cy);
+            Vertex2f(cx + cosf(a0) * radius, cy + sinf(a0) * radius);
+            Vertex2f(cx + cosf(a1) * radius, cy + sinf(a1) * radius);
+        }
+        return;
+    }
+
+    RBVec2 tri[3];
+    RBVec2 clipped[128];
+    for (int i = 0; i < segments; ++i)
+    {
+        const float a0 = step * i;
+        const float a1 = step * (i + 1);
+        tri[0] = {cx, cy};
+        tri[1] = {cx + cosf(a0) * radius, cy + sinf(a0) * radius};
+        tri[2] = {cx + cosf(a1) * radius, cy + sinf(a1) * radius};
+        int n = rbClipPoly(tri, 3, cr, clipped);
+        rbEmitFan(*this, clipped, n);
+    }
+}
+
+void RenderBatch::TriangleClipped(float x1, float y1, float x2, float y2, float x3, float y3)
+{
+    float minX = std::min({x1, x2, x3});
+    float maxX = std::max({x1, x2, x3});
+    float minY = std::min({y1, y2, y3});
+    float maxY = std::max({y1, y2, y3});
+    RBRect bb = {minX, minY, maxX - minX, maxY - minY};
+    const ClipRectState c = currentClipRect();
+    RBRect cr = {c.x, c.y, c.w, c.h};
+    if (rbIsOutside(bb, cr)) return;
+
+    RBVec2 tri[3] = {{x1, y1}, {x2, y2}, {x3, y3}};
+    if (rbIsContained(bb, cr))
+    {
+        rbEmitFan(*this, tri, 3);
+        return;
+    }
+    RBVec2 clipped[128];
+    int n = rbClipPoly(tri, 3, cr, clipped);
+    rbEmitFan(*this, clipped, n);
 }
 
 // ---------------------------------------------------------------------------
@@ -924,12 +1365,23 @@ void RenderBatch::DrawImageRegion(Texture* texture,
     rot(lx2, ly2, quad[2].x, quad[2].y); quad[2].u = u1; quad[2].v = v1;
     rot(lx3, ly3, quad[3].x, quad[3].y); quad[3].u = u0; quad[3].v = v1;
 
+    float clipFromStack[4];
+    const float* effectiveClip = clip;
+    if (!effectiveClip && HasClipRect())
+    {
+        GetClipRect(clipFromStack);
+        effectiveClip = clipFromStack;
+    }
+
     ClipVert clipped[12];
     int vertCount;
 
-    if (clip)
+    if (effectiveClip)
     {
-        vertCount = clipPolygon(quad, 4, clip[0], clip[1], clip[2], clip[3], clipped);
+        vertCount = clipPolygon(quad, 4,
+                                effectiveClip[0], effectiveClip[1],
+                                effectiveClip[2], effectiveClip[3],
+                                clipped);
         if (vertCount < 3) return;
     }
     else
