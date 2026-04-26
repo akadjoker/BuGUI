@@ -17,7 +17,6 @@ add_compile_options(
 
 set(SOURCES
     src/Batch.cpp
-    src/Color.cpp
     src/Device.cpp
     src/Font.cpp
     src/Input.cpp
@@ -27,7 +26,6 @@ set(SOURCES
     src/Shader.cpp
     src/Texture.cpp
     src/RenderTexture.cpp
-    src/FileSystem.cpp
     src/glad.cpp
 )
 
@@ -44,13 +42,11 @@ target_include_directories(bugui_core PRIVATE
 target_compile_definitions(bugui_core PRIVATE USE_STB_TRUETYPE)
 
 target_link_libraries(bugui_core
+    bugui_base
+    bugui_stb
     OpenGL::GL
     ${SDL2_LIBRARIES}
     glm::glm
-)
-
-target_sources(bugui_core PRIVATE
-    ${CMAKE_SOURCE_DIR}/vendor/stb/stb_impl.cpp
 )
 
 target_precompile_headers(bugui_core PRIVATE src/pch.h)

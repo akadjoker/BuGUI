@@ -1,38 +1,5 @@
 #pragma once
-// ═════════════════════════════════════════════════════════════════════════════
-//  BuGUI - Umbrella header (includes all widget headers)
-//  For faster builds, include only the specific headers you need instead.
-// ═════════════════════════════════════════════════════════════════════════════
+// New BuGUI core umbrella. Legacy widgets live in their own headers while the
+// backend/render architecture is rebuilt.
 
-#include "Theme.hpp"
-#include "BasicWidgets.hpp"
-#include "ListWidgets.hpp"
-#include "ScrollWidgets.hpp"
-#include "LayoutWidgets.hpp"
-#include "ViewWidgets.hpp"
-#include "Dialog.hpp"
-#include "TextWidgets.hpp"
-#include "MenuWidgets.hpp"
-#include "TreeWidgets.hpp"
-#include "ColorPicker.hpp"
-#include "DataWidgets.hpp"
-#include "FileDialog.hpp"
-#include "Dialogs.hpp"
-#include "ViewportWidget.hpp"
-#include "Gizmo2D.hpp"
-#include "Gizmo3D.hpp"
-#include "CurveEditor.hpp"
-#include "NodeEditor.hpp"
-#include "Timeline.hpp"
-#include "ConsoleWidget.hpp"
-#include "GradientEditor.hpp"
-#include "PlotWidget.hpp"
-#include "HistogramWidget.hpp"
-#include "VUMeter.hpp"
-#include "WaveformView.hpp"
-#include "SpectrumAnalyzer.hpp"
-#include "ADSRWidget.hpp"
-#include "PianoRoll.hpp"
-#include "Knob.hpp"
-#include "AssetBrowser.hpp"
-#include "DockPanel.hpp"
+#include "BuGUI.hpp"

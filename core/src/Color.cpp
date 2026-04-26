@@ -1,9 +1,5 @@
 
-
-
-#include "pch.h"
 #include "Color.hpp"
-
 
 const Color Color::WHITE;
 const Color Color::GRAY     (128, 128, 128);

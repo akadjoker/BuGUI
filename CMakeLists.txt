@@ -16,21 +16,34 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
+option(BUGUI_BUILD_APP "Build BuGUI demo app executable" ON)
+option(BUGUI_BUILD_DEMO "Build BuGUI backend demo executable" ON)
+option(BUGUI_BUILD_EDITOR "Build BuGUI editor executable" ON)
+option(BUGUI_BUILD_TUTORIALS "Build tutorial executables" OFF)
+
 add_subdirectory(vendor/poly2tri)
+add_subdirectory(vendor/stb)
 #add_subdirectory(vendor/SDL)
+add_subdirectory(base)
 add_subdirectory(core)
 add_subdirectory(widgets)
-add_subdirectory(app)
-if(BUILD_TESTING)
+
+if(BUGUI_BUILD_APP AND EXISTS "${CMAKE_SOURCE_DIR}/app/CMakeLists.txt")
+    add_subdirectory(app)
+endif()
+
+if(BUGUI_BUILD_DEMO AND EXISTS "${CMAKE_SOURCE_DIR}/demo/CMakeLists.txt")
+    add_subdirectory(demo)
+endif()
+
+if(BUILD_TESTING AND EXISTS "${CMAKE_SOURCE_DIR}/tests/CMakeLists.txt")
     add_subdirectory(tests)
 endif()
 
-option(BUGUI_BUILD_EDITOR "Build BuGUI editor executable" ON)
-if(BUGUI_BUILD_EDITOR)
+if(BUGUI_BUILD_EDITOR AND EXISTS "${CMAKE_SOURCE_DIR}/editor/CMakeLists.txt")
     add_subdirectory(editor)
 endif()
 
-option(BUGUI_BUILD_TUTORIALS "Build tutorial executables" OFF)
 if(BUGUI_BUILD_TUTORIALS)
     add_subdirectory(tutorials)
 endif()

@@ -1,5 +1,12 @@
 #pragma once
 
+// Legacy widget-system icon atlas.
+//
+// This belongs to the old Texture/Pixmap/RenderBatch path and is only kept for
+// BUGUI_BUILD_EXTRA_WIDGETS while the migration is in progress. New BuGUI code
+// should use BuGUI::DrawList::addIcon() for vector icons or FontAtlas merged
+// icon glyphs for richer icon sets.
+
 #include "Math.hpp"
 #include <vector>
 
