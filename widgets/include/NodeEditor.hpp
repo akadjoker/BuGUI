@@ -1,30 +1,28 @@
 #pragma once
 
 #include "Widget.hpp"
-#include "Theme.hpp"
 #include "Signal.hpp"
 #include <vector>
 #include <string>
-#include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  NodeEditor - Visual node graph (for shaders, AI, scripting)
+//  NodeEditor — Visual node graph (shaders, AI, scripting)
 //
 //  Features:
 //  - Nodes with typed input/output pins
-//  - Drag to connect pins (type-checked by color)
-//  - Pan (middle-drag) + zoom (scroll wheel)
-//  - Selection, multi-select (Shift+click)
-//  - Node drag with snap-to-grid
-//  - Curved connection lines (Bezier)
+//  - Drag to connect pins (type-checked by colour)
+//  - Pan (middle-drag or left-drag on background) + zoom (scroll wheel)
+//  - Selection with highlight
+//  - Node drag with optional snap-to-grid
+//  - Smooth cubic-Bezier connection lines
 //
 //  Usage:
-//    auto* editor = parent->createChild<NodeEditor>();
-//    int n1 = editor->addNode("Add", 100, 100);
-//    editor->addPin(n1, "A", PinDir::Input, PinType::Float);
-//    editor->addPin(n1, "B", PinDir::Input, PinType::Float);
-//    editor->addPin(n1, "Result", PinDir::Output, PinType::Float);
-//    editor->addLink(n1, 2, n2, 0); // connect output pin 2 of n1 to input pin 0 of n2
+//    auto* ed = parent->createChild<NodeEditor>();
+//    int n1 = ed->addNode("Add", 100, 100);
+//    ed->addPin(n1, "A",      PinDir::Input,  PinType::Float);
+//    ed->addPin(n1, "B",      PinDir::Input,  PinType::Float);
+//    ed->addPin(n1, "Result", PinDir::Output, PinType::Float);
+//    ed->addLink(n1, 2, n2, 0);
 // ═════════════════════════════════════════════════════════════════════════════
 
 enum class PinDir  { Input, Output };
@@ -37,13 +35,13 @@ struct Pin {
 };
 
 struct Node {
-    std::string    title;
-    float          x = 0, y = 0;    // position in graph space
-    float          w = 140, h = 0;  // width fixed, height computed
+    std::string      title;
+    float            x = 0, y = 0;     // position in graph space
+    float            w = 140, h = 0;   // width fixed, height computed
     std::vector<Pin> pins;
-    Color          headerColor = Color(70, 90, 130, 255);
-    bool           selected = false;
-    bool           collapsed = false;
+    Color            headerColor = Color(70, 90, 130, 255);
+    bool             selected    = false;
+    bool             collapsed   = false;
 };
 
 struct Link {
@@ -56,87 +54,92 @@ class NodeEditor : public Widget
 public:
     NodeEditor();
 
-    // ── Node management ──────────────────────────────────────────────────
-
+    /// @brief Add a node at position (x, y).
     int  addNode(const std::string& title, float x, float y);
+    /// @brief Remove a node by ID.
     void removeNode(int nodeId);
+    /// @brief Remove all nodes and links.
     void clearAll();
 
-    int  nodeCount() const { return static_cast<int>(nodes_.size()); }
+    /// @brief Get the number of nodes.
+    int         nodeCount() const { return static_cast<int>(nodes_.size()); }
+    /// @brief Get a mutable node reference.
     Node&       node(int id)       { return nodes_[id]; }
+    /// @brief Get a const node reference.
     const Node& node(int id) const { return nodes_[id]; }
 
-    void setNodeHeader(int nodeId, const Color& c) { nodes_[nodeId].headerColor = c; markDirty(); }
+    /// @brief Set a node's header color.
+    void setNodeHeader(int nodeId, const Color& c);
 
-    // ── Pin management ───────────────────────────────────────────────────
+    /// @brief Add a typed pin to a node.
+    int addPin(int nodeId, const std::string& name, PinDir dir, PinType type);
 
-    int  addPin(int nodeId, const std::string& name, PinDir dir, PinType type);
-
-    // ── Link management ──────────────────────────────────────────────────
-
+    /// @brief Add a link between two pins.
     int  addLink(int srcNode, int srcPin, int dstNode, int dstPin);
+    /// @brief Remove a link by ID.
     void removeLink(int linkId);
+    /// @brief Check if two pins can be linked.
     bool canLink(int srcNode, int srcPin, int dstNode, int dstPin) const;
-
+    /// @brief Get the number of links.
     int  linkCount() const { return static_cast<int>(links_.size()); }
 
-    // ── View ─────────────────────────────────────────────────────────────
-
-    void setGridSnap(float s) { gridSnap_ = s; }
-    void fitView();
-
+    /// @brief Set the snap-to-grid spacing.
+    void  setGridSnap(float s) { gridSnap_ = s; }
+    /// @brief Fit all nodes into the view.
+    void  fitView();
+    /// @brief Get the horizontal pan offset.
     float panX() const { return panX_; }
+    /// @brief Get the vertical pan offset.
     float panY() const { return panY_; }
+    /// @brief Get the current zoom level.
     float zoom() const { return zoom_; }
 
-    // ── Signals ──────────────────────────────────────────────────────────
+    /// @brief Set the background color.
+    void setBgColor(const Color& c) { bgColor_ = c; markDirty(); }
 
-    Signal<int>       onNodeSelected;   // nodeId
-    Signal<int, int>  onLinkCreated;    // linkId, (srcNode<<16|dstNode)
-    Signal<int>       onLinkRemoved;    // linkId
+    /// @brief Emitted when a node is selected.
+    Signal<int>      onNodeSelected;
+    /// @brief Emitted when a link is created.
+    Signal<int, int> onLinkCreated;
+    /// @brief Emitted when a link is removed.
+    Signal<int>      onLinkRemoved;
 
     // ── Overrides ────────────────────────────────────────────────────────
-
     void paint(PaintContext& ctx) override;
     void onMousePress(MouseEvent& e) override;
     void onMouseRelease(MouseEvent& e) override;
     void onMouseMove(MouseEvent& e) override;
     void onMouseScroll(MouseEvent& e) override;
 
-    void setBgColor(const Color& c) { bgColor_ = c; }
-
 private:
     std::vector<Node> nodes_;
     std::vector<Link> links_;
     Color bgColor_ = Color(32, 34, 38, 255);
 
-    // View
+    // View transform
     float panX_ = 0, panY_ = 0;
     float zoom_ = 1.0f;
     float gridSnap_ = 16.0f;
 
     // Interaction state
     enum class DragMode { None, Pan, MoveNode, ConnectPin };
-    DragMode dragMode_ = DragMode::None;
+    DragMode dragMode_   = DragMode::None;
     float    dragStartX_ = 0, dragStartY_ = 0;
-    float    panStartX_ = 0, panStartY_ = 0;
-    int      dragNode_ = -1;
+    float    panStartX_  = 0, panStartY_ = 0;
+    int      dragNode_   = -1;
     float    nodeStartX_ = 0, nodeStartY_ = 0;
-    // For pin connection
     int      connSrcNode_ = -1, connSrcPin_ = -1;
     float    connEndX_ = 0, connEndY_ = 0;
 
+    // Layout constants
     static constexpr float kNodeHeaderH = 24;
     static constexpr float kPinH        = 20;
     static constexpr float kPinRadius   = 5;
 
     // ── Helpers ──────────────────────────────────────────────────────────
-
-    // Graph space → screen
-    float gx(float x) const;
+    float gx(float x) const;   // graph → screen
     float gy(float y) const;
-    // Screen → graph
-    float sx(float x) const;
+    float sx(float x) const;   // screen → graph
     float sy(float y) const;
 
     float nodeHeight(const Node& n) const;

@@ -1,9 +1,9 @@
+#include "pch.hpp"
 #include "WidgetSerializer.hpp"
+#include "BasicWidgets.hpp"
+#include "LayoutWidgets.hpp"
+#include "InputWidgets.hpp"
 #include "Widgets.hpp"
-#include <SDL.h>
-#include <cstdio>
-#include <string>
-#include <vector>
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Registry
@@ -22,39 +22,38 @@ void WidgetSerializer::registerType(const std::string& typeName, WidgetFactory f
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Type name from widget (using dynamic_cast chain)
+//  Type name from widget (dynamic_cast chain, most derived first)
 // ═════════════════════════════════════════════════════════════════════════════
 
 std::string WidgetSerializer::typeName(const Widget* w)
 {
-    // Order matters: most derived first
-    if (dynamic_cast<const ImageView*>(w))    return "ImageView";
+    if (dynamic_cast<const ImageView*>(w))     return "ImageView";
     if (dynamic_cast<const ScrollView*>(w))    return "ScrollView";
     if (dynamic_cast<const ScrollBar*>(w))     return "ScrollBar";
-    if (dynamic_cast<const Canvas*>(w))       return "Canvas";
-    if (dynamic_cast<const ProgressBar*>(w))  return "ProgressBar";
-    if (dynamic_cast<const Slider*>(w))       return "Slider";
-    if (dynamic_cast<const ComboBox*>(w))     return "ComboBox";
-    if (dynamic_cast<const ListWidget*>(w))   return "ListWidget";
-    if (dynamic_cast<const ListBox*>(w))      return "ListBox";
-    if (dynamic_cast<const RadioButton*>(w))  return "RadioButton";
-    if (dynamic_cast<const Switch*>(w))       return "Switch";
-    if (dynamic_cast<const CheckBox*>(w))     return "CheckBox";
-    if (dynamic_cast<const Button*>(w))       return "Button";
-    if (dynamic_cast<const Line*>(w))         return "Line";
-    if (dynamic_cast<const Spacer*>(w))       return "Spacer";
-    if (dynamic_cast<const Label*>(w))        return "Label";
-    if (dynamic_cast<const Panel*>(w))        return "Panel";
+    if (dynamic_cast<const Canvas*>(w))        return "Canvas";
+    if (dynamic_cast<const ProgressBar*>(w))   return "ProgressBar";
+    if (dynamic_cast<const Slider*>(w))        return "Slider";
+    if (dynamic_cast<const ComboBox*>(w))      return "ComboBox";
+    if (dynamic_cast<const ListWidget*>(w))    return "ListWidget";
+    if (dynamic_cast<const ListBox*>(w))       return "ListBox";
+    if (dynamic_cast<const RadioButton*>(w))   return "RadioButton";
+    if (dynamic_cast<const Switch*>(w))        return "Switch";
+    if (dynamic_cast<const CheckBox*>(w))      return "CheckBox";
+    if (dynamic_cast<const Button*>(w))        return "Button";
+    if (dynamic_cast<const Line*>(w))          return "Line";
+    if (dynamic_cast<const Spacer*>(w))        return "Spacer";
+    if (dynamic_cast<const Label*>(w))         return "Label";
+    if (dynamic_cast<const Panel*>(w))         return "Panel";
     if (dynamic_cast<const StatusBar*>(w))     return "StatusBar";
-    if (dynamic_cast<const Collapsible*>(w))  return "Collapsible";
-    if (dynamic_cast<const StackLayout*>(w))  return "StackLayout";
-    if (dynamic_cast<const FormLayout*>(w))   return "FormLayout";
-    if (dynamic_cast<const FlowLayout*>(w))   return "FlowLayout";
-    if (dynamic_cast<const Overlay*>(w))      return "Overlay";
-    if (dynamic_cast<const Splitter*>(w))     return "Splitter";
-    if (dynamic_cast<const GridLayout*>(w))   return "GridLayout";
+    if (dynamic_cast<const Collapsible*>(w))   return "Collapsible";
+    if (dynamic_cast<const StackLayout*>(w))   return "StackLayout";
+    if (dynamic_cast<const FormLayout*>(w))    return "FormLayout";
+    if (dynamic_cast<const FlowLayout*>(w))    return "FlowLayout";
+    if (dynamic_cast<const Overlay*>(w))       return "Overlay";
+    if (dynamic_cast<const Splitter*>(w))      return "Splitter";
+    if (dynamic_cast<const GridLayout*>(w))    return "GridLayout";
     if (dynamic_cast<const BorderLayout*>(w))  return "BorderLayout";
-    if (dynamic_cast<const BoxLayout*>(w))    return "BoxLayout";
+    if (dynamic_cast<const BoxLayout*>(w))     return "BoxLayout";
     return "Widget";
 }
 
@@ -164,7 +163,6 @@ json WidgetSerializer::serializeBase(const Widget* w)
     if (!w->isEnabled())
         j["enabled"] = false;
 
-    // Layout props - only if non-default
     const auto& m = w->margins();
     if (m.top != 0 || m.right != 0 || m.bottom != 0 || m.left != 0)
         j["margins"] = edgesToJson(m);
@@ -175,9 +173,7 @@ json WidgetSerializer::serializeBase(const Widget* w)
     if (w->stretch() != 0.0f)
         j["stretch"] = w->stretch();
 
-    // Tags
-    if (!w->tags().empty())
-    {
+    if (!w->tags().empty()) {
         json tagArr = json::array();
         for (const auto& t : w->tags())
             tagArr.push_back(t);
@@ -213,7 +209,6 @@ void WidgetSerializer::deserializeBase(const json& j, Widget* w)
     if (j.contains("stretch"))
         w->setStretch(j["stretch"].get<float>());
 
-    // Tags
     if (j.contains("tags"))
         for (const auto& t : j["tags"])
             w->addTag(t.get<std::string>());
@@ -245,8 +240,6 @@ void WidgetSerializer::deserializeChildren(const json& j, Widget* w)
 json WidgetSerializer::save(const Widget* root)
 {
     json j = serializeBase(root);
-
-    // Type-specific properties
     const std::string type = typeName(root);
 
     if (type == "Label") {
@@ -285,20 +278,17 @@ json WidgetSerializer::save(const Widget* root)
     else if (type == "CheckBox") {
         auto* w = static_cast<const CheckBox*>(root);
         j["text"] = w->text();
-        if (w->isChecked())
-            j["checked"] = true;
+        if (w->isChecked()) j["checked"] = true;
     }
     else if (type == "RadioButton") {
         auto* w = static_cast<const RadioButton*>(root);
         j["text"] = w->text();
-        if (w->isSelected())
-            j["selected"] = true;
+        if (w->isSelected()) j["selected"] = true;
     }
     else if (type == "Switch") {
         auto* w = static_cast<const Switch*>(root);
         j["text"] = w->text();
-        if (w->isOn())
-            j["on"] = true;
+        if (w->isOn()) j["on"] = true;
     }
     else if (type == "ListBox") {
         auto* w = static_cast<const ListBox*>(root);
@@ -306,8 +296,7 @@ json WidgetSerializer::save(const Widget* root)
         for (int i = 0; i < w->itemCount(); ++i)
             arr.push_back(w->itemText(i));
         j["items"] = arr;
-        if (w->selectedIndex() >= 0)
-            j["selected"] = w->selectedIndex();
+        if (w->selectedIndex() >= 0) j["selected"] = w->selectedIndex();
     }
     else if (type == "ComboBox") {
         auto* w = static_cast<const ComboBox*>(root);
@@ -315,14 +304,11 @@ json WidgetSerializer::save(const Widget* root)
         for (int i = 0; i < w->itemCount(); ++i)
             arr.push_back(w->itemText(i));
         j["items"] = arr;
-        if (w->selectedIndex() >= 0)
-            j["selected"] = w->selectedIndex();
+        if (w->selectedIndex() >= 0) j["selected"] = w->selectedIndex();
     }
     else if (type == "ListWidget") {
         auto* w = static_cast<const ListWidget*>(root);
-        if (w->selectedIndex() >= 0)
-            j["selected"] = w->selectedIndex();
-        // Note: row widgets are serialized as children
+        if (w->selectedIndex() >= 0) j["selected"] = w->selectedIndex();
     }
     else if (type == "Slider") {
         auto* w = static_cast<const Slider*>(root);
@@ -339,29 +325,25 @@ json WidgetSerializer::save(const Widget* root)
         j["value"] = w->value();
         if (w->orientation() == LayoutDir::Vertical)
             j["orientation"] = "Vertical";
-        if (!w->text().empty())
-            j["text"] = w->text();
+        if (!w->text().empty()) j["text"] = w->text();
         if (w->textAlign() != TextAlign::CENTER)
             j["textAlign"] = textAlignToStr(w->textAlign());
-        // barColor - only if non-default
         const Color defBar(140, 140, 145, 255);
         if (w->barColor().r != defBar.r || w->barColor().g != defBar.g ||
             w->barColor().b != defBar.b || w->barColor().a != defBar.a)
             j["barColor"] = colorToJson(w->barColor());
     }
     else if (type == "ScrollBar") {
+        // ScrollBar: orientation stored, value serialized
+        // contentSize/viewSize are typically set by ScrollView, not serialized
         auto* w = static_cast<const ScrollBar*>(root);
-        j["contentSize"]  = w->contentSize();
-        j["visibleSize"]  = w->visibleSize();
-        j["value"]        = w->value();
-        if (w->orientation() == LayoutDir::Horizontal)
-            j["orientation"] = "Horizontal";
+        j["value"] = w->value();
+        if (w->maxValue() > 0) j["maxValue"] = w->maxValue();
     }
     else if (type == "ScrollView") {
         auto* w = static_cast<const ScrollView*>(root);
         if (w->scrollX() != 0) j["scrollX"] = w->scrollX();
         if (w->scrollY() != 0) j["scrollY"] = w->scrollY();
-        // Content is serialized as the first child automatically
     }
     else if (type == "Canvas") {
         auto* w = static_cast<const Canvas*>(root);
@@ -374,16 +356,12 @@ json WidgetSerializer::save(const Widget* root)
         auto* w = static_cast<const ImageView*>(root);
         if (w->offsetX() != 0 || w->offsetY() != 0)
             j["offset"] = json::array({w->offsetX(), w->offsetY()});
-        if (w->angle() != 0)
-            j["angle"] = w->angle();
-        // texture path would need a name/path system - skip for now
     }
     else if (type == "GridLayout") {
         auto* w = static_cast<const GridLayout*>(root);
         j["cols"] = w->cols();
         j["spacingH"] = w->spacingH();
         j["spacingV"] = w->spacingV();
-
         const auto& p = w->padding();
         if (p.top != 0 || p.right != 0 || p.bottom != 0 || p.left != 0)
             j["padding"] = edgesToJson(p);
@@ -425,9 +403,6 @@ json WidgetSerializer::save(const Widget* root)
         if (p.top != 0 || p.right != 0 || p.bottom != 0 || p.left != 0)
             j["padding"] = edgesToJson(p);
     }
-    else if (type == "Overlay") {
-        // No extra properties
-    }
     else if (type == "Splitter") {
         auto* w = static_cast<const Splitter*>(root);
         j["dir"] = (w->dir() == LayoutDir::Horizontal) ? "Horizontal" : "Vertical";
@@ -438,12 +413,9 @@ json WidgetSerializer::save(const Widget* root)
     else if (type == "BorderLayout") {
         auto* w = static_cast<const BorderLayout*>(root);
         j["spacing"] = w->spacing();
-
         const auto& p = w->padding();
         if (p.top != 0 || p.right != 0 || p.bottom != 0 || p.left != 0)
             j["padding"] = edgesToJson(p);
-
-        // Region sizes
         const char* regionNames[] = {"topSize", "bottomSize", "leftSize", "rightSize", "centerSize"};
         for (int i = 0; i < 5; ++i) {
             float s = w->regionSize(static_cast<BorderRegion>(i));
@@ -454,36 +426,32 @@ json WidgetSerializer::save(const Widget* root)
         auto* w = static_cast<const BoxLayout*>(root);
         j["dir"] = (w->dir() == LayoutDir::Horizontal) ? "Horizontal" : "Vertical";
         j["spacing"] = w->spacing();
-
         const auto& p = w->padding();
         if (p.top != 0 || p.right != 0 || p.bottom != 0 || p.left != 0)
             j["padding"] = edgesToJson(p);
-
         if (w->mainAlign() != MainAlign::Start)
             j["mainAlign"] = mainAlignToStr(w->mainAlign());
     }
 
-    // Children
     if (!root->children().empty())
         j["children"] = serializeChildren(root);
 
     return j;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  File I/O — uses IO callbacks (no SDL dependency)
+// ═════════════════════════════════════════════════════════════════════════════
+
 bool WidgetSerializer::saveToFile(const Widget* root, const std::string& path)
 {
-    json j = save(root);
-    std::string data = j.dump(2);
-
-    SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "w");
-    if (!rw) {
-        fprintf(stderr, "WidgetSerializer: cannot write '%s': %s\n",
-                path.c_str(), SDL_GetError());
+    auto& io = BuGUI::GetIO();
+    if (!io.writeFile) {
+        fprintf(stderr, "WidgetSerializer: writeFile callback not set\n");
         return false;
     }
-    size_t written = SDL_RWwrite(rw, data.c_str(), 1, data.size());
-    SDL_RWclose(rw);
-    return written == data.size();
+    json j = save(root);
+    return io.writeFile(path, j.dump(2));
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -512,31 +480,21 @@ Widget* WidgetSerializer::load(const json& j, Widget* parent)
 
 Widget* WidgetSerializer::loadFromFile(const std::string& path, Widget* parent)
 {
-    SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "r");
-    if (!rw) {
-        fprintf(stderr, "WidgetSerializer: cannot open '%s': %s\n",
-                path.c_str(), SDL_GetError());
+    auto& io = BuGUI::GetIO();
+    if (!io.readFile) {
+        fprintf(stderr, "WidgetSerializer: readFile callback not set\n");
         return nullptr;
     }
 
-    Sint64 size = SDL_RWsize(rw);
-    if (size <= 0) {
-        SDL_RWclose(rw);
-        fprintf(stderr, "WidgetSerializer: empty or unreadable '%s'\n", path.c_str());
+    std::string data = io.readFile(path);
+    if (data.empty()) {
+        fprintf(stderr, "WidgetSerializer: cannot read '%s'\n", path.c_str());
         return nullptr;
     }
-
-    std::vector<char> buf(static_cast<size_t>(size));
-    if (SDL_RWread(rw, buf.data(), 1, buf.size()) != static_cast<size_t>(size)) {
-        SDL_RWclose(rw);
-        fprintf(stderr, "WidgetSerializer: read error '%s'\n", path.c_str());
-        return nullptr;
-    }
-    SDL_RWclose(rw);
 
     json j;
     try {
-        j = json::parse(buf.begin(), buf.end());
+        j = json::parse(data);
     } catch (const json::parse_error& e) {
         fprintf(stderr, "WidgetSerializer: parse error in '%s': %s\n",
                 path.c_str(), e.what());
@@ -670,13 +628,11 @@ void WidgetSerializer::registerBuiltinTypes()
     });
 
     registerType("ScrollBar", [](const json& j, Widget* parent) -> Widget* {
-        LayoutDir dir = LayoutDir::Vertical;
+        ScrollBarOrientation dir = ScrollBarOrientation::Vertical;
         if (j.contains("orientation") && j["orientation"].get<std::string>() == "Horizontal")
-            dir = LayoutDir::Horizontal;
+            dir = ScrollBarOrientation::Horizontal;
         auto* w = parent->createChild<ScrollBar>(dir);
-        if (j.contains("contentSize"))  w->setContentSize(j["contentSize"].get<float>());
-        if (j.contains("visibleSize"))  w->setVisibleSize(j["visibleSize"].get<float>());
-        if (j.contains("value"))        w->setValue(j["value"].get<float>());
+        if (j.contains("value")) w->setValue(j["value"].get<float>());
         return w;
     });
 
@@ -700,9 +656,6 @@ void WidgetSerializer::registerBuiltinTypes()
             const auto& o = j["offset"];
             w->setOffset(o[0].get<float>(), o[1].get<float>());
         }
-        if (j.contains("angle"))
-            w->setAngle(j["angle"].get<float>());
-        // texture must be set by application code after loading
         return w;
     });
 
@@ -819,8 +772,7 @@ void WidgetSerializer::registerBuiltinTypes()
 
     registerType("TabLayout", [](const json& j, Widget* parent) -> Widget* {
         auto* w = parent->createChild<TabLayout>();
-        if (j.contains("tabPosition"))
-        {
+        if (j.contains("tabPosition")) {
             std::string p = j["tabPosition"].get<std::string>();
             if (p == "Bottom") w->setTabPosition(TabPosition::Bottom);
             else if (p == "Left") w->setTabPosition(TabPosition::Left);

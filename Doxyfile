@@ -1,0 +1,51 @@
+# BuGUI API Documentation
+PROJECT_NAME           = "BuGUI"
+PROJECT_BRIEF          = "Immediate-retained hybrid GUI toolkit"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = widgets/include
+FILE_PATTERNS          = *.hpp
+RECURSIVE              = NO
+
+# Show all public API even without doc comments
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = NO
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_IN_BODY_DOCS      = YES
+
+# Generate HTML only (no LaTeX/RTF)
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_COLORSTYLE        = DARK
+GENERATE_LATEX         = NO
+GENERATE_RTF           = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+
+# Improve output
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+ALWAYS_DETAILED_SEC    = NO
+INLINE_INHERITED_MEMB  = YES
+SHOW_GROUPED_MEMB_INC  = YES
+
+# Class diagrams
+HAVE_DOT               = NO
+COLLABORATION_GRAPH    = NO
+
+# Source browsing
+SOURCE_BROWSER         = NO
+VERBATIM_HEADERS       = NO
+
+# Preprocessor
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = NO
+
+# Warnings
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Widget.hpp"
-#include "Color.hpp"
+#include "BuGUI_base.hpp"
+#include "BuGUI.hpp"
+#include <cstdint>
 #include <functional>
 #include <vector>
 #include <string>
@@ -47,86 +49,128 @@ enum class TransitionType
     ZoomOut,       // old zooms out to center (full → small), new behind
 };
 
-class RenderBatch;
-class Font;
 class FloatWindow;
+class StatusBar;
+
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Window flags (combinable via |)
-// ═════════════════════════════════════════════════════════════════════════════
-
-enum WindowFlags : unsigned int
-{
-    WindowFlag_None        = 0,
-    WindowFlag_Resizable   = 1 << 0,   // window can be resized (default on)
-    WindowFlag_Borderless  = 1 << 1,   // no window decorations
-    WindowFlag_Fullscreen  = 1 << 2,   // fullscreen desktop
-    WindowFlag_Maximized   = 1 << 3,   // start maximized
-    WindowFlag_AlwaysOnTop = 1 << 4,   // window stays on top
-
-    WindowFlag_Default = WindowFlag_Resizable,
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  WidgetApp - singleton that manages window, rendering, events, widget tree
+//  WidgetApp – pure widget manager 
 //
-//  Usage:
-//      auto& app = WidgetApp::instance();
-//      app.init("My App", 1024, 768);
+//  The application (backend) owns the window, GL context and main loop.
+//  WidgetApp manages the widget tree, layout, input dispatch and painting.
 //
-//      auto* btn = app.root()->createChild<Button>("Click");
-//      btn->onClick.connect([]{ ... });
-//
-//      app.run();   // blocks until window closes
+//  Typical frame:
+//      widgetApp.update(BuGUI::GetIO());                    // input → widgets
+//      widgetApp.paint(*BuGUI::GetDrawData(), font, icons); // layout + draw
+//      BuGUI::Render();
+//      backend.render(*BuGUI::GetDrawData());
 // ═════════════════════════════════════════════════════════════════════════════
 
 class WidgetApp
 {
 public:
+    /// @brief Get the singleton instance.
     static WidgetApp& instance();
 
-    // Initialize window + GL + batch + font. Returns false on failure.
-    // monitor: -1 = default/centered, 0..N = specific display index
-    bool init(const char* title, int width = 1024, int height = 768,
-              int monitor = -1, unsigned int flags = WindowFlag_Default);
+    /// @brief Initialize the widget system (call after GL context ready).
+    bool init();
 
-    // ── Window properties (runtime) ───────────────────────────────────────
-    bool isResizable() const;
-    bool isMaximized() const;
-    void setResizable(bool r);
-    void setMinSize(int w, int h);
-    void setMaxSize(int w, int h);
-    void setTitle(const char* title);
-
-    // Run the main loop (blocks). Returns exit code.
-    int run();
-
-    // Release all resources (called automatically by run() and destructor).
+    /// @brief Release all resources.
     void shutdown();
 
-    // Stop the main loop (call from signal handlers etc.)
-    void quit() { running_ = false; }
+    // ── Per-frame API ──────────────────────────────────────────────────────
+    /// @brief Dispatch IO events to the widget tree.
+    void update(const BuGUI::IO& io);
 
-    // ── Lifecycle callbacks ───────────────────────────────────────────────
-    // Called once after init, GL context is alive - create textures, shaders, etc.
-    void setOnCreate(std::function<void()> cb)  { onCreate_  = std::move(cb); }
-    // Called before shutdown, GL context still alive - free user GL resources.
-    void setOnDestroy(std::function<void()> cb) { onDestroy_ = std::move(cb); }
-    // Called every frame before render - update logic, animations, etc.
-    void setOnIdle(std::function<void(float dt)> cb) { onIdle_ = std::move(cb); }
+    /// @brief Layout and paint the widget tree into draw data.
+    void paint(BuGUI::DrawData& data,
+               const BuGUI::Font* font  = nullptr,
+               IconAtlas*         icons = nullptr);
 
-    // ── Input event callbacks ──────────────────────────────────────────────
-    // Return true to consume the event (widgets won't receive it).
-    void setOnKeyDown(std::function<bool(int key, int scancode, int mod)> cb)    { onKeyDown_    = std::move(cb); }
-    void setOnKeyUp(std::function<bool(int key, int scancode, int mod)> cb)      { onKeyUp_      = std::move(cb); }
-    void setOnTextInput(std::function<bool(const char* text)> cb)                { onTextInput_  = std::move(cb); }
-    void setOnMouseWheel(std::function<bool(float x, float y)> cb)               { onMouseWheel_ = std::move(cb); }
+    /// @brief Get the cursor type the backend should apply.
+    CursorType wantedCursor() const { return wantedCursor_; }
+
+    /// @brief Get the background color.
+    const Color& bgColor() const    { return bgColor_; }
+    /// @brief Set the background color.
+    void setBgColor(const Color& c) { bgColor_ = c; }
+
+    // ── Dimensions (read from IO each frame) ──────────────────────────────
+    /// @brief Get the window width in pixels.
+    int   width()     const { return width_; }
+    /// @brief Get the window height in pixels.
+    int   height()    const { return height_; }
+    /// @brief Get the frame delta time in seconds.
+    float deltaTime() const { return dt_; }
+
+    /// @brief Get elapsed time in milliseconds since init.
+    uint32_t elapsedMs() const { return elapsedMs_; }
+
+    // ── Platform-agnostic clipboard (set by backend via IO) ──────────────
+    /// @brief Set clipboard text (platform-agnostic).
+    void        setClipboardText(const char* text);
+    /// @brief Get clipboard text.
+    std::string getClipboardText() const;
+
+    /// @brief Get the cached font from the last paint() call.
+    const BuGUI::Font* font() const { return font_; }
+    /// @brief Measure text width using the cached font.
+    float textWidth(const char* text) const;
+    /// @brief Get approximate frames per second.
+    int   fps()       const { return dt_ > 0.0f ? static_cast<int>(1.0f / dt_) : 0; }
+    /// @brief Get the current mouse X position.
+    float mouseX()    const { return mouseX_; }
+    /// @brief Get the current mouse Y position.
+    float mouseY()    const { return mouseY_; }
+
+    /// @brief Toggle debug layout wireframe overlay.
+    bool debugLayout() const    { return debugLayout_; }
+    /// @brief Enable/disable debug layout wireframe.
+    void setDebugLayout(bool d) { debugLayout_ = d; }
+
+    /// @brief Set per-frame overlay paint callback.
+    void setOverlayCallback(std::function<void(PaintContext&)> cb) { overlay_ = std::move(cb); }
+
+    // ── Drag & Drop state (read by widgets/app during frame) ──────────────
+    /// @brief Check if a widget drag is in progress.
+    bool isDragging() const { return dragPayload_ != nullptr; }
+    /// @brief Get the current drag payload.
+    const DragPayload* dragPayload() const { return dragPayload_; }
+    /// @brief Get the drag source widget.
+    Widget* dragSource() const { return dragSource_; }
+
+    /// @brief Set the drag threshold in pixels.
+    void  setDragThreshold(float px) { dragThreshold_ = px; }
+    /// @brief Get the drag threshold.
+    float dragThreshold() const      { return dragThreshold_; }
+
+    // ── Texture services (set by backend at init) ─────────────────────────
+    // The backend registers these so widgets can create/destroy GPU textures
+    // without depending on any specific graphics API.
+    using UploadTextureFn  = std::function<BuGUI::TextureHandle(const unsigned char* rgba, int w, int h)>;
+    using DestroyTextureFn = std::function<void(BuGUI::TextureHandle)>;
+
+    /// @brief Register a texture upload function.
+    void setTextureUpload(UploadTextureFn fn)   { uploadTex_ = std::move(fn); }
+    /// @brief Register a texture destroy function.
+    void setTextureDestroy(DestroyTextureFn fn)  { destroyTex_ = std::move(fn); }
+
+    /// @brief Upload RGBA pixels to GPU texture.
+    BuGUI::TextureHandle uploadTexture(const unsigned char* rgba, int w, int h)
+    { return uploadTex_ ? uploadTex_(rgba, w, h) : BuGUI::TextureHandle{0}; }
+
+    /// @brief Free a previously uploaded texture.
+    void destroyTexture(BuGUI::TextureHandle tex)
+    { if (destroyTex_ && tex) destroyTex_(tex); }
+
+    /// @brief Load an image file to GPU texture.
+    BuGUI::TextureHandle loadImageTexture(const char* path, int& outW, int& outH);
 
     // ── Root widget ───────────────────────────────────────────────────────
-    // A default root Panel is created by init(). Add children to it.
+    /// @brief Get the root widget.
     Widget* root() const { return root_; }
 
-    // Replace the root widget (takes ownership, deletes old)
+    /// @brief Replace the root widget (takes ownership, deletes old).
     void setRoot(Widget* r);
 
     // ── Stage management ──────────────────────────────────────────────────
@@ -140,37 +184,64 @@ public:
     //   app.setStage("menu");  // shows menu
     //   app.setStage("game");  // switches to game, menu preserved
 
-    // Create a new stage. Returns its root widget (a plain Widget container).
-    // If the stage already exists, returns the existing root.
+    /// @brief Create a named stage. Returns its root widget.
     Widget* addStage(const std::string& name);
 
-    // Switch to a named stage with optional transition and easing.
-    // Returns false if stage not found.
+    /// @brief Switch to a named stage.
     bool setStage(const std::string& name);
+    /// @brief Switch with a specific transition.
     bool setStage(const std::string& name, TransitionType transition);
+    /// @brief Switch with transition and easing.
     bool setStage(const std::string& name, TransitionType transition, EaseType ease);
 
-    // Set default transition type, easing and duration
+    /// @brief Set default transition type, easing and duration.
     void setTransition(TransitionType type, float durationSec = 0.3f, EaseType ease = EaseType::InOutCubic);
+    /// @brief Get the transition type.
     TransitionType transitionType() const { return transType_; }
+    /// @brief Get the transition easing.
     EaseType       transitionEase() const { return transEase_; }
+    /// @brief Get the transition duration in seconds.
     float transitionDuration() const { return transDuration_; }
+    /// @brief Check if a stage transition is active.
     bool  isTransitioning()   const { return transActive_; }
 
-    // Get a stage's root widget (nullptr if not found). Works for any stage.
+    /// @brief Get a stage's root widget by name.
     Widget* stage(const std::string& name) const;
 
-    // Current stage name (empty if no stage system used)
+    /// @brief Get the current stage name (empty if unused).
     const std::string& currentStageName() const { return currentStage_; }
 
-    // Remove a stage (deletes its widget tree). Cannot remove active stage.
+    /// @brief Remove a stage and delete its widget tree.
     bool removeStage(const std::string& name);
 
-    // Request a layout pass on the next frame
+    /// @brief Set a 2D camera for a named stage.
+    void setStageCamera(const std::string& name, const BuGUI::Camera2D& cam);
+    /// @brief Get the camera for a named stage.
+    BuGUI::Camera2D stageCamera(const std::string& name) const;
+
+    /// @brief Set a per-stage background color.
+    void setStageBgColor(const std::string& name, const Color& c);
+    /// @brief Get a stage's background color.
+    Color stageBgColor(const std::string& name) const;
+
+    // ── Status bar (managed by WidgetApp, pinned to window bottom) ─────
+    // One shared StatusBar across all stages. Painted and hit-tested by
+    // WidgetApp after the stage tree. Stages access it via statusBar().
+    /// @brief Get the shared status bar widget.
+    StatusBar* statusBar() const { return statusBar_; }
+    /// @brief Set the status bar text.
+    void setStatusText(const std::string& text);
+    /// @brief Show or hide the status bar.
+    void setShowStatusBar(bool show) { showStatusBar_ = show; needsLayout_ = true; }
+    /// @brief Check if the status bar is shown.
+    bool showStatusBar() const       { return showStatusBar_; }
+    /// @brief Get the status bar height.
+    float statusBarHeight() const;
+
+    /// @brief Request a layout pass on the next frame.
     void requestLayout() { needsLayout_ = true; }
 
-    // Clear any internal references to a widget about to be destroyed
-    // (called automatically by Widget::removeChild)
+    /// @brief Clear internal refs to a widget being destroyed.
     void notifyWidgetRemoved(Widget* w);
 
     // ── Float windows ───────────────────────────────────────────────────
@@ -182,40 +253,28 @@ public:
         addFloatImpl(fw);
         return fw;
     }
-    void removeFloat(FloatWindow* fw);    // deletes it
-    void bringToFront(FloatWindow* fw);   // re-stack to top
+    /// @brief Remove and delete a float window.
+    void removeFloat(FloatWindow* fw);
+    /// @brief Bring a float window to the top of the stack.
+    void bringToFront(FloatWindow* fw);
+    /// @brief Get the list of float windows.
     const std::vector<FloatWindow*>& floats() const { return floats_; }
 
-    // ── Accessors ─────────────────────────────────────────────────────────
-    int  width()  const { return width_; }
-    int  height() const { return height_; }
-    int  fps()    const;
-    float deltaTime() const { return dt_; }
-    float mouseX() const { return mouseX_; }
-    float mouseY() const { return mouseY_; }
-
-    // Background color
-    void setBgColor(const Color& c) { bgColor_ = c; }
-
-    // Debug layout visualization (toggle with F1)
-    bool debugLayout() const { return debugLayout_; }
-    void setDebugLayout(bool d) { debugLayout_ = d; }
-
-    // Optional per-frame callback (called after widget paint, before swap)
-    void setOverlayCallback(std::function<void(PaintContext&)> cb) { overlay_ = std::move(cb); }
-
     // ── Focus ─────────────────────────────────────────────────────────────
+    /// @brief Set the focused widget.
     void setFocused(Widget* w);
+    /// @brief Get the currently focused widget.
     Widget* focused() const { return focused_; }
 
-    // ── Widget lookup shortcuts ───────────────────────────────────────────
-    // Find by ID in current root (active stage)
+    // ── Widget lookup ─────────────────────────────────────────────────────
+    /// @brief Find a widget by ID.
     Widget* widget(const std::string& id) { return root_ ? root_->findById(id) : nullptr; }
 
+    /// @brief Find a widget by ID and cast to type T.
     template <typename T>
     T* widget(const std::string& id) { return root_ ? root_->findById<T>(id) : nullptr; }
 
-    // Find all widgets with a tag in current root
+    /// @brief Find all widgets with a given tag.
     std::vector<Widget*> widgetsByTag(const std::string& tag);
 
     template <typename T>
@@ -245,19 +304,16 @@ public:
     void fireEvent(const std::string& event, Widget* w);
 
     // ── Popup overlay ─────────────────────────────────────────────────
-    // Show a popup widget on top of everything.
-    // owner = the widget that opened it (clicks on owner won't close it).
-    // owned = if true (default), popup is deleted on close.
+    /// @brief Show a popup widget on top of everything.
     void showPopup(Widget* popup, Widget* owner = nullptr, bool owned = true);
+    /// @brief Close the current popup.
     void closePopup();
+    /// @brief Get the active popup widget.
     Widget* popup() const { return popup_; }
+    /// @brief Get the widget that opened the popup.
     Widget* popupOwner() const { return popupOwner_; }
 
-    // ── Internal access (for widgets that need batch/font) ────────────────
-    RenderBatch& fillBatch();
-    RenderBatch& lineBatch();
-    RenderBatch& textBatch();
-    Font& font();
+    /// @brief Get the shared icon atlas.
     IconAtlas& iconAtlas();
 
 private:
@@ -268,58 +324,69 @@ private:
     WidgetApp(const WidgetApp&) = delete;
     WidgetApp& operator=(const WidgetApp&) = delete;
 
-    // Event handling - called per SDL event
-    void handleEvent(union SDL_Event& event);
-    void handleMouseButton(union SDL_Event& event, bool down);
-    void handleMouseMotion(union SDL_Event& event);
-    void handleMouseWheel(union SDL_Event& event);
-    void handleKey(union SDL_Event& event, bool down);
-    void handleTextInput(union SDL_Event& event);
+    // Input dispatch helpers
+    void dispatchMouseMove(float x, float y);
+    void dispatchMousePress(float x, float y, int btn);
+    void dispatchMouseRelease(float x, float y, int btn);
+    void dispatchMouseScroll(float x, float y, float sx, float sy);
+    void dispatchKeyEvent(const BuGUI::IO::KeyEvent& ke);
+    void dispatchTextInput(const std::vector<uint32_t>& chars);
 
-    // Hit test - find deepest widget under (x,y)
+    // Build a MouseEvent pre-filled with current IO modifier state
+    MouseEvent makeMouseEvent(float x, float y, int btn = 0) const;
+
+    // Hit test
     Widget* hitTest(Widget* w, float x, float y);
-
-    // Fill localX/localY on a MouseEvent for a target widget
     void fillLocal(Widget* target, MouseEvent& e);
 
-    // Bubble an event up the parent chain until consumed
     template <typename Func>
     void bubble(Widget* target, MouseEvent& e, Func handler);
 
-    // Build chain from root to widget (inclusive)
     static std::vector<Widget*> buildChain(Widget* w);
-
-    // Update hover chain, fire enter/leave
     void updateHover(Widget* newLeaf);
-
-    // Apply SDL cursor
     void applyCursor(CursorType type);
 
-    // Render
-    void render();
-
-    // Paint a widget tree with offset + scale (for transitions)
-    void paintTree(Widget* tree, float w, float h,
-                   float offsetX, float offsetY, float scale);
+    // Paint helpers
+    void paintTreeInto(Widget* tree, BuGUI::DrawList& dl,
+                       const BuGUI::Font* font, IconAtlas* icons,
+                       float w, float h, const Color& bgColor = Color(30,30,30,255));
+    void paintDebugOverlay(Widget* w, BuGUI::DrawList& dl, int depth = 0);
+    void paintTooltipInto(BuGUI::DrawList& dl, const BuGUI::Font* font);
 
     // State
-    bool  inited_       = false;
-    bool  running_      = false;
-    bool  needsLayout_  = true;
-    int   width_   = 0;
-    int   height_  = 0;
-    int   drawW_   = 0;   // GL drawable size (for glViewport, may differ on HiDPI)
-    int   drawH_   = 0;
-    float dt_      = 0.0f;
-    Color bgColor_ = Color(30, 30, 30, 255);
+    bool  inited_      = false;
+    bool  needsLayout_ = true;
+    int   width_       = 0;
+    int   height_      = 0;
+    float dt_          = 0.0f;
+    uint32_t elapsedMs_ = 0;
+    Color bgColor_     = Color(30, 30, 30, 255);
     bool  debugLayout_ = false;
 
-    // Subsystems (pointers to avoid including headers)
-    RenderBatch* fillBatch_  = nullptr;  // filled shapes
-    RenderBatch* lineBatch_  = nullptr;  // outlines, borders
-    RenderBatch* textBatch_  = nullptr;  // font quads
-    Font*        font_       = nullptr;
-    IconAtlas*   iconAtlas_  = nullptr;  // icon sprite sheet
+    // Cursor hint (set by applyCursor, read by backend via wantedCursor())
+    CursorType wantedCursor_ = CursorType::Arrow;
+
+    // Previous-frame IO state for press/release delta detection
+    float prevMouseX_      = 0.0f;
+    float prevMouseY_      = 0.0f;
+    bool  prevMouseDown_[5] = {};
+    bool  ioKeyCtrl_  = false;
+    bool  ioKeyShift_ = false;
+    bool  ioKeyAlt_   = false;
+
+    // Double/triple-click detection
+    uint32_t lastClickMs_  = 0;
+    float    lastClickX_   = 0, lastClickY_ = 0;
+    int      lastClickBtn_ = -1;
+    int      clickSeq_     = 0;   // 0→1→2→3 then resets
+
+    std::function<void(const char*)> clipSet_;
+    std::function<std::string()>     clipGet_;
+
+    // Subsystems
+    IconAtlas* iconAtlas_ = nullptr;
+    const BuGUI::Font*  font_      = nullptr;  // cached from last paint()
+    BuGUI::DrawList*    drawList_  = nullptr;  // cached from last paint()
 
     // Widget tree
     Widget* root_    = nullptr;
@@ -336,22 +403,30 @@ private:
     Widget* pendingPopupDelete_ = nullptr;   // deferred delete (safe after event loop)
     bool    popupOwned_         = true;      // if true, popup is deleted on close
 
+    // Popup animation
+    float   popupAnimProgress_  = 1.0f;     // 0→1 open, 1→0 close
+    float   popupAnimDuration_  = 0.12f;    // seconds
+    bool    popupAnimOpening_   = false;
+    bool    popupAnimClosing_   = false;
+    EaseType popupAnimEase_     = EaseType::OutCubic;
+    // Closing state: kept alive during close animation
+    Widget* popupClosing_       = nullptr;
+    Widget* popupClosingOwner_  = nullptr;
+    bool    popupClosingOwned_  = true;
+
     // Float windows (painted above stage, below popup)
     std::vector<FloatWindow*> floats_;
     std::vector<FloatWindow*> pendingFloatDeletes_;  // deferred delete (safe after event loop)
 
     // Tooltip
-    float   tooltipTimer_   = 0.0f;   // seconds hovered on current widget
+    float   tooltipTimer_   = 0.0f;
     bool    tooltipVisible_ = false;
-    Widget* tooltipWidget_  = nullptr; // widget whose tooltip is showing
-    void    paintTooltip();
-
-    // Cursors (SDL system cursors, indexed by CursorType)
-    void*       sdlCursors_[8] = {};
-    CursorType  activeCursor_  = CursorType::Arrow;
+    Widget* tooltipWidget_  = nullptr;
 
     // Stage system
-    std::unordered_map<std::string, Widget*> stages_;  // name → root widget
+    std::unordered_map<std::string, Widget*>          stages_;       // name → root widget
+    std::unordered_map<std::string, BuGUI::Camera2D>  stageCameras_; // per-stage camera
+    std::unordered_map<std::string, Color>            stageBgColors_;// per-stage background
     std::string currentStage_;
 
     // Transition
@@ -365,21 +440,28 @@ private:
     Widget*        transOldRoot_  = nullptr;
     std::string    transOldStage_;
 
-    // Lifecycle callbacks
-    std::function<void()> onCreate_;
-    std::function<void()> onDestroy_;
-    std::function<void(float)> onIdle_;
-
-    // Input event callbacks
-    std::function<bool(int, int, int)> onKeyDown_;
-    std::function<bool(int, int, int)> onKeyUp_;
-    std::function<bool(const char*)>   onTextInput_;
-    std::function<bool(float, float)>  onMouseWheel_;
+    // Status bar (owned, painted after stage)
+    StatusBar* statusBar_    = nullptr;
+    bool       showStatusBar_ = true;
 
     // Optional overlay callback
     std::function<void(PaintContext&)> overlay_;
 
+    // Texture service callbacks (set by backend)
+    UploadTextureFn  uploadTex_;
+    DestroyTextureFn destroyTex_;
+
     // Global event dispatcher
     // Key = "event:widgetId" for targeted, "event:*" for catch-all
     std::unordered_map<std::string, std::vector<EventCallback>> globalHandlers_;
+
+    // ── Drag & Drop state ─────────────────────────────────────────────────
+    DragPayload* dragPayload_  = nullptr;   // active payload (owned)
+    Widget*      dragSource_   = nullptr;   // widget that started the drag
+    float        dragStartX_   = 0, dragStartY_ = 0;
+    bool         dragPending_  = false;     // mouse down on dragSource, waiting threshold
+    float        dragThreshold_= 5.0f;     // pixels before drag begins
+
+    void dispatchDropEvents(const std::vector<BuGUI::IO::DropEvent>& drops);
+    void cancelDrag();
 };

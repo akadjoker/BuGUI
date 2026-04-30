@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['n_0',['N',['../namespaceBuGUI_1_1Key.html#a332bf415f935df6a44df4dbf65f1b34d',1,'BuGUI::Key']]],
+  ['name_1',['name',['../structPropertyGrid_1_1PropRow.html#a1f7bab71ae68923b6ec1dad720607a9a',1,'PropertyGrid::PropRow::name'],['../structTimelineTrack.html#a103ce22dc0d0eb82c626a684afb422f4',1,'TimelineTrack::name'],['../structPin.html#ad940005d3eda19065f03f1deb6b469d1',1,'Pin::name'],['../structAssetItem.html#ad269320f66d22c4e622cbb91440b3c89',1,'AssetItem::name'],['../structPlotSeries.html#a0de97b71bbb27513afd074c65bcdee88',1,'PlotSeries::name'],['../structCurveData.html#aa9e23d212341596ff9ede8acfd02722b',1,'CurveData::name'],['../structDirCache_1_1DirNode.html#a90c01252bc1ef495e68b5f2ce1f76b83',1,'DirCache::DirNode::name'],['../structDockNode_1_1Tab.html#a322c40060e61b8fee328927b7d796c01',1,'DockNode::Tab::name'],['../structFileSystem_1_1Entry.html#ada515473f2bdb82dbdfbb0d2e08bd739',1,'FileSystem::Entry::name']]],
+  ['navigate_2',['navigate',['../classDirCache.html#a0da23ef9582de1b72251bca244077204',1,'DirCache']]],
+  ['needed_3',['needed',['../classScrollBar.html#a3a71c8ed77e16b438041f60ab7555992',1,'ScrollBar']]],
+  ['newframe_4',['NewFrame',['../namespaceBuGUI.html#a947d79941ec867fa2b85c87c3626965b',1,'BuGUI']]],
+  ['next_5',['next',['../classCarousel.html#a4ad0bf38ac1c8aaa8d28a117abe002f5',1,'Carousel']]],
+  ['no_6',['No',['../Widget_8hpp.html#abbe637356c8cb749a9726f13658031faabafd7322c6e97d25b6299b5d6fe8920b',1,'Widget.hpp']]],
+  ['node_7',['node',['../structTreeGrid_1_1Node.html',1,'TreeGrid::Node'],['../structTreeModel_1_1Node.html',1,'TreeModel::Node'],['../classNodeEditor.html#ad9c6cf82797fc5d0af07e89990f6e58b',1,'NodeEditor::node(int id)'],['../classNodeEditor.html#a69e11348ddf96d109d1409ac681f3337',1,'NodeEditor::node(int id) const'],['../structNode.html',1,'Node']]],
+  ['nodecollapsed_8',['nodecollapsed',['../classTreeGrid.html#a546082147e8105c44ad9b169a2a3592c',1,'TreeGrid::nodeCollapsed'],['../classTreeView.html#abe30a9b03db987f9de97b4982035315b',1,'TreeView::nodeCollapsed']]],
+  ['nodecount_9',['nodecount',['../classTreeGrid.html#a538350caad265d8d04c1ceafc8045c42',1,'TreeGrid::nodeCount()'],['../classNodeEditor.html#af51c8aa0b724e780fb668698a12f1189',1,'NodeEditor::nodeCount() const']]],
+  ['nodeeditor_10',['nodeeditor',['../classNodeEditor.html#a89227e42e98cdfef1271bc1bce3cbb99',1,'NodeEditor::NodeEditor()'],['../classNodeEditor.html',1,'NodeEditor']]],
+  ['nodeeditor_2ehpp_11',['NodeEditor.hpp',['../NodeEditor_8hpp.html',1,'']]],
+  ['nodeexpanded_12',['nodeexpanded',['../classTreeGrid.html#a01c9a7ee325e3d99e0118dcae0eb938c',1,'TreeGrid::nodeExpanded'],['../classTreeView.html#a0ef884d27f7edd2f718c793a9c12c88e',1,'TreeView::nodeExpanded']]],
+  ['nodefromindex_13',['nodeFromIndex',['../classTreeModel.html#adc559718825818325c450213e3f45201',1,'TreeModel']]],
+  ['none_14',['none',['../classPageView.html#a78bdc718c287fc21df454bb0a2c3843ea669f2cf2ce9831429c934cd3e5b4d4c1',1,'PageView::None'],['../GizmoWidgets_8hpp.html#afb80358877cd551687530d96798caf63a6adf97f83acf6453d4a6a4b1070f3754',1,'None:&#160;GizmoWidgets.hpp'],['../namespaceBuGUI.html#a6c0cb98cb666ed339e7995f234be7bdaa6adf97f83acf6453d4a6a4b1070f3754',1,'BuGUI::None'],['../classAbstractItemModel.html#aa9db577be0d6e9bbb4a9028dc996443aa0e01aa4c5d869dfe5e37535d4a8d89d8',1,'AbstractItemModel::None'],['../GizmoWidgets_8hpp.html#adb5d8b833866c60056c5ce10c64c35fea6adf97f83acf6453d4a6a4b1070f3754',1,'None:&#160;GizmoWidgets.hpp'],['../IconAtlas_8hpp.html#af12b1c373512ce0c0bc82dea30426e14a6adf97f83acf6453d4a6a4b1070f3754',1,'None:&#160;IconAtlas.hpp'],['../WidgetApp_8hpp.html#a4e38d9519e74e10eccdfda5c5b92b283a6adf97f83acf6453d4a6a4b1070f3754',1,'None:&#160;WidgetApp.hpp'],['../classDataGrid.html#ad70ec8d50fb5d7c3e1a0c1b0cd8211c0a6adf97f83acf6453d4a6a4b1070f3754',1,'DataGrid::None']]],
+  ['normal_15',['normal',['../classTextInput.html#a3aa2d139e6cb0c7659fe0f0fb70128d7a960b44c579bc2f6818d2daaf9e4c16f0',1,'TextInput::Normal'],['../classDialog.html#aaebfaae3760132823d8696c4889cc405a960b44c579bc2f6818d2daaf9e4c16f0',1,'Dialog::Normal']]],
+  ['normalised_16',['normalised',['../classLinearKnob.html#a811ae370aee6d93fdd856578d0d9276b',1,'LinearKnob::normalised()'],['../classKnob.html#ad97a4d9158d5134a420b967a24746151',1,'Knob::normalised()']]],
+  ['normalized_17',['normalized',['../structBuGUI_1_1Vec3f.html#ac0302cf4daf86c7f2aeb632fd04172cd',1,'BuGUI::Vec3f::normalized()'],['../structBuGUI_1_1Vec2f.html#a96346d8f31ca8e4a32110a8baa64b89d',1,'BuGUI::Vec2f::normalized()']]],
+  ['normalizepath_18',['normalizePath',['../namespaceFileSystem.html#a72447c6a2484a4f85e99d375f0c25411',1,'FileSystem']]],
+  ['notes_19',['notes',['../classPianoRoll.html#ace910e6760b14d7c51e5fd97c5128d6b',1,'PianoRoll']]],
+  ['notifywidgetremoved_20',['notifyWidgetRemoved',['../classWidgetApp.html#ad20ab31fb029e4dc8421b5ef73744f14',1,'WidgetApp']]],
+  ['number_21',['Number',['../classSyntaxHighlighter.html#a7e7c218d1b6f119c51dd16af6efc0cf5ab2ee912b91d69b435159c7c3f6df7f5f',1,'SyntaxHighlighter']]],
+  ['numberonly_22',['NumberOnly',['../classTextInput.html#a3aa2d139e6cb0c7659fe0f0fb70128d7ae6634b3f3e0f5da6ab274a12812f6f7e',1,'TextInput']]]
+];

@@ -2,16 +2,21 @@
 
 #include "Widget.hpp"
 #include "Theme.hpp"
+#include "Signal.hpp"
 #include <string>
 #include <functional>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FloatWindow - draggable floating panel with title bar, close & minimize
-//    auto* fw = new FloatWindow("Inspector");
-//    fw->setContent<BoxLayout>(BoxLayout::Vertical);
+//  FloatWindow - draggable, resizable floating panel with title bar
+//
+//  Usage:
+//    auto* fw = app.addFloat<FloatWindow>("Inspector");
+//    auto* vbox = fw->setContent<BoxLayout>(LayoutDir::Vertical);
 //    fw->setFloatPos(100, 100);
 //    fw->setFloatSize(300, 200);
-//    app.addFloat(fw);
+//    fw->closed.connect([&app, fw]() { app.removeFloat(fw); });
+//
+//  The FloatWindow lives in WidgetApp's float layer (above stages, below popups).
 // ═════════════════════════════════════════════════════════════════════════════
 
 class FloatWindow : public Widget
@@ -20,21 +25,30 @@ public:
     explicit FloatWindow(const std::string& title = "Window");
     ~FloatWindow() override;
 
-    // Title bar
+    // ── Title bar ────────────────────────────────────────────────────────
+    /// @brief Set the window title.
     void setTitle(const std::string& t) { title_ = t; markDirty(); }
-    const std::string& title() const { return title_; }
+    /// @brief Get the window title.
+    const std::string& title() const    { return title_; }
 
-    // Floating position (absolute screen coords)
+    // ── Floating position (absolute screen coords) ───────────────────────
+    /// @brief Set absolute screen position.
     void  setFloatPos(float x, float y) { floatX_ = x; floatY_ = y; markDirty(); }
+    /// @brief Get the X position.
     float floatX() const { return floatX_; }
+    /// @brief Get the Y position.
     float floatY() const { return floatY_; }
 
-    // Floating size
+    // ── Floating size ────────────────────────────────────────────────────
+    /// @brief Set the floating window size.
     void  setFloatSize(float w, float h) { floatW_ = w; floatH_ = h; markDirty(); }
+    /// @brief Get the width.
     float floatW() const { return floatW_; }
+    /// @brief Get the height.
     float floatH() const { return floatH_; }
 
-    // Content (takes ownership, like ScrollView)
+    // ── Content widget ───────────────────────────────────────────────────
+    /// @brief Create and set a content widget of type T.
     template <typename T, typename... Args>
     T* setContent(Args&&... args)
     {
@@ -42,137 +56,143 @@ public:
         setContentWidget(w);
         return w;
     }
-    void setContentWidget(Widget* w);
+    /// @brief Set the content widget (takes ownership).
+    void    setContentWidget(Widget* w);
+    /// @brief Get the content widget.
     Widget* content() const { return content_; }
 
-    // Features
-    void setClosable(bool c)    { closable_ = c; }
+    // ── Features ─────────────────────────────────────────────────────────
+    /// @brief Enable the close button.
+    void setClosable(bool c)    { closable_    = c; }
+    /// @brief Enable the minimize button.
     void setMinimizable(bool m) { minimizable_ = m; }
-    void setResizable(bool r)   { resizable_ = r; }
+    /// @brief Enable window resizing.
+    void setResizable(bool r)   { resizable_   = r; }
+    /// @brief Check if the window is minimized.
     bool isMinimized() const    { return minimized_; }
+    /// @brief Set the minimized state.
     void setMinimized(bool m);
 
-    // Title bar height
+    /// @brief Set the title bar height.
     void  setTitleBarHeight(float h) { titleBarH_ = h; markDirty(); }
-    float titleBarHeight() const { return titleBarH_; }
+    /// @brief Get the title bar height.
+    float titleBarHeight() const     { return titleBarH_; }
 
-    // Signals
-    Signal<> closed;     // emitted when close button clicked
-    Signal<bool> minimizedChanged;
+    // ── Signals ──────────────────────────────────────────────────────────
+    Signal<>    closed;           ///< close button clicked
+    Signal<bool> minimizedChanged; ///< minimized state changed
 
-    // Overrides - called by WidgetApp float layer
-    void layout() override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
+    // ── Widget overrides ─────────────────────────────────────────────────
+    void  layout() override;
+    void  paint(PaintContext& ctx) override;
+    void  onMousePress(MouseEvent& e) override;
+    void  onMouseRelease(MouseEvent& e) override;
+    void  onMouseMove(MouseEvent& e) override;
     Vec2f sizeHint() const override;
 
 private:
     std::string title_;
-    Widget* content_ = nullptr;
-    float floatX_ = 50, floatY_ = 50;
-    float floatW_ = 300, floatH_ = 200;
-    float titleBarH_ = 28.0f;
-    bool closable_    = true;
-    bool minimizable_ = true;
-    bool resizable_   = true;
-    bool minimized_   = false;
+    Widget*     content_    = nullptr;
+    float floatX_     = 50,  floatY_    = 50;
+    float floatW_     = 300, floatH_    = 200;
+    float titleBarH_  = 28.0f;
+    bool  closable_    = true;
+    bool  minimizable_ = true;
+    bool  resizable_   = true;
+    bool  minimized_   = false;
 
     // Drag state
-    bool  dragging_   = false;
-    float dragOffX_   = 0, dragOffY_ = 0;
+    bool  dragging_  = false;
+    float dragOffX_  = 0, dragOffY_ = 0;
 
     // Resize state
-    bool  resizing_     = false;
-    float resizeOffX_   = 0, resizeOffY_ = 0;
-    float resizeStartW_ = 0, resizeStartH_ = 0;
-    static constexpr float kResizeGrip = 8.0f;
+    bool  resizing_      = false;
+    float resizeOffX_    = 0, resizeOffY_    = 0;
+    float resizeStartW_  = 0, resizeStartH_  = 0;
+    static constexpr float kResizeGrip = 12.0f;
 
-    // Button hover
-    int hoveredBtn_ = 0;  // 0=none, 1=close, 2=minimize
+    // Button hover: 0=none, 1=close, 2=minimize
+    int hoveredBtn_ = 0;
 
     // Geometry helpers
-    Rect titleBarRect() const;
-    Rect contentRect() const;
-    Rect closeButtonRect() const;
+    Rect titleBarRect()     const;
+    Rect contentRect()      const;
+    Rect closeButtonRect()  const;
     Rect minimizeButtonRect() const;
-    Rect resizeGripRect() const;
+    Rect resizeGripRect()   const;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SidePanel - slide-in drawer (hamburger menu pattern)
-//    auto* sp = parent->createChild<SidePanel>();
-//    auto* content = sp->setContent<BoxLayout>(BoxLayout::Vertical);
-//    sp->toggle();   // open/close with animation
+//  Canvas - panel that clips children + custom paint callback
+//
+//    auto* cv = parent->createChild<Canvas>();
+//    cv->setOnPaint([](PaintContext& ctx, const Rect& b) {
+//        ctx.fill.SetColor(200, 50, 50, 255);
+//        ctx.fillCircle(b.x + b.w * 0.5f, b.y + b.h * 0.5f, 40.f);
+//    });
 // ═════════════════════════════════════════════════════════════════════════════
 
-class SidePanel : public Widget
+class Canvas : public Widget
 {
 public:
-    enum Side { Left, Right };
+    Canvas() = default;
 
-    explicit SidePanel(Side side = Left, float panelWidth = 260.0f);
+    /// @brief Set the background color.
+    void setBgColor(const Color& c) { bgColor_ = c; markDirty(); }
+    /// @brief Get the background color.
+    const Color& bgColor() const    { return bgColor_; }
 
-    // Content inside the drawer (takes ownership)
-    template <typename T, typename... Args>
-    T* setContent(Args&&... args)
-    {
-        auto* w = new T(std::forward<Args>(args)...);
-        setContentWidget(w);
-        return w;
-    }
-    void setContentWidget(Widget* w);
-    Widget* content() const { return content_; }
-
-    // Open / close
-    void open();
-    void close();
-    void toggle();
-    bool isOpen() const { return open_; }
-
-    // Settings
-    void  setPanelWidth(float w) { panelWidth_ = w; markDirty(); }
-    float panelWidth() const { return panelWidth_; }
-    void  setAnimDuration(float sec) { animDuration_ = sec; }
-    void  setScrimColor(const Color& c) { scrimColor_ = c; }
-
-    Signal<bool> openChanged;
+    /// @brief Set a custom paint callback.
+    using PaintCallback = std::function<void(PaintContext& ctx, const Rect& bounds)>;
+    void setOnPaint(PaintCallback cb) { onPaint_ = std::move(cb); }
 
     void layout() override;
     void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    Vec2f sizeHint() const override;
-
-    // Called by WidgetApp idle to animate
-    void update(float dt);
 
 private:
-    Side    side_          = Left;
-    float   panelWidth_    = 260.0f;
-    bool    open_          = false;
-
-    // Animation
-    float   animProgress_  = 0.0f;   // 0 = closed, 1 = fully open
-    float   animDuration_  = 0.25f;
-    bool    animating_     = false;
-    int     animDir_       = 0;      // +1 opening, -1 closing
-
-    Color   scrimColor_    = Color(0, 0, 0, 120);
-    Widget* content_       = nullptr;
-
-    float currentOffset() const;  // panel X offset based on progress
+    Color bgColor_ = Theme::instance().panelColor;
+    PaintCallback onPaint_;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PageView - shows one child ("page") at a time, with animated transitions
-//    Like Qt's QStackedWidget or Android's ViewPager.
+//  ImageView - draws a TextureHandle with offset (pure display widget)
 //
-//    auto* pv = parent->createChild<PageView>();
-//    auto* page0 = pv->addPage<BoxLayout>(LayoutDir::Vertical);  // index 0
-//    auto* page1 = pv->addPage<BoxLayout>(LayoutDir::Vertical);  // index 1
-//    pv->setPage(1);  // switch to page 1 with animation
-//    pv->setPage(0, PageView::Fade);  // explicit transition
+//    auto* iv = parent->createChild<ImageView>();
+//    iv->setTexture(tex, w, h);
+//    iv->setOffset(10, 20);
+// ═════════════════════════════════════════════════════════════════════════════
+
+class ImageView : public Widget
+{
+public:
+    ImageView() = default;
+
+    /// @brief Set the texture, width and height.
+    void setTexture(BuGUI::TextureHandle tex, int w, int h);
+    /// @brief Get the texture handle.
+    BuGUI::TextureHandle texture() const { return texture_; }
+
+    /// @brief Set the image offset.
+    void setOffset(float ox, float oy) { offsetX_ = ox; offsetY_ = oy; markDirty(); }
+    /// @brief Get the horizontal offset.
+    float offsetX() const { return offsetX_; }
+    /// @brief Get the vertical offset.
+    float offsetY() const { return offsetY_; }
+
+    /// @brief Set a tint color.
+    void setTint(const Color& c) { tint_ = c; markDirty(); }
+
+    void paint(PaintContext& ctx) override;
+
+private:
+    BuGUI::TextureHandle texture_;
+    int   texW_ = 0, texH_ = 0;
+    float offsetX_ = 0, offsetY_ = 0;
+    Color tint_ = Color(255, 255, 255, 255);
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PageView – Container showing one page at a time with transitions
 // ═════════════════════════════════════════════════════════════════════════════
 
 class PageView : public Widget
@@ -182,46 +202,33 @@ public:
 
     PageView() = default;
 
-    // ── Page management ──────────────────────────────────────────────────
-    template <typename T, typename... Args>
+    /// @brief Add a new page of the given widget type.
+    template<typename T, typename... Args>
     T* addPage(Args&&... args)
     {
-        auto* w = new T(std::forward<Args>(args)...);
+        T* w = new T(std::forward<Args>(args)...);
         addPageImpl(w);
-        pageNames_.emplace_back();
         return w;
     }
 
-    void setPageName(int idx, const std::string& name)
-    {
-        if (idx >= 0 && idx < static_cast<int>(pageNames_.size()))
-            pageNames_[idx] = name;
-    }
-
-    int  pageCount() const   { return static_cast<int>(pages_.size()); }
+    /// @brief Get the number of pages.
+    int  pageCount() const { return static_cast<int>(pages_.size()); }
+    /// @brief Get the index of the current page.
     int  currentPage() const { return currentIdx_; }
+    /// @brief Get a page widget by index.
     Widget* page(int idx) const;
 
-    const std::string& pageName(int idx) const
-    {
-        static const std::string empty;
-        if (idx < 0 || idx >= static_cast<int>(pageNames_.size())) return empty;
-        return pageNames_[idx];
-    }
-
-    // Switch to page by index, with optional transition override
+    /// @brief Switch to a page with an optional transition.
     void setPage(int idx, Transition tr = SlideAuto);
+    /// @brief Switch to a page widget with an optional transition.
+    void setPage(Widget* pg, Transition tr = SlideAuto);
 
-    // Switch to page by pointer
-    void setPage(Widget* page, Transition tr = SlideAuto);
+    /// @brief Set the transition animation duration in seconds.
+    void setTransitionDuration(float sec) { transDuration_ = sec; }
 
-    // Default transition used when SlideAuto picks direction
-    void setTransitionDuration(float secs) { transDuration_ = secs; }
-    float transitionDuration() const       { return transDuration_; }
+    /// @brief Emitted when the current page changes.
+    Signal<int> pageChanged;
 
-    Signal<int> pageChanged;  // emits new page index
-
-    // ── Overrides ────────────────────────────────────────────────────────
     void layout() override;
     void paint(PaintContext& ctx) override;
 
@@ -229,11 +236,9 @@ private:
     void addPageImpl(Widget* w);
 
     std::vector<Widget*> pages_;
-    std::vector<std::string> pageNames_;
-    int   currentIdx_    = -1;
-    int   prevIdx_       = -1;
-    float transProgress_ = 1.0f;  // 1.0 = done
-    float transDuration_ = 0.3f;
+    int   currentIdx_   = -1;
+    int   prevIdx_      = -1;
+    float transProgress_ = 1.0f;
+    float transDuration_ = 0.25f;
     Transition transType_ = None;
 };
-

@@ -1,745 +1,520 @@
-#include "Widgets.hpp"
+#include "pch.hpp"
+#include "MenuWidgets.hpp"
 #include "WidgetApp.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
 #include <algorithm>
 #include <cmath>
 
-namespace {
-    inline Font::ClipRect toFontClip(const Rect& r)
-    { return {r.x, r.y, r.w, r.h}; }
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
-//  Menu - popup dropdown list
+//  Menu
 // ═════════════════════════════════════════════════════════════════════════════
 
 Menu::Menu()
 {
-    acceptsFocus_ = false;
+    acceptsFocus_ = true;
+    scrollable_   = false;
 }
 
 Menu::~Menu()
 {
-    for (auto* sub : ownedSubmenus_)
-        delete sub;
-    ownedSubmenus_.clear();
+    for (auto* a : actions_) delete a;
 }
 
-void Menu::addAction(const std::string& label, std::function<void()> cb,
-                     const std::string& shortcut)
+MenuAction* Menu::addAction(const std::string& text)
 {
-    MenuAction a;
-    a.label = label; a.shortcut = shortcut; a.enabled = true;
-    a.callback = std::move(cb);
-    actions_.push_back(std::move(a));
-    markDirty();
+    auto* a = new MenuAction();
+    a->text_ = text;
+    actions_.push_back(a);
+    return a;
 }
 
-void Menu::addAction(const std::string& label, std::function<void()> cb,
-                     bool enabled, const std::string& shortcut)
+MenuAction* Menu::addAction(const std::string& text, std::function<void()> cb)
 {
-    MenuAction a;
-    a.label = label; a.shortcut = shortcut; a.enabled = enabled;
-    a.callback = std::move(cb);
-    actions_.push_back(std::move(a));
-    markDirty();
+    auto* a = addAction(text);
+    a->triggered.connect(std::move(cb));
+    return a;
 }
 
-void Menu::addCheckable(const std::string& label, bool checked,
-                        std::function<void(bool)> cb)
+MenuAction* Menu::addCheckable(const std::string& text, bool checked)
 {
-    MenuAction a;
-    a.label = label; a.enabled = true;
-    a.checkable = true; a.checked = checked;
-    // Wrap the bool callback so it toggles the checked state
-    int idx = static_cast<int>(actions_.size());
-    a.callback = [this, idx, cb = std::move(cb)]() {
-        if (idx < static_cast<int>(actions_.size())) {
-            actions_[idx].checked = !actions_[idx].checked;
-            if (cb) cb(actions_[idx].checked);
-        }
-    };
-    actions_.push_back(std::move(a));
-    markDirty();
+    auto* a = addAction(text);
+    a->checkable_ = true;
+    a->checked_   = checked;
+    return a;
 }
 
-Menu* Menu::addSubmenu(const std::string& label)
+MenuAction* Menu::addSeparator()
 {
-    auto* sub = new Menu();
-    ownedSubmenus_.push_back(sub);
-    MenuAction a;
-    a.label = label; a.enabled = true;
-    a.submenu = sub;
-    actions_.push_back(std::move(a));
-    markDirty();
-    return sub;
+    auto* a = new MenuAction();
+    a->separator_ = true;
+    actions_.push_back(a);
+    return a;
 }
 
-void Menu::addSeparator()
+void Menu::clearActions()
 {
-    actions_.push_back(MenuAction::Separator());
-    markDirty();
-}
-
-void Menu::clear()
-{
-    for (auto* sub : ownedSubmenus_)
-        delete sub;
-    ownedSubmenus_.clear();
+    for (auto* a : actions_) delete a;
     actions_.clear();
-    hovered_ = -1;
-    openSub_ = -1;
-    markDirty();
 }
 
-void Menu::resetState()
+MenuAction* Menu::action(int idx) const
 {
-    closeSubmenu();
-    hovered_ = -1;
-    // Recursively reset all submenus
-    for (auto& a : actions_)
-        if (a.submenu) a.submenu->resetState();
-    markDirty();
+    if (idx < 0 || idx >= static_cast<int>(actions_.size())) return nullptr;
+    return actions_[idx];
 }
 
-bool Menu::hasCheckable() const
-{
-    for (auto& a : actions_)
-        if (a.checkable) return true;
-    return false;
-}
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
-float Menu::computeWidth() const
+float Menu::rowY_(int idx) const
 {
     const auto& t = Theme::instance();
-    auto& app = WidgetApp::instance();
-    auto& font = app.font();
-    font.SetFontSize(t.fontSize);
-
-    float maxLabel = 0;
-    float maxShortcut = 0;
-    bool hasSubmenu = false;
-    bool hasCheck = hasCheckable();
-
-    for (auto& a : actions_)
-    {
-        if (a.separator) continue;
-        float lw = font.GetTextWidth(a.label.c_str());
-        maxLabel = std::max(maxLabel, lw);
-        if (!a.shortcut.empty())
-        {
-            float sw = font.GetTextWidth(a.shortcut.c_str());
-            maxShortcut = std::max(maxShortcut, sw);
-        }
-        if (a.submenu) hasSubmenu = true;
-    }
-
-    // checkIndent + padX + label + padX + shortcut/arrow + padX
-    float checkIndent = hasCheck ? t.fontSize + 4.0f : 0;
-    float w = checkIndent + t.menuItemPadX + maxLabel;
-    if (maxShortcut > 0)
-        w += t.menuItemPadX + maxShortcut;
-    if (hasSubmenu)
-        w += t.menuItemPadX + 8.0f;  // arrow space
-    w += t.menuItemPadX;
-
-    return std::max(w, t.menuMinWidth);
+    float y = rect_.y + 4.0f;
+    for (int i = 0; i < idx; ++i)
+        y += actions_[i]->isSeparator() ? kSepH : t.menuItemHeight;
+    return y;
 }
+
+int Menu::hitItem_(float screenY) const
+{
+    const auto& t = Theme::instance();
+    float y = rect_.y + 4.0f;
+    for (int i = 0; i < static_cast<int>(actions_.size()); ++i)
+    {
+        float h = actions_[i]->isSeparator() ? kSepH : t.menuItemHeight;
+        if (screenY >= y && screenY < y + h) return i;
+        y += h;
+    }
+    return -1;
+}
+
+float Menu::computeWidth_() const
+{
+    const auto& t = Theme::instance();
+    float maxW = t.menuMinWidth;
+    for (auto* a : actions_)
+    {
+        if (a->isSeparator()) continue;
+        float tw = WidgetApp::instance().textWidth(a->text().c_str());
+        float sw = a->shortcut().empty() ? 0.0f
+                 : WidgetApp::instance().textWidth(a->shortcut().c_str()) + kPadX * 2;
+        float w = kIconW + kPadX + tw + sw + kPadX;
+        if (a->submenu()) w += 16.0f;
+        maxW = std::max(maxW, w);
+    }
+    return maxW;
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 
 Widget::Vec2f Menu::sizeHint() const
 {
     const auto& t = Theme::instance();
-    float h = 0;
-    for (auto& a : actions_)
-        h += a.separator ? (t.padding + 1.0f) : t.menuItemHeight;
-    h += t.padding; // top + bottom padding (half each)
-
-    float w = const_cast<Menu*>(this)->computeWidth();
-    return {w, h};
+    float h = 8.0f;
+    for (auto* a : actions_)
+        h += a->isSeparator() ? kSepH : t.menuItemHeight;
+    return {computeWidth_(), h};
 }
 
-void Menu::layout()
+void Menu::exec(float x, float y)
 {
-    Vec2f hint = sizeHint();
-    setSize(hint.x, hint.y);
+    Vec2f sz = sizeHint();
+    float sw = static_cast<float>(WidgetApp::instance().width());
+    float sh = static_cast<float>(WidgetApp::instance().height());
+    if (x + sz.x > sw) x = sw - sz.x;
+    if (y + sz.y > sh) y = sh - sz.y;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    setPosition(x, y);
+    setSize(sz.x, sz.y);
+    hoveredIdx_ = -1;
+    WidgetApp::instance().showPopup(this, nullptr, false);
 }
 
-void Menu::openSubmenu(int index)
+void Menu::resetPopupState()
 {
-    if (openSub_ == index) return;
-    closeSubmenu();
-    if (index < 0 || index >= static_cast<int>(actions_.size())) return;
-    auto& a = actions_[index];
-    if (!a.submenu) return;
-
-    Rect abs = absoluteRect();
-    const auto& t = Theme::instance();
-
-    // Compute Y position of item
-    float y = abs.y + t.padding * 0.5f;
-    for (int i = 0; i < index; ++i)
-        y += actions_[i].separator ? (t.padding + 1.0f) : t.menuItemHeight;
-
-    a.submenu->layout();
-    Widget::Vec2f hint = a.submenu->sizeHint();
-
-    // Position to the right of this menu
-    float sx = abs.x + abs.w - 2;
-    float sy = y;
-
-    // Clamp to window
-    auto& app = WidgetApp::instance();
-    if (sx + hint.x > app.width())
-        sx = abs.x - hint.x + 2;  // open to the left
-    if (sy + hint.y > app.height())
-        sy = app.height() - hint.y;
-    if (sx < 0) sx = 0;
-    if (sy < 0) sy = 0;
-
-    a.submenu->setPosition(sx, sy);
-    a.submenu->layout();
-    openSub_ = index;
-}
-
-void Menu::closeSubmenu()
-{
-    if (openSub_ >= 0)
-    {
-        openSub_ = -1;
-    }
-}
-
-void Menu::paint(PaintContext& ctx)
-{
-    if (!visible_) return;
-
-    Rect abs = absoluteRect();
-    const auto& t = Theme::instance();
-
-    // Shadow
-    if (t.menuShadowSize > 0)
-    {
-        float s = t.menuShadowSize;
-        ctx.fill.SetColor(0, 0, 0, 40);
-        ctx.fill.Rectangle(
-            static_cast<int>(abs.x + s), static_cast<int>(abs.y + s),
-            static_cast<int>(abs.w), static_cast<int>(abs.h), true);
-    }
-
-    // Background
-    ctx.fill.SetColor(t.menuBg.r, t.menuBg.g, t.menuBg.b, t.menuBg.a);
-    ctx.fill.Rectangle(
-        static_cast<int>(abs.x), static_cast<int>(abs.y),
-        static_cast<int>(abs.w), static_cast<int>(abs.h), true);
-
-    // Border
-    ctx.line.SetColor(t.menuBorder.r, t.menuBorder.g, t.menuBorder.b, t.menuBorder.a);
-    ctx.line.Rectangle(
-        static_cast<int>(abs.x), static_cast<int>(abs.y),
-        static_cast<int>(abs.w), static_cast<int>(abs.h), false);
-
-    // Items
-    float y = abs.y + t.padding * 0.5f;
-    bool hasCheck = hasCheckable();
-    float checkIndent = hasCheck ? t.fontSize + 4.0f : 0;
-
-    ctx.font.SetFontSize(t.fontSize);
-    ctx.font.SetBatch(&ctx.text);
-
-    for (int i = 0; i < static_cast<int>(actions_.size()); ++i)
-    {
-        auto& a = actions_[i];
-
-        if (a.separator)
-        {
-            float sy = y + t.padding * 0.5f;
-            ctx.line.SetColor(t.menuSeparator.r, t.menuSeparator.g, t.menuSeparator.b, t.menuSeparator.a);
-            ctx.line.Line2D(
-                static_cast<int>(abs.x + t.padding),
-                static_cast<int>(sy),
-                static_cast<int>(abs.x + abs.w - t.padding),
-                static_cast<int>(sy));
-            y += t.padding + 1.0f;
-            continue;
-        }
-
-        Rect itemRect = {abs.x, y, abs.w, t.menuItemHeight};
-        bool isHov = (i == hovered_ && a.enabled);
-
-        // Hover highlight
-        if (isHov)
-        {
-            ctx.fill.SetColor(t.menuItemHover.r, t.menuItemHover.g, t.menuItemHover.b, t.menuItemHover.a);
-            ctx.fill.Rectangle(
-                static_cast<int>(itemRect.x + 2), static_cast<int>(itemRect.y),
-                static_cast<int>(itemRect.w - 4), static_cast<int>(itemRect.h), true);
-        }
-
-        float textY = itemRect.y + (t.menuItemHeight - t.fontSize) * 0.5f;
-        float labelX = itemRect.x + checkIndent + t.menuItemPadX;
-        auto fc = toFontClip({abs.x, abs.y, abs.w, abs.h});
-
-        // Check box (same style as CheckBox widget)
-        if (a.checkable)
-        {
-            float boxSz = t.fontSize - 2.0f;
-            float bx = itemRect.x + t.menuItemPadX * 0.5f + (t.fontSize - boxSz) * 0.5f;
-            float by = itemRect.y + (t.menuItemHeight - boxSz) * 0.5f;
-
-            // Box background
-            Color bg = isHov ? t.inputBgHover : t.inputBg;
-            ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
-            ctx.fill.Rectangle(
-                static_cast<int>(bx), static_cast<int>(by),
-                static_cast<int>(boxSz), static_cast<int>(boxSz), true);
-
-            // Box border
-            Color border = isHov ? t.inputBorderHover : t.inputBorder;
-            ctx.line.SetColor(border.r, border.g, border.b, border.a);
-            ctx.line.Rectangle(
-                static_cast<int>(bx), static_cast<int>(by),
-                static_cast<int>(boxSz), static_cast<int>(boxSz), false);
-
-            // Inner fill when checked
-            if (a.checked)
-            {
-                Color ck = isHov ? t.menuItemTextHover : t.menuCheckMark;
-                float m = 3.0f;
-                ctx.fill.SetColor(ck.r, ck.g, ck.b, ck.a);
-                ctx.fill.Rectangle(
-                    static_cast<int>(bx + m), static_cast<int>(by + m),
-                    static_cast<int>(boxSz - m * 2), static_cast<int>(boxSz - m * 2), true);
-            }
-        }
-
-        // Label text
-        Color textCol = a.enabled ? t.menuItemText : t.menuItemDisabled;
-        if (isHov)
-            textCol = t.menuItemTextHover;
-        ctx.font.SetColor(textCol);
-        ctx.font.Print(a.label.c_str(), labelX, textY, &fc);
-
-        // Submenu arrow > (chevron, drawn with lines)
-        if (a.submenu)
-        {
-            Color arrowCol = isHov ? t.menuItemTextHover : t.menuSubmenuArrow;
-            float arrowX = itemRect.x + itemRect.w - t.menuItemPadX + 2;
-            float arrowCY = itemRect.y + t.menuItemHeight * 0.5f;
-            float hs = 4.0f;
-            ctx.line.SetColor(arrowCol.r, arrowCol.g, arrowCol.b, arrowCol.a);
-            ctx.line.Line2D(arrowX - hs * 0.4f, arrowCY - hs,
-                           arrowX + hs * 0.4f, arrowCY);
-            ctx.line.Line2D(arrowX + hs * 0.4f, arrowCY,
-                           arrowX - hs * 0.4f, arrowCY + hs);
-        }
-        // Shortcut text
-        else if (!a.shortcut.empty())
-        {
-            Color scCol = a.enabled ? t.menuShortcutText : t.menuItemDisabled;
-            if (isHov)
-                scCol = t.menuShortcutHover;
-            ctx.font.SetColor(scCol);
-            float sw = ctx.font.GetTextWidth(a.shortcut.c_str());
-            ctx.font.Print(a.shortcut.c_str(),
-                          itemRect.x + itemRect.w - sw - t.menuItemPadX,
-                          textY, &fc);
-        }
-
-        y += t.menuItemHeight;
-    }
-
-    // Paint open submenu (drawn in same popup pass)
-    if (openSub_ >= 0 && openSub_ < static_cast<int>(actions_.size()))
-    {
-        auto* sub = actions_[openSub_].submenu;
-        if (sub) sub->paint(ctx);
-    }
-}
-
-void Menu::onMousePress(MouseEvent& e)
-{
-    if (!visible_) return;
-
-    // Check if click is in open submenu
-    if (openSub_ >= 0 && openSub_ < static_cast<int>(actions_.size()))
-    {
-        auto* sub = actions_[openSub_].submenu;
-        if (sub)
-        {
-            Rect subAbs = sub->absoluteRect();
-            if (subAbs.contains(e.x, e.y))
-            {
-                sub->onMousePress(e);
-                return;
-            }
-        }
-    }
-
-    Rect abs = absoluteRect();
-    const auto& t = Theme::instance();
-
-    float y = abs.y + t.padding * 0.5f;
-    for (int i = 0; i < static_cast<int>(actions_.size()); ++i)
-    {
-        auto& a = actions_[i];
-        if (a.separator) { y += t.padding + 1.0f; continue; }
-
-        Rect itemRect = {abs.x, y, abs.w, t.menuItemHeight};
-        if (itemRect.contains(e.x, e.y) && a.enabled)
-        {
-            if (a.submenu)
-            {
-                // Click on submenu item - just open/keep the submenu
-                openSubmenu(i);
-                e.consumed = true;
-                return;
-            }
-            if (a.callback) a.callback();
-            // Checkable items stay open so user can toggle several
-            if (!a.checkable)
-                WidgetApp::instance().closePopup();
-            else
-                markDirty();  // redraw to show toggled state
-            e.consumed = true;
-            return;
-        }
-        y += t.menuItemHeight;
-    }
-    e.consumed = true;
-}
-
-void Menu::onMouseMove(MouseEvent& e)
-{
-    if (!visible_) return;
-
-    // Check if mouse is in open submenu
-    if (openSub_ >= 0 && openSub_ < static_cast<int>(actions_.size()))
-    {
-        auto* sub = actions_[openSub_].submenu;
-        if (sub)
-        {
-            Rect subAbs = sub->absoluteRect();
-            if (subAbs.contains(e.x, e.y))
-            {
-                sub->onMouseMove(e);
-                return;
-            }
-        }
-    }
-
-    Rect abs = absoluteRect();
-    const auto& t = Theme::instance();
-
-    int oldHovered = hovered_;
-    hovered_ = -1;
-
-    float y = abs.y + t.padding * 0.5f;
-    for (int i = 0; i < static_cast<int>(actions_.size()); ++i)
-    {
-        auto& a = actions_[i];
-        if (a.separator) { y += t.padding + 1.0f; continue; }
-
-        Rect itemRect = {abs.x, y, abs.w, t.menuItemHeight};
-        if (itemRect.contains(e.x, e.y))
-        {
-            hovered_ = i;
-
-            // Open submenu on hover
-            if (a.submenu && a.enabled)
-                openSubmenu(i);
-            else if (openSub_ >= 0 && openSub_ != i)
-                closeSubmenu();
-
-            break;
-        }
-        y += t.menuItemHeight;
-    }
-
-    if (hovered_ != oldHovered)
-        markDirty();
-}
-
-void Menu::onMouseLeave()
-{
-    // Don't close submenu if mouse moved into it
-    if (openSub_ >= 0 && openSub_ < static_cast<int>(actions_.size()))
-    {
-        auto* sub = actions_[openSub_].submenu;
-        if (sub)
-        {
-            auto& app = WidgetApp::instance();
-            float mx = app.mouseX();
-            float my = app.mouseY();
-            if (sub->popupContains(mx, my))
-                return;  // mouse is in submenu, keep it open
-        }
-    }
-    closeSubmenu();
-    hovered_ = -1;
+    hideSubmenu_();
+    hoveredIdx_ = -1;
     markDirty();
 }
 
 bool Menu::popupContains(float x, float y) const
 {
     if (absoluteRect().contains(x, y)) return true;
-    if (openSub_ >= 0 && openSub_ < static_cast<int>(actions_.size()))
-    {
-        auto* sub = actions_[openSub_].submenu;
-        if (sub && sub->popupContains(x, y)) return true;
-    }
+    if (activeSubmenu_ && activeSubmenu_->popupContains(x, y)) return true;
     return false;
 }
 
+void Menu::showSubmenu_(int idx)
+{
+    if (activeSubmenuIdx_ == idx) return;
+    hideSubmenu_();
+    MenuAction* a = actions_[idx];
+    Menu* sub = a->submenu();
+    if (!sub) return;
+
+    Widget::Vec2f sz = sub->sizeHint();
+    Rect abs = absoluteRect();
+    float sw = static_cast<float>(WidgetApp::instance().width());
+    float sh = static_cast<float>(WidgetApp::instance().height());
+
+    float sx = abs.x + abs.w;
+    float sy = rowY_(idx);
+    if (sx + sz.x > sw) sx = abs.x - sz.x;  // flip left
+    if (sy + sz.y > sh) sy = sh - sz.y;      // flip up
+    if (sx < 0) sx = 0;
+    if (sy < 0) sy = 0;
+
+    sub->setPosition(sx, sy);
+    sub->setSize(sz.x, sz.y);
+    sub->resetPopupState();
+    activeSubmenu_    = sub;
+    activeSubmenuIdx_ = idx;
+    markDirty();
+}
+
+void Menu::hideSubmenu_()
+{
+    if (!activeSubmenu_) return;
+    activeSubmenu_->hideSubmenu_();
+    activeSubmenu_->resetPopupState();
+    activeSubmenu_    = nullptr;
+    activeSubmenuIdx_ = -1;
+    markDirty();
+}
+
+// ── Paint ─────────────────────────────────────────────────────────────────────
+
+void Menu::paint(PaintContext& ctx)
+{
+    if (!visible_) return;
+    const auto& t = Theme::instance();
+    Rect abs = absoluteRect();
+
+    // Background
+    ctx.fill.SetColor(t.menuBg.r, t.menuBg.g, t.menuBg.b, 255);
+    ctx.fill.RoundedRectangle(abs.x, abs.y, abs.w, abs.h, t.borderRadius, 6, true);
+
+    ctx.pushClip(abs);
+
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    float asc = ctx.font.GetAscender();
+
+    float y = abs.y + 4.0f;
+    for (int i = 0; i < static_cast<int>(actions_.size()); ++i)
+    {
+        MenuAction* a   = actions_[i];
+        float       itemH = a->isSeparator() ? kSepH : t.menuItemHeight;
+
+        if (a->isSeparator())
+        {
+            float sy = y + kSepH * 0.5f;
+            ctx.line.SetColor(t.menuSeparator.r, t.menuSeparator.g,
+                              t.menuSeparator.b, t.menuSeparator.a);
+            ctx.line.Line2D(abs.x + 4, sy, abs.x + abs.w - 4, sy);
+        }
+        else
+        {
+            bool hov = (i == hoveredIdx_) && a->isEnabled();
+
+            // Hover highlight
+            if (hov)
+            {
+                ctx.fill.SetColor(t.menuItemHover.r, t.menuItemHover.g,
+                                  t.menuItemHover.b, 255);
+                ctx.fill.RoundedRectangle(abs.x + 2, y, abs.w - 4, itemH,
+                                          t.borderRadius, 6, true);
+            }
+
+            // Checkmark
+            if (a->isCheckable() && a->isChecked())
+            {
+                float cx = abs.x + kIconW * 0.5f;
+                float cy = y + itemH * 0.5f;
+                ctx.line.SetColor(t.menuCheckMark.r, t.menuCheckMark.g,
+                                  t.menuCheckMark.b, 255);
+                ctx.line.Line2D(cx - 5, cy,     cx - 1, cy + 4);
+                ctx.line.Line2D(cx - 1, cy + 4, cx + 5, cy - 4);
+            }
+
+            // Item text
+            Color tc = !a->isEnabled()   ? t.menuItemDisabled
+                     : hov               ? t.menuItemTextHover
+                                         : t.menuItemText;
+            ctx.font.SetColor(tc);
+            float ty = y + (itemH + asc) * 0.5f;
+            ctx.font.Print(a->text().c_str(), abs.x + kIconW + kPadX, ty);
+
+            // Shortcut (right-aligned)
+            if (!a->shortcut().empty())
+            {
+                Color sc = hov ? t.menuShortcutHover : t.menuShortcutText;
+                ctx.font.SetColor(sc);
+                float shw = ctx.font.GetTextWidth(a->shortcut().c_str());
+                ctx.font.Print(a->shortcut().c_str(),
+                               abs.x + abs.w - shw - kPadX, ty);
+            }
+
+            // Submenu arrow
+            if (a->submenu())
+            {
+                float ax = abs.x + abs.w - 10;
+                float ay = y + itemH * 0.5f;
+                ctx.line.SetColor(t.menuSubmenuArrow.r, t.menuSubmenuArrow.g,
+                                  t.menuSubmenuArrow.b, 255);
+                ctx.line.Line2D(ax - 4, ay - 4, ax, ay);
+                ctx.line.Line2D(ax,     ay,      ax - 4, ay + 4);
+            }
+        }
+
+        y += itemH;
+    }
+
+    ctx.popClip();
+
+    // Border — outside clip so it draws cleanly over the content
+    ctx.line.SetColor(t.menuBorder.r, t.menuBorder.g,
+                      t.menuBorder.b, t.menuBorder.a);
+    ctx.line.RoundedRectangle(abs.x, abs.y, abs.w, abs.h, t.borderRadius, 6, false);
+
+    // Recursively paint any open submenu on top
+    if (activeSubmenu_)
+        activeSubmenu_->paint(ctx);
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+void Menu::onMousePress(MouseEvent& e)
+{
+    // Delegate to open submenu first
+    if (activeSubmenu_ && activeSubmenu_->popupContains(e.x, e.y))
+    {
+        activeSubmenu_->onMousePress(e);
+        return;
+    }
+
+    int idx = hitItem_(e.y);
+    if (idx < 0 || idx >= static_cast<int>(actions_.size()))
+    {
+        e.consumed = true;
+        return;
+    }
+    MenuAction* a = actions_[idx];
+    if (a->isSeparator() || !a->isEnabled()) { e.consumed = true; return; }
+
+    // Submenu item: open on click (don't trigger or close)
+    if (a->submenu())
+    {
+        showSubmenu_(idx);
+        e.consumed = true;
+        return;
+    }
+
+    if (a->isCheckable()) a->checked_ = !a->checked_;
+    WidgetApp::instance().closePopup();
+    a->triggered.emit();
+    e.consumed = true;
+}
+
+void Menu::onMouseMove(MouseEvent& e)
+{
+    // Delegate move to submenu if cursor is over it
+    if (activeSubmenu_ && activeSubmenu_->popupContains(e.x, e.y))
+    {
+        activeSubmenu_->onMouseMove(e);
+        return;
+    }
+
+    int idx = hitItem_(e.y);
+    if (idx != hoveredIdx_) { hoveredIdx_ = idx; markDirty(); }
+
+    if (idx >= 0 && idx < static_cast<int>(actions_.size()))
+    {
+        MenuAction* a = actions_[idx];
+        if (a->submenu())
+            showSubmenu_(idx);       // open/switch submenu on hover
+        else if (idx != activeSubmenuIdx_)
+            hideSubmenu_();          // close submenu when on a non-submenu item
+    }
+}
+
+void Menu::onMouseLeave()
+{
+    hoveredIdx_ = -1;
+    markDirty();
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  MenuBar - horizontal bar of menu titles
+//  MenuBar
 // ═════════════════════════════════════════════════════════════════════════════
 
 MenuBar::MenuBar()
 {
-    const auto& t = Theme::instance();
-    setSize(0, t.menuBarHeight);
+    acceptsFocus_ = false;
 }
 
 MenuBar::~MenuBar()
 {
-    for (auto& e : entries_)
-        delete e.menu;
-    entries_.clear();
-}
-
-float MenuBar::computeItemWidth(const std::string& title) const
-{
-    const auto& t = Theme::instance();
-    auto& app = WidgetApp::instance();
-    auto& font = app.font();
-    font.SetFontSize(t.fontSize);
-    float tw = font.GetTextWidth(title.c_str());
-    return tw + t.menuItemPadX * 2;
+    for (auto& e : entries_) delete e.menu;
 }
 
 Menu* MenuBar::addMenu(const std::string& title)
 {
-    auto* menu = new Menu();
-    entries_.push_back({title, menu, 0, 0});
-    markDirty();
-    return menu;
+    Entry e;
+    e.title = title;
+    e.menu  = new Menu();
+    entries_.push_back(std::move(e));
+    return entries_.back().menu;
+}
+
+Menu* MenuBar::menu(int i) const
+{
+    if (i < 0 || i >= static_cast<int>(entries_.size())) return nullptr;
+    return entries_[i].menu;
+}
+
+const std::string& MenuBar::menuTitle(int i) const
+{
+    static const std::string empty;
+    if (i < 0 || i >= static_cast<int>(entries_.size())) return empty;
+    return entries_[i].title;
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+void MenuBar::computeEntryWidths_()
+{
+    float x = 0;
+    for (auto& e : entries_)
+    {
+        float tw = WidgetApp::instance().textWidth(e.title.c_str());
+        e.w = tw + kPadX * 2;
+        e.x = x;
+        x  += e.w;
+    }
+}
+
+int MenuBar::hitEntry_(float localX) const
+{
+    for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
+        if (localX >= entries_[i].x && localX < entries_[i].x + entries_[i].w)
+            return i;
+    return -1;
+}
+
+int MenuBar::openMenuIdx_() const
+{
+    Widget* p = WidgetApp::instance().popup();
+    if (!p) return -1;
+    for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
+        if (entries_[i].menu == p) return i;
+    return -1;
+}
+
+void MenuBar::openMenu_(int idx)
+{
+    if (idx < 0 || idx >= static_cast<int>(entries_.size())) return;
+    closeMenu_();
+    auto& e = entries_[idx];
+    Rect abs = absoluteRect();
+    e.menu->exec(abs.x + e.x, abs.y + abs.h);
+}
+
+void MenuBar::closeMenu_()
+{
+    WidgetApp::instance().closePopup();
+}
+
+// ── Widget overrides ──────────────────────────────────────────────────────────
+
+Widget::Vec2f MenuBar::sizeHint() const
+{
+    return {rect_.w, Theme::instance().menuBarHeight};
 }
 
 void MenuBar::layout()
 {
-    const auto& t = Theme::instance();
-    Rect abs = absoluteRect();
-
-    float x = abs.x;
-    for (auto& e : entries_)
-    {
-        e.w = computeItemWidth(e.title);
-        e.x = x;
-        x += e.w;
-    }
-
-    setSize(abs.w, t.menuBarHeight);
-}
-
-Widget::Vec2f MenuBar::sizeHint() const
-{
-    const auto& t = Theme::instance();
-    float w = 0;
-    for (auto& e : entries_)
-        w += const_cast<MenuBar*>(this)->computeItemWidth(e.title);
-    return {w, t.menuBarHeight};
+    computeEntryWidths_();
 }
 
 void MenuBar::paint(PaintContext& ctx)
 {
     if (!visible_) return;
-
+    const auto& t = Theme::instance();
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
 
-    const auto& t = Theme::instance();
+    // Recompute widths each frame so font changes are reflected
+    computeEntryWidths_();
 
-    // Bar background
-    ctx.fill.SetColor(t.menuBarBg.r, t.menuBarBg.g, t.menuBarBg.b, t.menuBarBg.a);
-    ctx.fill.Rectangle(
-        static_cast<int>(abs.x), static_cast<int>(abs.y),
-        static_cast<int>(abs.w), static_cast<int>(abs.h), true);
+    // Background
+    ctx.fill.SetColor(t.menuBarBg.r, t.menuBarBg.g, t.menuBarBg.b, 255);
+    ctx.fill.Rectangle(abs.x, abs.y, abs.w, abs.h, true);
 
-    // Border bottom
-    ctx.line.SetColor(t.menuBorder.r, t.menuBorder.g, t.menuBorder.b, t.menuBorder.a);
-    ctx.line.Line2D(
-        static_cast<int>(abs.x), static_cast<int>(abs.y + abs.h - 1),
-        static_cast<int>(abs.x + abs.w), static_cast<int>(abs.y + abs.h - 1));
+    ctx.pushClip(abs);
 
-    // Menu titles
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetBatch(&ctx.text);
-    auto fc = toFontClip(ctx.clipRect());
+    float asc  = ctx.font.GetAscender();
+    int   open = openMenuIdx_();
 
     for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
     {
-        auto& e = entries_[i];
-        Rect itemRect = {e.x, abs.y, e.w, abs.h};
+        auto&  e  = entries_[i];
+        float  ix = abs.x + e.x;
+        bool   hov = (i == hoveredIdx_) || (i == open);
 
-        // Hover/active highlight
-        if (i == activeMenu_ || i == hoveredItem_)
+        if (hov)
         {
-            Color bg = i == activeMenu_ ? t.menuItemHover : t.menuBarItemHover;
-            ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
-            ctx.fill.Rectangle(
-                static_cast<int>(itemRect.x), static_cast<int>(itemRect.y),
-                static_cast<int>(itemRect.w), static_cast<int>(itemRect.h), true);
+            ctx.fill.SetColor(t.menuBarItemHover.r, t.menuBarItemHover.g,
+                              t.menuBarItemHover.b, 255);
+            ctx.fill.RoundedRectangle(ix + 2, abs.y + 2, e.w - 4,
+                                      abs.h - 4, t.borderRadius, 6, true);
         }
 
-        // Title text
-        Color textCol = t.menuItemText;
-        if (i == activeMenu_)
-            textCol = t.menuItemTextHover;
-        ctx.font.SetColor(textCol);
+        Color tc = hov ? t.menuItemTextHover : t.menuItemText;
+        ctx.font.SetColor(tc);
         float tw = ctx.font.GetTextWidth(e.title.c_str());
-        float tx = e.x + (e.w - tw) * 0.5f;
-        float ty = abs.y + (abs.h - t.fontSize) * 0.5f;
-        ctx.font.Print(e.title.c_str(), tx, ty, &fc);
+        float tx = ix + (e.w - tw) * 0.5f;
+        float ty = abs.y + (abs.h + asc) * 0.5f;
+        ctx.font.Print(e.title.c_str(), tx, ty);
     }
-}
 
-void MenuBar::openMenu(int index)
-{
-    if (index < 0 || index >= static_cast<int>(entries_.size())) return;
+    ctx.popClip();
 
-    auto& e = entries_[index];
-    if (!e.menu || e.menu->actions().empty()) return;
-
-    Rect abs = absoluteRect();
-    const auto& t = Theme::instance();
-
-    // Position menu below the bar item
-    e.menu->setPosition(e.x, abs.y + t.menuBarHeight);
-    e.menu->layout();
-
-    // Clamp to window bounds
-    auto& app = WidgetApp::instance();
-    Widget::Vec2f hint = e.menu->sizeHint();
-    float menuRight = e.x + hint.x;
-    float menuBottom = abs.y + t.menuBarHeight + hint.y;
-
-    float mx = e.x;
-    if (menuRight > app.width())
-        mx = app.width() - hint.x;
-    if (mx < 0) mx = 0;
-
-    float my = abs.y + t.menuBarHeight;
-    if (menuBottom > app.height())
-        my = abs.y - hint.y;  // open above if no space below
-
-    e.menu->setPosition(mx, my);
-    e.menu->layout();
-
-    activeMenu_ = index;
-    armed_ = true;
-    app.showPopup(e.menu, this, false);  // not owned - MenuBar manages lifetime
-}
-
-void MenuBar::closeMenu()
-{
-    if (activeMenu_ >= 0)
-    {
-        entries_[activeMenu_].menu->resetState();
-        WidgetApp::instance().closePopup();
-        activeMenu_ = -1;
-        armed_ = false;
-    }
+    // Bottom border line
+    ctx.line.SetColor(t.menuBorder.r, t.menuBorder.g,
+                      t.menuBorder.b, t.menuBorder.a);
+    ctx.line.Line2D(abs.x, abs.y + abs.h - 1, abs.x + abs.w, abs.y + abs.h - 1);
 }
 
 void MenuBar::onMousePress(MouseEvent& e)
 {
-    if (!visible_) return;
-
-    Rect abs = absoluteRect();
-    if (!abs.contains(e.x, e.y)) return;
-
-    for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
-    {
-        Rect itemRect = {entries_[i].x, abs.y, entries_[i].w, abs.h};
-        if (itemRect.contains(e.x, e.y))
-        {
-            if (activeMenu_ == i)
-            {
-                closeMenu();
-            }
-            else
-            {
-                closeMenu();
-                openMenu(i);
-            }
-            e.consumed = true;
-            return;
-        }
-    }
+    Rect abs    = absoluteRect();
+    int  idx    = hitEntry_(e.x - abs.x);
+    if (idx < 0) return;
+    int  open   = openMenuIdx_();
+    if (open == idx)
+        closeMenu_();
+    else
+        openMenu_(idx);
+    e.consumed = true;
 }
 
 void MenuBar::onMouseMove(MouseEvent& e)
 {
-    if (!visible_) return;
-
     Rect abs = absoluteRect();
-    if (!abs.contains(e.x, e.y))
-    {
-        if (hoveredItem_ >= 0) { hoveredItem_ = -1; markDirty(); }
-        return;
-    }
+    int  idx = hitEntry_(e.x - abs.x);
 
-    int oldHovered = hoveredItem_;
-    hoveredItem_ = -1;
+    if (idx != hoveredIdx_) { hoveredIdx_ = idx; markDirty(); }
 
-    for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
-    {
-        Rect itemRect = {entries_[i].x, abs.y, entries_[i].w, abs.h};
-        if (itemRect.contains(e.x, e.y))
-        {
-            hoveredItem_ = i;
-
-            // If a menu is already open, hovering a different title opens it
-            if (armed_ && activeMenu_ >= 0 && activeMenu_ != i)
-            {
-                closeMenu();
-                openMenu(i);
-            }
-            break;
-        }
-    }
-
-    if (hoveredItem_ != oldHovered)
-        markDirty();
+    // If a menu is already open, hover to switch
+    int open = openMenuIdx_();
+    if (open >= 0 && idx >= 0 && idx != open)
+        openMenu_(idx);
 }
 
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  ContextMenu - show a Menu at an arbitrary position
-// ═════════════════════════════════════════════════════════════════════════════
-
-void ContextMenu::show(Menu* menu, float x, float y, Widget* owner)
+void MenuBar::onMouseLeave()
 {
-    if (!menu) return;
-
-    menu->resetState();
-    auto& app = WidgetApp::instance();
-    menu->layout();
-
-    Widget::Vec2f hint = menu->sizeHint();
-
-    // Clamp to window
-    if (x + hint.x > app.width())
-        x = app.width() - hint.x;
-    if (y + hint.y > app.height())
-        y = app.height() - hint.y;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-
-    menu->setPosition(x, y);
-    menu->layout();
-
-    app.showPopup(menu, nullptr, false);  // no owner - left-click anywhere outside closes
+    hoveredIdx_ = -1;
+    markDirty();
 }

@@ -1,314 +1,302 @@
 #pragma once
-
 #include "Widget.hpp"
-#include "Theme.hpp"
-#include <string>
+#include "IconAtlas.hpp"
+#include "ItemModel.hpp"
 #include <functional>
+#include <string>
+#include <vector>
+#include <numeric>
+#include <unordered_set>
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  DataGrid - spreadsheet/database-style table widget
-//    auto* grid = parent->createChild<DataGrid>();
-//    grid->addColumn("Name",  200);
-//    grid->addColumn("Age",    60);
-//    grid->addColumn("Email", 250);
-//    grid->addRow({"Alice", "30", "alice@example.com"});
-//    grid->addRow({"Bob",   "25", "bob@example.com"});
-//
-//  Features:
-//    - Clickable headers with sort (asc/desc/none)
-//    - Drag-resizable columns
-//    - Single or multi-select rows (Ctrl+click, Shift+click)
-//    - Inline cell editing (double-click)
-//    - Optional checkbox column
-//    - Alternating row colors (zebra stripes)
-//    - Vertical + horizontal scroll
+//  DataGrid — spreadsheet table with sortable columns, inline edit,
+//             checkboxes, multi-select, zebra stripes
 // ═════════════════════════════════════════════════════════════════════════════
-
 class DataGrid : public Widget
-
 {
 public:
-    DataGrid();
-
-    // ── Column definition ────────────────────────────────────────────────
-    struct Column {
-        std::string name;
-        float width = 100.0f;
-        float minWidth = 40.0f;
-        bool  sortable = true;
-        bool  readOnly = false;
-    };
-
+    /// @brief Sort order for column headers.
     enum class SortOrder { None, Ascending, Descending };
 
-    int  addColumn(const std::string& name, float width = 100.0f, bool sortable = true);
-    int  columnCount() const { return static_cast<int>(columns_.size()); }
+    DataGrid();
+
+    /// @brief Add a column with name, width and sortability.
+    int  addColumn(const std::string& name, float width, bool sortable = true);
+    /// @brief Set a column's width.
     void setColumnWidth(int col, float w);
+    /// @brief Set a column as read-only.
+    void setColumnReadOnly(int col, bool ro);
 
-    // ── Row data ─────────────────────────────────────────────────────────
-    int  addRow(const std::vector<std::string>& cells);
-    void setCell(int row, int col, const std::string& value);
+    /// @brief Add a row with cell values.
+    int         addRow(const std::vector<std::string>& cells);
+    /// @brief Set a cell value.
+    void        setCell(int row, int col, const std::string& value);
+    /// @brief Get a cell value.
     std::string cell(int row, int col) const;
-    void removeRow(int row);
-    void clearRows();
-    int  rowCount() const { return static_cast<int>(rows_.size()); }
+    /// @brief Remove a row by index.
+    void        removeRow(int row);
+    /// @brief Clear all rows.
+    void        clearRows();
 
-    // ── Checkbox column ──────────────────────────────────────────────────
-    void setShowCheckboxes(bool s) { showCheckboxes_ = s; markDirty(); }
-    bool showCheckboxes() const { return showCheckboxes_; }
-    bool isRowChecked(int row) const;
-    void setRowChecked(int row, bool checked);
+    /// @brief Check if a row's checkbox is checked.
+    bool             isRowChecked(int row) const;
+    /// @brief Set a row's checkbox state.
+    void             setRowChecked(int row, bool checked);
+    /// @brief Get indices of all checked rows.
     std::vector<int> checkedRows() const;
 
-    // ── Selection ────────────────────────────────────────────────────────
-    void setMultiSelect(bool m) { multiSelect_ = m; }
-    bool multiSelect() const { return multiSelect_; }
-    int  selectedRow() const { return selectedRow_; }
-    const std::vector<int>& selectedRows() const { return selectedRows_; }
+    /// @brief Select a single row.
     void setSelectedRow(int row);
+    /// @brief Deselect all rows.
     void clearSelection();
+    /// @brief Check if a row is selected.
+    bool isSelected(int row) const;
+    /// @brief Get the primary selected row index.
+    int  selectedRow() const { return selectedRow_; }
+    /// @brief Get all selected row indices.
+    const std::vector<int>& selectedRows() const { return selectedRows_; }
+    /// @brief Set a data model (overrides internal row storage).
+    void setModel(AbstractItemModel* model);
+    /// @brief Get the attached data model.
+    AbstractItemModel* model() const { return model_; }
+    /// @brief Enable multi-row selection.
+    void setMultiSelect   (bool m) { multiSelect_    = m; }
+    /// @brief Show checkbox column.
+    void setShowCheckboxes(bool s) { showCheckboxes_ = s; markDirty(); }
+    /// @brief Enable alternating row colors.
+    void setZebraStripes  (bool z) { zebraStripes_   = z; markDirty(); }
+    /// @brief Set the entire grid as read-only.
+    void setReadOnly      (bool r) { readOnly_        = r; }
 
-    // ── Appearance ───────────────────────────────────────────────────────
-    void  setRowHeight(float h) { rowHeight_ = h; markDirty(); }
-    float rowHeight() const { return rowHeight_; }
-    void  setHeaderHeight(float h) { headerHeight_ = h; markDirty(); }
-    float headerHeight() const { return headerHeight_; }
-    void  setZebraStripes(bool z) { zebraStripes_ = z; markDirty(); }
-    bool  zebraStripes() const { return zebraStripes_; }
-    void  setReadOnly(bool ro) { readOnly_ = ro; }
-    bool  readOnly() const { return readOnly_; }
-    void  setColumnReadOnly(int col, bool ro);
+    /// @brief Emitted when row selection changes.
+    Signal<int>       selectionChanged;
+    /// @brief Emitted when a column sort is applied.
+    Signal<int>       columnSorted;
+    /// @brief Emitted when a cell is edited (row, col).
+    Signal<int, int>  cellEdited;
+    /// @brief Emitted when a row checkbox changes.
+    Signal<int, bool> rowCheckChanged;
 
-    // ── Signals ──────────────────────────────────────────────────────────
-    Signal<int>       selectionChanged;   // row index
-    Signal<int, int>  cellEdited;         // row, col
-    Signal<int>       columnSorted;       // col index
-    Signal<int, bool> rowCheckChanged;    // row, checked
-
-    Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
-    void onMouseScroll(MouseEvent& e) override;
-    void onKeyPress(KeyEvent& e) override;
-    void onTextInput(KeyEvent& e) override;
+    Vec2f sizeHint()                    const override;
+    void  paint(PaintContext& ctx)            override;
+    void  onMousePress(MouseEvent& e)         override;
+    void  onMouseRelease(MouseEvent& e)       override;
+    void  onMouseMove(MouseEvent& e)          override;
+    void  onMouseScroll(MouseEvent& e)        override;
+    void  onKeyPress(KeyEvent& e)             override;
+    void  onTextInput(KeyEvent& e)            override;
 
 private:
+    struct Column {
+        std::string name;
+        float       width    = 100.f;
+        float       minWidth =  40.f;
+        bool        sortable = true;
+        bool        readOnly = false;
+    };
     struct Row {
         std::vector<std::string> cells;
         bool checked = false;
     };
 
-    std::vector<Column> columns_;
-
-// NOTE: TreeGrid uses DataGrid::SortOrder  both in same header
-    std::vector<Row>    rows_;
-
-    // Sort state
-    int       sortCol_   = -1;
-    SortOrder sortOrder_ = SortOrder::None;
-    std::vector<int> sortedIndices_;  // row display order
-
-    // Selection
-    int selectedRow_ = -1;
-    std::vector<int> selectedRows_;
-    bool multiSelect_ = false;
-
-    // Appearance
-    float rowHeight_    = 24.0f;
-    float headerHeight_ = 26.0f;
-    bool  zebraStripes_ = true;
-    bool  showCheckboxes_ = false;
-    float checkboxColW_   = 28.0f;
-    bool  readOnly_       = false;
-
-    // Scroll
-    float scrollX_ = 0.0f;
-    float scrollY_ = 0.0f;
-
-    // Column resize
-    int   resizeCol_    = -1;   // column being resized (-1 = none)
-    float resizeStartX_ = 0;
-    float resizeStartW_ = 0;
-
-    // Hover
-    int hoveredRow_ = -1;
-    int hoveredCol_ = -1;
-
-    // Inline editing
-    bool editing_     = false;
-    int  editRow_     = -1;
-    int  editCol_     = -1;
-    std::string editBuf_;
-    int  editCursor_  = 0;
-
-    // Helpers
-    float totalColumnsWidth() const;
-    float contentX() const { return showCheckboxes_ ? checkboxColW_ : 0.0f; }
-    float columnX(int col) const;  // X offset of column (before scroll)
-    int   hitColumn(float localX) const;
-    int   hitRow(float localY) const;
-    int   hitResizeEdge(float localX) const;  // returns col index or -1
-    int   displayRow(int idx) const;  // maps sorted index to data index
     void  rebuildSortOrder();
     void  sortByColumn(int col);
     void  startEdit(int row, int col);
     void  commitEdit();
     void  cancelEdit();
-    bool  isSelected(int row) const;
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  TreeGrid - hierarchical table (tree + columns)
-//    auto* tg = parent->createChild<TreeGrid>();
-//    tg->addColumn("Name",  250);
-//    tg->addColumn("Type",   80);
-//    tg->addColumn("Size",   80);
-//    auto* root = tg->addRoot({"src", "Folder", "12 KB"});
-//    root->addChild({"main.cpp", "C++", "3 KB"});
-//
-//  Features:
-//    - Expandable/collapsible tree nodes
-//    - Sortable columns (click header)
-//    - Drag-resizable columns
-//    - Single/multi select
-//    - Inline cell editing (double-click)
-//    - Zebra stripes
-//    - Icon support (via IconAtlas)
-//    - Vertical + horizontal scroll
-// ═════════════════════════════════════════════════════════════════════════════
-
-class TreeGrid : public Widget
-{
-public:
-    TreeGrid();
-    ~TreeGrid() override;
-
-    // ── Column definition ────────────────────────────────────────────────
-    struct Column {
-        std::string name;
-        float width = 100.0f;
-        float minWidth = 40.0f;
-        bool  sortable = true;
-        bool  readOnly = false;
-    };
-
-    int  addColumn(const std::string& name, float width = 100.0f, bool sortable = true);
-    int  columnCount() const { return static_cast<int>(columns_.size()); }
-
-    // ── Tree nodes ───────────────────────────────────────────────────────
-    struct Node {
-        std::vector<std::string> cells;  // one per column
-        std::vector<Node*> children;
-        Node* parent = nullptr;
-        bool expanded = true;
-        int depth = 0;
-        IconId iconId = IconId::None;
-        bool readOnly = false;
-
-        Node* addChild(const std::vector<std::string>& cellData);
-        void setIcon(IconId id) { iconId = id; }
-        void setReadOnly(bool ro) { readOnly = ro; }
-    };
-
-    Node* addRoot(const std::vector<std::string>& cells);
-    void clearAll();
-    int nodeCount() const;  // total visible + hidden
-
-    // ── Selection ────────────────────────────────────────────────────────
-    void setMultiSelect(bool m) { multiSelect_ = m; }
-    bool multiSelect() const { return multiSelect_; }
-    Node* selectedNode() const { return selectedNode_; }
-    void clearSelection();
-
-    // ── Appearance ───────────────────────────────────────────────────────
-    void  setRowHeight(float h) { rowHeight_ = h; markDirty(); }
-    float rowHeight() const { return rowHeight_; }
-    void  setHeaderHeight(float h) { headerHeight_ = h; markDirty(); }
-    float headerHeight() const { return headerHeight_; }
-    void  setZebraStripes(bool z) { zebraStripes_ = z; markDirty(); }
-    bool  zebraStripes() const { return zebraStripes_; }
-    void  setIndentWidth(float w) { indentWidth_ = w; markDirty(); }
-    float indentWidth() const { return indentWidth_; }
-    void  setReadOnly(bool ro) { readOnly_ = ro; }
-    bool  readOnly() const { return readOnly_; }
-    void  setColumnReadOnly(int col, bool ro);
-
-    // ── Signals ──────────────────────────────────────────────────────────
-    Signal<Node*>       selectionChanged;
-    Signal<Node*, int>  cellEdited;       // node, col
-    Signal<int>         columnSorted;     // col
-    Signal<Node*>       nodeExpanded;
-    Signal<Node*>       nodeCollapsed;
-
-    Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
-    void onMouseScroll(MouseEvent& e) override;
-    void onKeyPress(KeyEvent& e) override;
-    void onTextInput(KeyEvent& e) override;
-
-private:
-    std::vector<Column> columns_;
-    std::vector<Node*> roots_;
-
-    // Flat list of visible nodes (rebuilt on expand/collapse)
-    struct FlatEntry { Node* node; int depth; };
-    std::vector<FlatEntry> flatList_;
-    void rebuildFlatList();
-    void flattenNode(Node* n, int depth);
-
-    // Sort
-    int sortCol_ = -1;
-    DataGrid::SortOrder sortOrder_ = DataGrid::SortOrder::None;
-    void sortChildren(Node* parent);
-
-    // Selection
-    Node* selectedNode_ = nullptr;
-    std::vector<Node*> selectedNodes_;
-    bool multiSelect_ = false;
-
-    // Appearance
-    float rowHeight_    = 24.0f;
-    float headerHeight_ = 26.0f;
-    bool  zebraStripes_ = true;
-    float indentWidth_  = 20.0f;
-    bool  readOnly_     = false;
-
-    // Scroll
-    float scrollX_ = 0.0f;
-    float scrollY_ = 0.0f;
-
-    // Column resize
-    int   resizeCol_    = -1;
-    float resizeStartX_ = 0;
-    float resizeStartW_ = 0;
-
-    // Hover
-    int hoveredRow_ = -1;
-
-    // Inline editing
-    bool editing_     = false;
-    Node* editNode_   = nullptr;
-    int  editCol_     = -1;
-    std::string editBuf_;
-    int  editCursor_  = 0;
-
-    // Helpers
     float totalColumnsWidth() const;
     float columnX(int col) const;
     int   hitColumn(float localX) const;
     int   hitRow(float localY) const;
     int   hitResizeEdge(float localX) const;
+    int   displayRow(int idx) const;
+    float contentX() const { return showCheckboxes_ ? checkboxColW_ : 0.f; }
+
+    std::vector<Column> columns_;
+    std::vector<Row>    rows_;
+    std::vector<int>    sortedIndices_;
+
+    int  selectedRow_   = -1;
+    std::vector<int> selectedRows_;
+    std::unordered_set<int> selectedSet_;  // O(1) lookup for isSelected
+    int  hoveredRow_    = -1;
+    int  hoveredCol_    = -1;
+
+    bool multiSelect_    = false;
+    bool showCheckboxes_ = false;
+    bool zebraStripes_   = true;
+    bool readOnly_       = false;
+
+    float rowHeight_     = 24.f;
+    float headerHeight_  = 28.f;
+    float checkboxColW_  = 24.f;
+    float scrollX_       = 0.f;
+    float scrollY_       = 0.f;
+
+    int       sortCol_   = -1;
+    SortOrder sortOrder_ = SortOrder::None;
+
+    bool        editing_    = false;
+    int         editRow_    = -1;
+    int         editCol_    = -1;
+    std::string editBuf_;
+    int         editCursor_ = 0;
+
+    int   resizeCol_    = -1;
+    float resizeStartX_ = 0.f;
+    float resizeStartW_ = 0.f;
+
+    // Double-click detection (per-instance)
+    uint32_t lastClickTime_ = 0;
+    int      lastClickRow_  = -1;
+
+    // Model/View
+    AbstractItemModel* model_ = nullptr;
+
+    // Model data accessors (use model if set, otherwise internal rows_)
+    int   modelRowCount() const;
+    int   modelColCount() const;
+    std::string modelCell(int row, int col) const;
+    std::string modelHeader(int col) const;
+    bool  modelIsChecked(int row) const;
+    bool  modelIsEditable(int row, int col) const;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TreeGrid — hierarchical table (tree + columns)
+// ═════════════════════════════════════════════════════════════════════════════
+class TreeGrid : public Widget
+{
+public:
+    struct Node {
+        std::vector<std::string> cells;
+        std::vector<Node*>       children;
+        Node*      parent   = nullptr;
+        TreeGrid*  owner_   = nullptr;
+        int        depth    = 0;
+        bool       expanded = true;
+        bool       readOnly = false;
+        IconId     iconId   = IconId::None;
+
+        /// @brief Add a child node with cell data.
+        Node* addChild(const std::vector<std::string>& cellData);
+        /// @brief Set whether this node is expanded or collapsed.
+        void  setExpanded(bool e);
+    };
+
+    TreeGrid();
+    ~TreeGrid() override;
+
+    /// @brief Add a root-level node with cell data.
+    Node* addRoot(const std::vector<std::string>& cells);
+    /// @brief Clear all nodes.
+    void  clearAll();
+    /// @brief Get total visible node count.
+    int   nodeCount() const;
+    /// @brief Rebuild the flat list after structural changes.
+    void  rebuild() { rebuildFlatList(); markDirty(); }
+    /// @brief Get the root nodes.
+    const std::vector<Node*>& roots() const { return roots_; }
+
+    // ── Columns ───────────────────────────────────────────────────────────
+    /// @brief Add a column with name, width and sortability.
+    int  addColumn(const std::string& name, float width, bool sortable = true);
+    /// @brief Set a column as read-only.
+    void setColumnReadOnly(int col, bool ro);
+
+    // ── Selection ─────────────────────────────────────────────────────────
+    /// @brief Deselect all nodes.
+    void clearSelection();
+    /// @brief Check if a node is selected.
+    bool isSelected(Node* n) const;
+    /// @brief Get the primary selected node.
+    Node* selectedNode() const { return selectedNode_; }
+    /// @brief Get all selected nodes.
+    const std::vector<Node*>& selectedNodes() const { return selectedNodes_; }
+
+    // ── Config ────────────────────────────────────────────────────────────
+    /// @brief Enable multi-node selection.
+    void setMultiSelect  (bool m) { multiSelect_  = m; }
+    /// @brief Enable alternating row colors.
+    void setZebraStripes (bool z) { zebraStripes_ = z; markDirty(); }
+    /// @brief Set the entire tree as read-only.
+    void setReadOnly     (bool r) { readOnly_      = r; }
+    /// @brief Set the indent width per depth level.
+    void setIndentWidth  (float w){ indentWidth_   = w; }
+
+    // ── Signals ───────────────────────────────────────────────────────────
+    /// @brief Emitted when node selection changes.
+    Signal<Node*>       selectionChanged;
+    /// @brief Emitted when a node is expanded.
+    Signal<Node*>       nodeExpanded;
+    /// @brief Emitted when a node is collapsed.
+    Signal<Node*>       nodeCollapsed;
+    /// @brief Emitted when a column sort is applied.
+    Signal<int>         columnSorted;
+    /// @brief Emitted when a tree cell is edited.
+    Signal<Node*, int>  cellEdited;   // node, col
+
+    Vec2f sizeHint()                    const override;
+    void  paint(PaintContext& ctx)            override;
+    void  onMousePress(MouseEvent& e)         override;
+    void  onMouseRelease(MouseEvent& e)       override;
+    void  onMouseMove(MouseEvent& e)          override;
+    void  onMouseScroll(MouseEvent& e)        override;
+    void  onKeyPress(KeyEvent& e)             override;
+    void  onTextInput(KeyEvent& e)            override;
+
+private:
+    struct Column {
+        std::string name;
+        float       width    = 100.f;
+        float       minWidth =  40.f;
+        bool        sortable = true;
+        bool        readOnly = false;
+    };
+    struct FlatEntry { Node* node; int depth; };
+
+    void  rebuildFlatList();
+    void  flattenNode(Node* n, int depth);
+    void  deleteNodes(Node* n);
     void  startEdit(Node* node, int col);
     void  commitEdit();
     void  cancelEdit();
-    bool  isSelected(Node* n) const;
+    float totalColumnsWidth() const;
+    float columnX(int col) const;
+    int   hitColumn(float localX) const;
+    int   hitRow(float localY) const;
+    int   hitResizeEdge(float localX) const;
 
-    // Cleanup
-    void deleteNodes(Node* n);
+    std::vector<Node*>    roots_;
+    std::vector<Column>   columns_;
+    std::vector<FlatEntry> flatList_;
+
+    Node* selectedNode_  = nullptr;
+    std::vector<Node*> selectedNodes_;
+    int   hoveredRow_    = -1;
+
+    bool  multiSelect_   = false;
+    bool  zebraStripes_  = true;
+    bool  readOnly_      = false;
+    float indentWidth_   = 16.f;
+
+    float rowHeight_     = 24.f;
+    float headerHeight_  = 28.f;
+    float scrollX_       = 0.f;
+    float scrollY_       = 0.f;
+
+    int   sortCol_       = -1;
+    DataGrid::SortOrder sortOrder_ = DataGrid::SortOrder::None;
+
+    void  sortChildren(Node* parent);
+
+    bool        editing_    = false;
+    Node*       editNode_   = nullptr;
+    int         editCol_    = -1;
+    std::string editBuf_;
+    int         editCursor_ = 0;
+
+    int   resizeCol_    = -1;
+    float resizeStartX_ = 0.f;
+    float resizeStartW_ = 0.f;
 };
-

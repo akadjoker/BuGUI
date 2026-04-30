@@ -2,11 +2,9 @@
 
 #include "Widget.hpp"
 #include "Theme.hpp"
-#include "Font.hpp"
 #include <string>
 #include <functional>
 
-struct Texture;
 class RadioButton;
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -16,11 +14,16 @@ class Label : public Widget
 public:
     explicit Label(const std::string& text = "");
 
+    /// @brief Set the display text.
     void setText(const std::string& t);
+    /// @brief Get the current display text.
     const std::string& text() const { return text_; }
 
+    /// @brief Set the text color.
     void setColor(const Color& c);
+    /// @brief Set horizontal text alignment.
     void setAlign(TextAlign a);
+    /// @brief Get horizontal text alignment.
     TextAlign align() const { return align_; }
 
     Vec2f sizeHint() const override;
@@ -34,8 +37,6 @@ private:
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Spacer — invisible widget that takes up space in layouts
-//    Fixed size: Spacer(20)        → 20px gap
-//    Stretch:    Spacer() + setStretch(1) → fills remaining space
 // ═════════════════════════════════════════════════════════════════════════════
 
 class Spacer : public Widget
@@ -59,10 +60,14 @@ class Line : public Widget
 public:
     explicit Line(float thickness = 1.0f);
 
+    /// @brief Set the line thickness in pixels.
     void setThickness(float t) { thickness_ = t; markDirty(); }
+    /// @brief Get the line thickness.
     float thickness() const    { return thickness_; }
 
+    /// @brief Set the line color.
     void setColor(const Color& c) { color_ = c; markDirty(); }
+    /// @brief Get the line color.
     const Color& color() const    { return color_; }
 
     Vec2f sizeHint() const override;
@@ -82,14 +87,24 @@ class Button : public Widget
 public:
     explicit Button(const std::string& text = "");
 
+    /// @brief Set the button label text.
     void setText(const std::string& t);
+    /// @brief Get the button label text.
     const std::string& text() const { return text_; }
 
+    /// @brief Set the text alignment within the button.
     void setAlign(TextAlign a);
+    /// @brief Get the text alignment.
     TextAlign align() const { return align_; }
 
-    // Custom background color (overrides theme). Set alpha=0 to use theme default.
+    /// @brief Atlas icon drawn before the label (IconId::None = no icon).
+    void setIconId(IconId id) { iconId_ = id; markDirty(); }
+    /// @brief Get the icon identifier.
+    IconId iconId() const { return iconId_; }
+
+    /// @brief Set a custom background color (alpha=0 uses theme).
     void setBgColor(const Color& c) { bgColor_ = c; }
+    /// @brief Get the custom background color.
     const Color& bgColor() const { return bgColor_; }
 
     Vec2f sizeHint() const override;
@@ -98,14 +113,15 @@ public:
 private:
     std::string text_;
     TextAlign align_ = TextAlign::CENTER;
-    Color bgColor_ = Color(0, 0, 0, 0);  // transparent = use theme
+    Color bgColor_ = Color(0, 0, 0, 0);
+    IconId iconId_ = IconId::None;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  ImageButton — button that draws a textured region from any atlas/texture
 //    auto* btn = parent->createChild<ImageButton>();
-//    btn->setTexture(atlas->texture());
-//    btn->setSrcRect({0, 0, 24, 24});   // region within the texture
+//    btn->setTexture(atlas->texture(), atlas->textureWidth(), atlas->textureHeight());
+//    btn->setSrcRect(atlas->srcRect(IconId::MyIcon));
 //    btn->setTint(Color(255,255,255,255)); // optional tint
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -114,30 +130,39 @@ class ImageButton : public Widget
 public:
     ImageButton() = default;
 
-    void setTexture(Texture* tex) { tex_ = tex; markDirty(); }
-    Texture* texture() const { return tex_; }
+    /// @brief Set the texture, dimensions for UV calculation.
+    void setTexture(BuGUI::TextureHandle tex, int texW, int texH)
+    { tex_ = tex; texW_ = texW; texH_ = texH; markDirty(); }
+    /// @brief Get the texture handle.
+    BuGUI::TextureHandle texture() const { return tex_; }
 
-    // Source rect within the texture (in pixels)
+    /// @brief Source pixel rect within the texture.
     void setSrcRect(const FloatRect& r) { srcRect_ = r; markDirty(); }
+    /// @brief Get the source rect.
     const FloatRect& srcRect() const { return srcRect_; }
 
-    // Icon padding inside the button (px from each edge)
+    /// @brief Icon padding inside the button (px from each edge).
     void setIconPadding(float p) { iconPad_ = p; markDirty(); }
+    /// @brief Get the icon padding.
     float iconPadding() const { return iconPad_; }
 
-    // Tint color (multiplied with texture). White = no tint.
+    /// @brief Tint color multiplied with texture (white = no tint).
     void setTint(const Color& c) { tint_ = c; markDirty(); }
+    /// @brief Get the tint color.
     const Color& tint() const { return tint_; }
 
-    // Custom background color (overrides theme). alpha=0 → theme default.
+    /// @brief Custom background color (alpha=0 uses theme).
     void setBgColor(const Color& c) { bgColor_ = c; }
+    /// @brief Get the background color.
     const Color& bgColor() const { return bgColor_; }
 
     Vec2f sizeHint() const override;
     void paint(PaintContext& ctx) override;
 
 private:
-    Texture*  tex_     = nullptr;
+    BuGUI::TextureHandle tex_;
+    int       texW_    = 0;
+    int       texH_    = 0;
     FloatRect srcRect_ = {0, 0, 0, 0};
     float     iconPad_ = 3.0f;
     Color     tint_    = Color(255, 255, 255, 255);
@@ -147,9 +172,6 @@ private:
 // ═════════════════════════════════════════════════════════════════════════════
 //  IconButton — button that draws a built-in icon using lines/shapes
 //    Supports animated transitions (e.g. hamburger ↔ X)
-//    auto* btn = parent->createChild<IconButton>(IconButton::Hamburger);
-//    btn->setIcon(IconButton::Close);  // switch icon
-//    btn->setAnimated(true);           // animate transitions
 // ═════════════════════════════════════════════════════════════════════════════
 
 class IconButton : public Widget
@@ -170,19 +192,24 @@ public:
 
     explicit IconButton(Icon icon = Hamburger);
 
+    /// @brief Set the displayed icon.
     void setIcon(Icon icon);
+    /// @brief Get the current icon.
     Icon icon() const { return icon_; }
 
-    // When animated=true, transitions between icons with interpolation
+    /// @brief Enable animated transitions between icons.
     void setAnimated(bool a) { animated_ = a; }
+    /// @brief Check if icon transitions are animated.
     bool isAnimated() const  { return animated_; }
 
-    // Icon color (defaults to theme text color)
+    /// @brief Set the icon drawing color.
     void setIconColor(const Color& c) { iconColor_ = c; markDirty(); }
+    /// @brief Get the icon color.
     const Color& iconColor() const    { return iconColor_; }
 
-    // Line thickness for icon drawing
+    /// @brief Set the icon stroke width.
     void setLineWidth(float w) { lineWidth_ = w; markDirty(); }
+    /// @brief Get the icon stroke width.
     float lineWidth() const    { return lineWidth_; }
 
     Vec2f sizeHint() const override;
@@ -192,7 +219,7 @@ private:
     Icon  icon_       = Hamburger;
     Icon  targetIcon_ = Hamburger;
     bool  animated_   = false;
-    float animProgress_ = 1.0f;  // 1.0 = fully at target
+    float animProgress_ = 1.0f;
     Color iconColor_  = Theme::instance().textColor;
     float lineWidth_  = 2.0f;
 
@@ -208,7 +235,9 @@ class Panel : public Widget
 public:
     Panel() = default;
 
+    /// @brief Set the panel background color.
     void setBgColor(const Color& c);
+    /// @brief Get the panel background color.
     const Color& bgColor() const { return bgColor_; }
 
     void layout() override;
@@ -227,11 +256,16 @@ class CheckBox : public Widget
 public:
     explicit CheckBox(const std::string& text = "");
 
+    /// @brief Set the checkbox label text.
     void setText(const std::string& t);
+    /// @brief Get the checkbox label text.
     const std::string& text() const { return text_; }
+    /// @brief Check if the checkbox is checked.
     bool isChecked() const { return checked_; }
+    /// @brief Set the checked state programmatically.
     void setChecked(bool c);
 
+    /// @brief Emitted when the checked state changes.
     Signal<bool> toggled;
 
     Vec2f sizeHint() const override;
@@ -246,22 +280,24 @@ private:
 //  RadioGroup — manages mutual exclusion for a set of RadioButtons
 // ═════════════════════════════════════════════════════════════════════════════
 
-class RadioButton; // forward
-
 class RadioGroup
 {
 public:
     RadioGroup() = default;
     ~RadioGroup();
 
+    /// @brief Add a radio button to this group.
     void add(RadioButton* rb);
+    /// @brief Remove a radio button from this group.
     void remove(RadioButton* rb);
 
-    // Currently selected button (nullptr if none)
+    /// @brief Get the currently selected radio button.
     RadioButton* selected() const { return selected_; }
+    /// @brief Get the index of the selected button (-1 if none).
     int selectedIndex() const;
 
-    Signal<int> selectionChanged;  // emits index of newly selected
+    /// @brief Emitted when the selected button changes.
+    Signal<int> selectionChanged;
 
 private:
     friend class RadioButton;
@@ -271,10 +307,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  RadioButton — exclusive toggle within a RadioGroup
-//    auto* group = new RadioGroup();
-//    auto* rb1 = parent->createChild<RadioButton>("Option A", group);
-//    auto* rb2 = parent->createChild<RadioButton>("Option B", group);
+//  RadioButton
 // ═════════════════════════════════════════════════════════════════════════════
 
 class RadioButton : public Widget
@@ -283,15 +316,22 @@ public:
     explicit RadioButton(const std::string& text = "", RadioGroup* group = nullptr);
     ~RadioButton() override;
 
+    /// @brief Set the radio button label text.
     void setText(const std::string& t) { text_ = t; markDirty(); }
+    /// @brief Get the radio button label text.
     const std::string& text() const    { return text_; }
 
+    /// @brief Check if this radio button is selected.
     bool isSelected() const { return selected_; }
+    /// @brief Set the selected state.
     void setSelected(bool s);
 
+    /// @brief Assign this button to a RadioGroup.
     void setGroup(RadioGroup* g);
+    /// @brief Get the owning RadioGroup.
     RadioGroup* group() const { return group_; }
 
+    /// @brief Emitted when selection state changes.
     Signal<bool> toggled;
 
     Vec2f sizeHint() const override;
@@ -305,9 +345,7 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Switch — on/off toggle (like iOS/Android toggle switch)
-//    auto* sw = parent->createChild<Switch>("Dark Mode");
-//    sw->toggled.connect([](bool on) { ... });
+//  Switch — on/off toggle
 // ═════════════════════════════════════════════════════════════════════════════
 
 class Switch : public Widget
@@ -315,16 +353,22 @@ class Switch : public Widget
 public:
     explicit Switch(const std::string& text = "");
 
+    /// @brief Set the switch label text.
     void setText(const std::string& t) { text_ = t; markDirty(); }
+    /// @brief Get the switch label text.
     const std::string& text() const    { return text_; }
 
+    /// @brief Check if the switch is on.
     bool isOn() const { return on_; }
+    /// @brief Set the switch on/off state.
     void setOn(bool v);
 
-    // Track colors
+    /// @brief Set the color when switch is on.
     void setOnColor(const Color& c)  { onColor_ = c; markDirty(); }
+    /// @brief Set the color when switch is off.
     void setOffColor(const Color& c) { offColor_ = c; markDirty(); }
 
+    /// @brief Emitted when the switch state changes.
     Signal<bool> toggled;
 
     Vec2f sizeHint() const override;
@@ -338,86 +382,49 @@ private:
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Slider
+//  Toolbar — horizontal bar of buttons/widgets with optional separators
+//    auto* tb = parent->createChild<Toolbar>();
+//    tb->addButton("Save", IconButton::Check, [](){ ... });
+//    tb->addSeparator();
+//    tb->addButton("Undo", IconButton::ArrowLeft, [](){ ... });
+//    tb->addWidget(myComboBox);  // arbitrary widget
 // ═════════════════════════════════════════════════════════════════════════════
 
-class Slider : public Widget
+class Toolbar : public Widget
 {
 public:
-    Slider(float minVal = 0.0f, float maxVal = 1.0f, float value = 0.5f);
+    explicit Toolbar(float height = 32.0f);
 
-    float value() const    { return value_; }
-    float minValue() const  { return min_; }
-    float maxValue() const  { return max_; }
-    void setValue(float v);
+    /// @brief Add an icon button with callback.
+    IconButton* addButton(const std::string& tooltip, IconButton::Icon icon,
+                          std::function<void()> onClick = {});
 
-    void setRange(float minVal, float maxVal);
+    /// @brief Add an arbitrary widget to the toolbar.
+    Widget* addWidget(Widget* w);
 
-    void setOrientation(LayoutDir dir) { orientation_ = dir; markDirty(); }
-    LayoutDir orientation() const      { return orientation_; }
+    /// @brief Add a vertical separator line.
+    void addSeparator();
 
-    Signal<float> onValueChanged;
+    /// @brief Set the toolbar height in pixels.
+    void setHeight(float h) { height_ = h; markDirty(); }
+    /// @brief Get the toolbar height.
+    float height() const    { return height_; }
 
-    Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
+    /// @brief Set spacing between toolbar items.
+    void setSpacing(float s) { spacing_ = s; markDirty(); }
+    /// @brief Get the spacing.
+    float spacing() const    { return spacing_; }
 
-private:
-    float min_, max_, value_;
-    LayoutDir orientation_ = LayoutDir::Horizontal;
-    bool dragging_ = false;
+    /// @brief Set the toolbar background color.
+    void setBgColor(const Color& c) { bgColor_ = c; markDirty(); }
 
-    void updateFromMouse(float localX, float localY);
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  ProgressBar — non-interactive progress display with optional text
-// ═════════════════════════════════════════════════════════════════════════════
-
-class ProgressBar : public Widget
-{
-public:
-    ProgressBar(float minVal = 0.0f, float maxVal = 1.0f, float value = 0.0f);
-
-    float value() const     { return value_; }
-    float minValue() const  { return min_; }
-    float maxValue() const  { return max_; }
-    void setValue(float v);
-    void setRange(float minVal, float maxVal);
-
-    // Orientation
-    void setOrientation(LayoutDir dir) { orientation_ = dir; markDirty(); }
-    LayoutDir orientation() const      { return orientation_; }
-
-    // Status text (shown on top of the bar)
-    void setText(const std::string& t) { text_ = t; markDirty(); }
-    const std::string& text() const    { return text_; }
-
-    // Text alignment within the bar
-    void setTextAlign(TextAlign a)  { textAlign_ = a; markDirty(); }
-    TextAlign textAlign() const     { return textAlign_; }
-
-    // Colors
-    void setBarColor(const Color& c)  { barColor_ = c; markDirty(); }
-    const Color& barColor() const     { return barColor_; }
-    void setTextColor(const Color& c) { textColor_ = c; markDirty(); }
-    const Color& textColor() const    { return textColor_; }
-
-    Signal<float> onValueChanged;
-
+    void layout() override;
     Vec2f sizeHint() const override;
     void paint(PaintContext& ctx) override;
 
 private:
-    float min_, max_, value_;
-    LayoutDir orientation_ = LayoutDir::Horizontal;
-    std::string text_;
-    TextAlign textAlign_ = TextAlign::CENTER;
-    Color barColor_  = Color(140, 140, 145, 255);
-    Color textColor_ = Color(220, 220, 220, 255);
+    float height_  = 32.0f;
+    float spacing_ = 2.0f;
+    Color bgColor_ = Color(0, 0, 0, 0);  // 0 alpha = use theme panelColor
 };
-
-
 

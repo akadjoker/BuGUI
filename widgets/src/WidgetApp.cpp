@@ -1,98 +1,31 @@
-#include "WidgetApp.hpp"
-#include "Widgets.hpp"
-#include "WidgetSerializer.hpp"
-#include "Device.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
-#include "IconAtlas.hpp"
-#include "RenderState.hpp"
-#include "Opengl.hpp"
-#include <SDL2/SDL.h>
-#include <algorithm>
-#include <cmath>
-#include <cstring>
+#include "pch.hpp"
+#include "ViewWidgets.hpp"   // FloatWindow (real implementation)
+#include "LayoutWidgets.hpp" // StatusBar
+#include "Animation.hpp"     // Animator
+#include "MenuWidgets.hpp"   // Menu::exec (for context menu)
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  GL state backup - modelled after Dear ImGui's ImGui_ImplOpenGL3_*
-//
-//  Saves every piece of GL state that BuGUI touches during render(), then
-//  restores it at the end.  This lets an application mix its own 3D
-//  rendering with BuGUI's 2D UI without any state pollution.
-// ═════════════════════════════════════════════════════════════════════════════
-
-namespace {
-
-struct GLBackup
-{
-    GLenum  activeTexture;
-    GLint   program;
-    GLint   texture;
-    GLint   arrayBuffer;
-    GLint   elementBuffer;
-    GLint   vertexArray;
-    GLint   viewport[4];
-    GLint   scissorBox[4];
-    GLint   blendSrcRgb, blendDstRgb;
-    GLint   blendSrcAlpha, blendDstAlpha;
-    GLint   blendEqRgb, blendEqAlpha;
-    GLboolean blendEnabled;
-    GLboolean cullEnabled;
-    GLboolean depthEnabled;
-    GLboolean depthWriteMask;
-    GLboolean scissorEnabled;
-    GLint   unpackAlignment;
-    GLfloat clearColor[4];
+struct ContextMenu {
+    static void show(Menu* menu, float x, float y, Widget* /*owner*/) {
+        if (menu) menu->exec(x, y);
+    }
 };
 
-static void backupGLState(GLBackup& b)
-{
-    glGetIntegerv(GL_ACTIVE_TEXTURE,              (GLint*)&b.activeTexture);
-    glGetIntegerv(GL_CURRENT_PROGRAM,             &b.program);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D,          &b.texture);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING,        &b.arrayBuffer);
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &b.elementBuffer);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING,        &b.vertexArray);
-    glGetIntegerv(GL_VIEWPORT,                    b.viewport);
-    glGetIntegerv(GL_SCISSOR_BOX,                 b.scissorBox);
-    glGetIntegerv(GL_BLEND_SRC_RGB,               &b.blendSrcRgb);
-    glGetIntegerv(GL_BLEND_DST_RGB,               &b.blendDstRgb);
-    glGetIntegerv(GL_BLEND_SRC_ALPHA,             &b.blendSrcAlpha);
-    glGetIntegerv(GL_BLEND_DST_ALPHA,             &b.blendDstAlpha);
-    glGetIntegerv(GL_BLEND_EQUATION_RGB,          &b.blendEqRgb);
-    glGetIntegerv(GL_BLEND_EQUATION_ALPHA,        &b.blendEqAlpha);
-    b.blendEnabled   = glIsEnabled(GL_BLEND);
-    b.cullEnabled    = glIsEnabled(GL_CULL_FACE);
-    b.depthEnabled   = glIsEnabled(GL_DEPTH_TEST);
-    b.scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
-    glGetBooleanv(GL_DEPTH_WRITEMASK,             &b.depthWriteMask);
-    glGetIntegerv(GL_UNPACK_ALIGNMENT,            &b.unpackAlignment);
-    glGetFloatv(GL_COLOR_CLEAR_VALUE,             b.clearColor);
-}
+struct Toast {
+    static void tick(float) {}
+    static bool hasActive() { return false; }
+    static void paint(PaintContext&, float, float) {}
+};
+#include <cstring>
 
-static void restoreGLState(const GLBackup& b)
-{
-    glUseProgram(b.program);
-    glActiveTexture(b.activeTexture);
-    glBindTexture(GL_TEXTURE_2D, b.texture);
-    glBindVertexArray(b.vertexArray);
-    glBindBuffer(GL_ARRAY_BUFFER, b.arrayBuffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, b.elementBuffer);
-    glBlendEquationSeparate(b.blendEqRgb, b.blendEqAlpha);
-    glBlendFuncSeparate(b.blendSrcRgb, b.blendDstRgb, b.blendSrcAlpha, b.blendDstAlpha);
-    if (b.blendEnabled)   glEnable(GL_BLEND);       else glDisable(GL_BLEND);
-    if (b.cullEnabled)    glEnable(GL_CULL_FACE);   else glDisable(GL_CULL_FACE);
-    if (b.depthEnabled)   glEnable(GL_DEPTH_TEST);  else glDisable(GL_DEPTH_TEST);
-    if (b.scissorEnabled) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-    glDepthMask(b.depthWriteMask);
-    glViewport(b.viewport[0], b.viewport[1], b.viewport[2], b.viewport[3]);
-    glScissor(b.scissorBox[0], b.scissorBox[1], b.scissorBox[2], b.scissorBox[3]);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, b.unpackAlignment);
-    glClearColor(b.clearColor[0], b.clearColor[1], b.clearColor[2], b.clearColor[3]);
-}
+// ── helpers ───────────────────────────────────────────────────────────────
 
-} // anonymous namespace
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+static void collectFocusable(Widget* w, std::vector<Widget*>& out)
+{
+    if (!w || !w->isVisible() || !w->isEnabled()) return;
+    if (w->acceptsFocus()) out.push_back(w);
+    for (auto* c : w->children())
+        collectFocusable(c, out);
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Singleton
@@ -100,10 +33,6 @@ static void restoreGLState(const GLBackup& b)
 
 WidgetApp& WidgetApp::instance()
 {
-    // Ensure Device is constructed first so it outlives WidgetApp.
-    // Static locals are destroyed in reverse construction order,
-    // so WidgetApp will be destroyed while GL context is still alive.
-    Device::Instance();
     static WidgetApp app;
     return app;
 }
@@ -115,18 +44,19 @@ WidgetApp::~WidgetApp()
 
 void WidgetApp::shutdown()
 {
-    if (!inited_) return;
     inited_ = false;
 
-    // Clean up popups BEFORE root - non-owned popups (e.g. MenuBar menus)
-    // live inside the root tree and will be freed by their owners.
+    // Clean up popups BEFORE root
     if (popupOwned_)
         delete popup_;
     popup_ = nullptr; popupOwner_ = nullptr; popupOwned_ = true;
 
+    if (popupClosingOwned_)
+        delete popupClosing_;
+    popupClosing_ = nullptr; popupClosingOwner_ = nullptr; popupClosingOwned_ = true;
+
     delete pendingPopupDelete_; pendingPopupDelete_ = nullptr;
 
-    // Delete all inactive stages
     for (auto& [name, stageRoot] : stages_) {
         if (stageRoot != root_)
             delete stageRoot;
@@ -136,116 +66,452 @@ void WidgetApp::shutdown()
     delete root_;    root_  = nullptr;
     for (auto* fw : floats_) delete fw;
     floats_.clear();
-    if (font_)      { font_->Release();      delete font_;      font_      = nullptr; }
-    if (iconAtlas_) { delete iconAtlas_; iconAtlas_ = nullptr; }
-    if (fillBatch_) { fillBatch_->Release();  delete fillBatch_; fillBatch_ = nullptr; }
-    if (lineBatch_) { lineBatch_->Release();  delete lineBatch_; lineBatch_ = nullptr; }
-    if (textBatch_) { textBatch_->Release();  delete textBatch_; textBatch_ = nullptr; }
-
-    // Free SDL cursors
-    for (auto& c : sdlCursors_) {
-        if (c) SDL_FreeCursor(static_cast<SDL_Cursor*>(c));
-        c = nullptr;
-    }
+    delete iconAtlas_; iconAtlas_ = nullptr;  // stub
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Init
 // ═════════════════════════════════════════════════════════════════════════════
 
-bool WidgetApp::init(const char* title, int width, int height, int monitor, unsigned int flags)
+bool WidgetApp::init()
 {
     if (inited_) return true;
 
-    // Convert WindowFlags to SDL flags
-    Uint32 sdlFlags = 0;
-    if (flags & WindowFlag_Resizable)   sdlFlags |= SDL_WINDOW_RESIZABLE;
-    if (flags & WindowFlag_Borderless)  sdlFlags |= SDL_WINDOW_BORDERLESS;
-    if (flags & WindowFlag_Fullscreen)  sdlFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-    if (flags & WindowFlag_Maximized)   sdlFlags |= SDL_WINDOW_MAXIMIZED;
-    if (flags & WindowFlag_AlwaysOnTop) sdlFlags |= SDL_WINDOW_ALWAYS_ON_TOP;
+    iconAtlas_ = nullptr;  // IconAtlas not yet compiled
 
-    Device& dev = Device::Instance();
-    if (!dev.Create(width, height, title, true, monitor, sdlFlags))
-        return false;
-
-    width_  = width;
-    height_ = height;
-    SDL_GL_GetDrawableSize(dev.GetWindow(), &drawW_, &drawH_);
-
-    fillBatch_ = new RenderBatch();
-    fillBatch_->Init(1, BUGUI_FILL_BUFFER_SIZE);
-
-    lineBatch_ = new RenderBatch();
-    lineBatch_->Init(1, BUGUI_LINE_BUFFER_SIZE);
-
-    textBatch_ = new RenderBatch();
-    textBatch_->Init(1, BUGUI_TEXT_BUFFER_SIZE);
-
-    font_ = new Font();
-    font_->LoadDefaultFont();
-
-    iconAtlas_ = new IconAtlas();
-    iconAtlas_->init(32);  // 32×32 px per icon cell
-
-    // root_ starts null; set via setStage() or direct assignment
     root_ = nullptr;
-
-    WidgetSerializer::registerBuiltinTypes();
-
-    // Create SDL system cursors
-    sdlCursors_[static_cast<int>(CursorType::Arrow)]     = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW));
-    sdlCursors_[static_cast<int>(CursorType::Hand)]      = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND));
-    sdlCursors_[static_cast<int>(CursorType::IBeam)]     = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM));
-    sdlCursors_[static_cast<int>(CursorType::Crosshair)] = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR));
-    sdlCursors_[static_cast<int>(CursorType::SizeH)]     = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE));
-    sdlCursors_[static_cast<int>(CursorType::SizeV)]     = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS));
-    sdlCursors_[static_cast<int>(CursorType::SizeAll)]   = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL));
-    sdlCursors_[static_cast<int>(CursorType::No)]        = static_cast<void*>(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO));
-    activeCursor_ = CursorType::Arrow;
+    // WidgetSerializer::registerBuiltinTypes();  // re-enable when migrated
 
     inited_ = true;
     return true;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Window properties (runtime)
+//  Per-frame input dispatch
 // ═════════════════════════════════════════════════════════════════════════════
 
-bool WidgetApp::isResizable() const
+void WidgetApp::update(const BuGUI::IO& io)
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    return win ? (SDL_GetWindowFlags(win) & SDL_WINDOW_RESIZABLE) != 0 : false;
+    dt_     = io.deltaTime;
+    elapsedMs_ += static_cast<uint32_t>(dt_ * 1000.0f);
+
+    // Cache modifier keys & clipboard callbacks from IO
+    ioKeyCtrl_  = io.keyCtrl;
+    ioKeyShift_ = io.keyShift;
+    ioKeyAlt_   = io.keyAlt;
+    clipSet_    = io.setClipboardText;
+    clipGet_    = io.getClipboardText;
+
+    int newW = static_cast<int>(io.displayWidth);
+    int newH = static_cast<int>(io.displayHeight);
+    if (newW != width_ || newH != height_) {
+        width_  = newW;
+        height_ = newH;
+        if (width_ != 0 && height_ != 0)
+            needsLayout_ = true;
+    }
+
+    float mx = io.mouseX;
+    float my = io.mouseY;
+
+    // Mouse move
+    if (mx != prevMouseX_ || my != prevMouseY_)
+        dispatchMouseMove(mx, my);
+
+    // Mouse buttons (delta detection)
+    for (int i = 0; i < 5; ++i)
+    {
+        if (io.mouseDown[i] && !prevMouseDown_[i])
+            dispatchMousePress(mx, my, i);
+        else if (!io.mouseDown[i] && prevMouseDown_[i])
+            dispatchMouseRelease(mx, my, i);
+    }
+
+    // Scroll
+    if (io.mouseWheelX != 0.0f || io.mouseWheelY != 0.0f)
+        dispatchMouseScroll(mx, my, io.mouseWheelX, io.mouseWheelY);
+
+    // Key press / release events
+    for (const auto& ke : io.keyEvents)
+    {
+        // F1 → toggle debug layout
+        if (ke.down && ke.scancode == 58 /*F1*/)
+            debugLayout_ = !debugLayout_;
+        else
+            dispatchKeyEvent(ke);
+    }
+
+    // Text input
+    if (!io.inputChars.empty())
+        dispatchTextInput(io.inputChars);
+
+    // OS-level file drops
+    if (!io.dropEvents.empty())
+        dispatchDropEvents(io.dropEvents);
+
+    // Tooltip timer
+    if (hovered_ && !hovered_->tooltip().empty())
+    {
+        tooltipTimer_ += dt_;
+        if (!tooltipVisible_ && tooltipTimer_ >= hovered_->tooltipDelay()) {
+            tooltipVisible_ = true;
+            tooltipWidget_  = hovered_;
+        }
+    }
+    else
+    {
+        tooltipTimer_   = 0.0f;
+        tooltipVisible_ = false;
+        tooltipWidget_  = nullptr;
+    }
+
+    // Flush deferred deletes
+    for (auto* fw : pendingFloatDeletes_) delete fw;
+    pendingFloatDeletes_.clear();
+    delete pendingPopupDelete_; pendingPopupDelete_ = nullptr;
+
+    // Tick animations
+    Animator::instance().tick(dt_);
+
+    // Tick popup animation
+    if (popupAnimOpening_) {
+        popupAnimProgress_ += dt_ / popupAnimDuration_;
+        if (popupAnimProgress_ >= 1.0f) {
+            popupAnimProgress_ = 1.0f;
+            popupAnimOpening_  = false;
+        }
+    }
+    if (popupAnimClosing_) {
+        popupAnimProgress_ -= dt_ / popupAnimDuration_;
+        if (popupAnimProgress_ <= 0.0f) {
+            popupAnimProgress_ = 0.0f;
+            popupAnimClosing_  = false;
+            // Now actually destroy
+            if (popupClosing_) {
+                popupClosing_->resetPopupState();
+                notifyWidgetRemoved(popupClosing_);
+                if (popupClosingOwned_) {
+                    delete pendingPopupDelete_;
+                    pendingPopupDelete_ = popupClosing_;
+                }
+                popupClosing_     = nullptr;
+                popupClosingOwner_= nullptr;
+                popupClosingOwned_= true;
+            }
+        }
+    }
+
+    // Store prev state
+    prevMouseX_ = mx;
+    prevMouseY_ = my;
+    for (int i = 0; i < 5; ++i)
+        prevMouseDown_[i] = io.mouseDown[i];
+
+    // Write cursor hint into IO so backend can read it
+    BuGUI::GetIO().wantedCursor = static_cast<int>(wantedCursor_);
 }
 
-bool WidgetApp::isMaximized() const
+// ═════════════════════════════════════════════════════════════════════════════
+//  Input dispatch helpers (formerly SDL event handlers)
+// ═════════════════════════════════════════════════════════════════════════════
+
+void WidgetApp::dispatchMouseMove(float x, float y)
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    return win ? (SDL_GetWindowFlags(win) & SDL_WINDOW_MAXIMIZED) != 0 : false;
+    mouseX_ = x;
+    mouseY_ = y;
+
+    if (pressed_)
+    {
+        // Check drag threshold
+        if (dragPending_ && !dragPayload_ && dragSource_) {
+            float dx = x - dragStartX_;
+            float dy = y - dragStartY_;
+            if (dx * dx + dy * dy >= dragThreshold_ * dragThreshold_) {
+                auto* p = new DragPayload(dragSource_->onDragBegin());
+                p->source = dragSource_;
+                dragPayload_ = p;
+                dragPending_ = false;
+            }
+        }
+        applyCursor(dragPayload_ ? CursorType::SizeAll : pressed_->cursor());
+        MouseEvent me = makeMouseEvent(x, y);
+        bubble(pressed_, me, &Widget::onMouseMove);
+        return;
+    }
+
+    Widget* hit = popup_ ? hitTest(popup_, x, y) : nullptr;
+    if (!hit && popup_ && popup_->popupContains(x, y))
+        hit = popup_;
+    if (!hit && popup_) {
+        if (hovered_) updateHover(nullptr);
+        return;
+    }
+    if (!hit) {
+        for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i) {
+            auto* fw = floats_[i];
+            if (!fw->isVisible()) continue;
+            hit = hitTest(fw, x, y);
+            if (hit) break;
+        }
+    }
+    if (!hit)
+        hit = hitTest(root_, x, y);
+
+    if (hit != hovered_)
+        updateHover(hit);
+
+    if (hovered_) {
+        MouseEvent me = makeMouseEvent(x, y);
+        bubble(hovered_, me, &Widget::onMouseMove);
+        // Re-read cursor — walk chain leaf→root, pick first non-Arrow
+        CursorType cur = CursorType::Arrow;
+        for (auto it = hoverChain_.rbegin(); it != hoverChain_.rend(); ++it) {
+            if ((*it)->cursor() != CursorType::Arrow) {
+                cur = (*it)->cursor();
+                break;
+            }
+        }
+        applyCursor(cur);
+    }
 }
 
-void WidgetApp::setResizable(bool r)
+void WidgetApp::dispatchMousePress(float x, float y, int btn)
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    if (win) SDL_SetWindowResizable(win, r ? SDL_TRUE : SDL_FALSE);
+    mouseX_ = x;
+    mouseY_ = y;
+
+    // ── Double/triple-click detection ────────────────────────────────────
+    constexpr uint32_t kDblClickMs  = 400;  // max ms between clicks
+    constexpr float    kDblClickDist = 5.0f; // max pixel drift
+    float dx = x - lastClickX_, dy = y - lastClickY_;
+    bool  sameSpot = (dx*dx + dy*dy) < kDblClickDist * kDblClickDist;
+    bool  sameBtn  = (btn == lastClickBtn_);
+    bool  inTime   = (elapsedMs_ - lastClickMs_) < kDblClickMs;
+    if (sameBtn && sameSpot && inTime)
+        clickSeq_ = std::min(clickSeq_ + 1, 3);
+    else
+        clickSeq_ = 1;
+    lastClickMs_  = elapsedMs_;
+    lastClickX_   = x;
+    lastClickY_   = y;
+    lastClickBtn_ = btn;
+
+    if (popup_)
+    {
+        Widget* popupHit = hitTest(popup_, x, y);
+        if (!popupHit && popup_->popupContains(x, y))
+            popupHit = popup_;
+        if (popupHit) {
+            MouseEvent me = makeMouseEvent(x, y, btn);
+            bubble(popupHit, me, &Widget::onMousePress);
+            if (popup_) pressed_ = popupHit;
+            return;
+        }
+        bool ownerToggle = (btn == 0) && popupOwner_ &&
+                           hitTest(popupOwner_, x, y) != nullptr;
+        if (!ownerToggle)
+            closePopup();
+    }
+
+    for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i) {
+        auto* fw = floats_[i];
+        if (!fw->isVisible()) continue;
+        Widget* fwHit = hitTest(fw, x, y);
+        if (fwHit) {
+            bringToFront(fw);
+            MouseEvent me = makeMouseEvent(x, y, btn);
+            bubble(fwHit, me, &Widget::onMousePress);
+            // fw may have been removed (and queued for deletion) during the event —
+            // only keep pressed_ if the window is still alive in the float list.
+            if (std::find(floats_.begin(), floats_.end(), fw) != floats_.end())
+                pressed_ = fwHit;
+            return;
+        }
+    }
+
+    Widget* hit = hitTest(root_, x, y);
+    if (hit) {
+        if (btn == 1) {
+            Widget* w = hit;
+            while (w) {
+                if (w->contextMenu()) {
+                    ContextMenu::show(w->contextMenu(), x, y, w);
+                    return;
+                }
+                w = w->parent();
+            }
+        }
+        if (hit->acceptsFocus() && hit != focused_)
+            setFocused(hit);
+
+        // Check for drag source on left-button press
+        if (btn == 0 && !dragPending_) {
+            Widget* ds = hit;
+            while (ds) {
+                if (ds->isDragSource()) {
+                    dragPending_ = true;
+                    dragSource_  = ds;
+                    dragStartX_  = x;
+                    dragStartY_  = y;
+                    break;
+                }
+                ds = ds->parent();
+            }
+        }
+
+        MouseEvent me = makeMouseEvent(x, y, btn);
+        bubble(hit, me, &Widget::onMousePress);
+        pressed_ = hit;
+    } else {
+        setFocused(nullptr);
+    }
 }
 
-void WidgetApp::setMinSize(int w, int h)
+void WidgetApp::dispatchMouseRelease(float x, float y, int btn)
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    if (win) SDL_SetWindowMinimumSize(win, w, h);
+    mouseX_ = x;
+    mouseY_ = y;
+
+    // Complete widget-to-widget drag & drop on left-button release
+    if (btn == 0 && dragPayload_) {
+        Widget* target = nullptr;
+        for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i) {
+            auto* fw = floats_[i];
+            if (!fw->isVisible()) continue;
+            target = hitTest(fw, x, y);
+            if (target) break;
+        }
+        if (!target)
+            target = hitTest(root_, x, y);
+
+        bool accepted = false;
+        if (target) {
+            // Walk up from target to find an acceptor
+            Widget* w = target;
+            while (w) {
+                if (w->acceptsDrop(*dragPayload_)) {
+                    w->onDropReceive(*dragPayload_);
+                    accepted = true;
+                    break;
+                }
+                w = w->parent();
+            }
+        }
+        if (dragSource_)
+            dragSource_->onDragEnd(accepted);
+        delete dragPayload_;
+        dragPayload_ = nullptr;
+        dragSource_  = nullptr;
+        dragPending_ = false;
+    }
+    if (btn == 0) {
+        dragPending_ = false;
+        dragSource_  = nullptr;
+    }
+
+    if (pressed_) {
+        MouseEvent me = makeMouseEvent(x, y, btn);
+        bubble(pressed_, me, &Widget::onMouseRelease);
+        pressed_ = nullptr;
+        Widget* hit2 = hitTest(root_, x, y);
+        if (hit2 != hovered_) updateHover(hit2);
+    }
 }
 
-void WidgetApp::setMaxSize(int w, int h)
+// ── MouseEvent with current IO modifiers ─────────────────────────────────
+MouseEvent WidgetApp::makeMouseEvent(float x, float y, int btn) const
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    if (win) SDL_SetWindowMaximumSize(win, w, h);
+    MouseEvent me;
+    me.x = x; me.y = y; me.button = btn;
+    me.clickCount = clickSeq_;
+    me.ctrl  = ioKeyCtrl_;
+    me.shift = ioKeyShift_;
+    me.alt   = ioKeyAlt_;
+    return me;
 }
 
-void WidgetApp::setTitle(const char* title)
+// ── Clipboard forwarding ─────────────────────────────────────────────────
+void WidgetApp::setClipboardText(const char* text)
 {
-    SDL_Window* win = Device::Instance().GetWindow();
-    if (win) SDL_SetWindowTitle(win, title);
+    if (clipSet_) clipSet_(text);
+}
+
+std::string WidgetApp::getClipboardText() const
+{
+    if (clipGet_) return clipGet_();
+    return {};
+}
+
+void WidgetApp::dispatchMouseScroll(float x, float y, float sx, float sy)
+{
+    if (!hovered_) return;
+    MouseEvent me = makeMouseEvent(x, y);
+    me.scrollX = sx; me.scrollY = sy;
+    bubble(hovered_, me, &Widget::onMouseScroll);
+}
+
+void WidgetApp::dispatchKeyEvent(const BuGUI::IO::KeyEvent& ke)
+{
+    // ── Tab / Shift+Tab focus cycling ────────────────────────────────────
+    if (ke.down && ke.key == BuGUI::Key::Tab && !ke.ctrl && !ke.alt) {
+        // First give the focused widget a chance to consume Tab
+        if (focused_) {
+            KeyEvent we;
+            we.key = ke.key; we.scancode = ke.scancode;
+            we.shift = ke.shift; we.ctrl = ke.ctrl; we.alt = ke.alt;
+            focused_->onKeyPress(we);
+            if (we.consumed) return;
+        }
+        // Collect all focusable widgets in DFS order
+        std::vector<Widget*> focusable;
+        collectFocusable(root_, focusable);
+        for (auto* fw : floats_)
+            collectFocusable(fw, focusable);
+        if (focusable.empty()) return;
+
+        auto it = std::find(focusable.begin(), focusable.end(), focused_);
+        if (ke.shift) {
+            if (it == focusable.begin() || it == focusable.end())
+                it = focusable.end();
+            --it;
+        } else {
+            if (it != focusable.end()) ++it;
+            if (it == focusable.end()) it = focusable.begin();
+        }
+        setFocused(*it);
+        return;
+    }
+
+    if (!focused_) return;
+    KeyEvent we;
+    we.key      = ke.key;
+    we.scancode = ke.scancode;
+    we.shift    = ke.shift;
+    we.ctrl     = ke.ctrl;
+    we.alt      = ke.alt;
+    Widget* w = focused_;
+    while (w && !we.consumed) {
+        if (ke.down)  w->onKeyPress(we);
+        else          w->onKeyRelease(we);
+        w = w->parent();
+    }
+}
+
+void WidgetApp::dispatchTextInput(const std::vector<uint32_t>& chars)
+{
+    if (!focused_) return;
+    KeyEvent ke;
+    // Convert UTF-32 codepoints to UTF-8 text[]
+    int off = 0;
+    for (uint32_t cp : chars) {
+        if (cp < 0x80)        { if (off+1>28) break; ke.text[off++] = static_cast<char>(cp); }
+        else if (cp < 0x800)  { if (off+2>28) break; ke.text[off++] = static_cast<char>(0xC0 | (cp >> 6)); ke.text[off++] = static_cast<char>(0x80 | (cp & 0x3F)); }
+        else if (cp < 0x10000){ if (off+3>28) break; ke.text[off++] = static_cast<char>(0xE0 | (cp >> 12)); ke.text[off++] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); ke.text[off++] = static_cast<char>(0x80 | (cp & 0x3F)); }
+        else if (cp<=0x10FFFF){ if (off+4>28) break; ke.text[off++] = static_cast<char>(0xF0 | (cp >> 18)); ke.text[off++] = static_cast<char>(0x80 | ((cp >> 12) & 0x3F)); ke.text[off++] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); ke.text[off++] = static_cast<char>(0x80 | (cp & 0x3F)); }
+    }
+    ke.text[off] = 0;
+    Widget* w = focused_;
+    while (w && !ke.consumed) { w->onTextInput(ke); w = w->parent(); }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -344,11 +610,11 @@ bool WidgetApp::removeStage(const std::string& name)
     return true;
 }
 
-RenderBatch& WidgetApp::fillBatch() { return *fillBatch_; }
-RenderBatch& WidgetApp::lineBatch() { return *lineBatch_; }
-RenderBatch& WidgetApp::textBatch() { return *textBatch_; }
-Font&        WidgetApp::font()      { return *font_; }
-IconAtlas&   WidgetApp::iconAtlas() { return *iconAtlas_; }
+IconAtlas& WidgetApp::iconAtlas()
+{
+    if (!iconAtlas_) { iconAtlas_ = new IconAtlas(); /* backend calls buildImage()+setTexture() */ }
+    return *iconAtlas_;
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Widget lookup
@@ -416,6 +682,8 @@ void WidgetApp::notifyWidgetRemoved(Widget* w)
         pressed_ = nullptr;
     if (focused_ && isDescendantOf(focused_, w))
         focused_ = nullptr;
+    if (dragSource_ && isDescendantOf(dragSource_, w))
+        cancelDrag();
     if (hovered_ && isDescendantOf(hovered_, w))
     {
         hovered_ = nullptr;
@@ -467,25 +735,54 @@ void WidgetApp::bringToFront(FloatWindow* fw)
 
 void WidgetApp::showPopup(Widget* popup, Widget* owner, bool owned)
 {
-    closePopup();
-    // Flush any pending delete before opening new popup
-    delete pendingPopupDelete_;
-    pendingPopupDelete_ = nullptr;
+    // If a close animation is running, finish it immediately
+    if (popupClosing_) {
+        popupClosing_->resetPopupState();
+        notifyWidgetRemoved(popupClosing_);
+        if (popupClosingOwned_) {
+            delete pendingPopupDelete_;
+            pendingPopupDelete_ = popupClosing_;
+        }
+        popupClosing_     = nullptr;
+        popupAnimClosing_ = false;
+    }
+
+    // Close previous popup instantly if any
+    if (popup_) {
+        popup_->resetPopupState();
+        notifyWidgetRemoved(popup_);
+        if (popupOwned_) {
+            delete pendingPopupDelete_;
+            pendingPopupDelete_ = popup_;
+        }
+    }
+
     popup_      = popup;
     popupOwner_ = owner;
     popupOwned_ = owned;
+
+    // Start open animation
+    popupAnimProgress_ = 0.0f;
+    popupAnimOpening_  = true;
+    popupAnimClosing_  = false;
+    popupAnimEase_     = EaseType::OutCubic;
 }
 
 void WidgetApp::closePopup()
 {
     if (popup_)
     {
-        // Reset menu state (hovered/submenu) so it opens clean next time
-        popup_->resetPopupState();
-        notifyWidgetRemoved(popup_);
-        // Defer delete only if we own the popup
-        if (popupOwned_)
-            pendingPopupDelete_ = popup_;
+        // Start close animation — keep popup alive during the tween
+        popupClosing_      = popup_;
+        popupClosingOwner_ = popupOwner_;
+        popupClosingOwned_ = popupOwned_;
+
+        popupAnimProgress_ = 1.0f;
+        popupAnimClosing_  = true;
+        popupAnimOpening_  = false;
+        popupAnimEase_     = EaseType::InCubic;
+
+        // Clear the active popup pointer so input goes through
         popup_      = nullptr;
         popupOwner_ = nullptr;
         popupOwned_ = true;
@@ -514,8 +811,9 @@ Widget* WidgetApp::hitTest(Widget* w, float x, float y)
 
     for (int i = static_cast<int>(ch.size()) - 1; i >= 0; --i)
     {
-        // Skip children outside the viewport when parent scrolls
-        if (clips)
+        // Skip children outside the viewport when parent scrolls,
+        // but never clip non-scrollable children (e.g. scrollbars).
+        if (clips && ch[i]->isScrollable())
         {
             Rect childAbs = ch[i]->absoluteRect();
             // Child must overlap the parent's visible area
@@ -573,11 +871,7 @@ std::vector<Widget*> WidgetApp::buildChain(Widget* w)
 
 void WidgetApp::applyCursor(CursorType type)
 {
-    if (type == activeCursor_) return;
-    activeCursor_ = type;
-    int idx = static_cast<int>(type);
-    if (idx >= 0 && idx < 8 && sdlCursors_[idx])
-        SDL_SetCursor(static_cast<SDL_Cursor*>(sdlCursors_[idx]));
+    wantedCursor_ = type;
 }
 
 void WidgetApp::updateHover(Widget* newLeaf)
@@ -622,318 +916,6 @@ void WidgetApp::updateHover(Widget* newLeaf)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SDL event handlers
-// ═════════════════════════════════════════════════════════════════════════════
-
-void WidgetApp::handleMouseMotion(SDL_Event& event)
-{
-    mouseX_ = static_cast<float>(event.motion.x);
-    mouseY_ = static_cast<float>(event.motion.y);
-
-    // During drag (pressed_), skip hover updates - other widgets
-    // should not get enter/leave while dragging a splitter/slider/etc.
-    if (pressed_)
-    {
-        applyCursor(pressed_->cursor());
-
-        MouseEvent me;
-        me.x = mouseX_;
-        me.y = mouseY_;
-        bubble(pressed_, me, &Widget::onMouseMove);
-        return;
-    }
-
-    Widget* hit = popup_ ? hitTest(popup_, mouseX_, mouseY_) : nullptr;
-    // If mouse is in submenu area (outside popup_ rect), route to popup
-    if (!hit && popup_ && popup_->popupContains(mouseX_, mouseY_))
-        hit = popup_;
-    if (!hit && popup_)
-    {
-        // Popup is open but mouse is outside it - don't hover root widgets
-        // (prevents I-beam cursor on TextEdit while context menu is open)
-        if (hovered_)
-            updateHover(nullptr);
-        return;
-    }
-    if (!hit)
-    {
-        // Check float windows (topmost = last in vector)
-        for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i)
-        {
-            auto* fw = floats_[i];
-            if (!fw->isVisible()) continue;
-            hit = hitTest(fw, mouseX_, mouseY_);
-            if (hit) break;
-        }
-    }
-    if (!hit)
-        hit = hitTest(root_, mouseX_, mouseY_);
-
-    // Enter / Leave - full chain tracking
-    if (hit != hovered_)
-        updateHover(hit);
-
-    // Send move to hovered widget (with bubbling)
-    if (hovered_)
-    {
-        MouseEvent me;
-        me.x = mouseX_;
-        me.y = mouseY_;
-        bubble(hovered_, me, &Widget::onMouseMove);
-    }
-}
-
-void WidgetApp::handleMouseButton(SDL_Event& event, bool down)
-{
-    int btn = 0;
-    if (event.button.button == SDL_BUTTON_RIGHT)  btn = 1;
-    if (event.button.button == SDL_BUTTON_MIDDLE) btn = 2;
-
-    mouseX_ = static_cast<float>(event.button.x);
-    mouseY_ = static_cast<float>(event.button.y);
-
-    if (down)
-    {
-        // Check popup first (if open)
-        if (popup_)
-        {
-            Widget* popupHit = hitTest(popup_, mouseX_, mouseY_);
-            // If mouse is in submenu area, route to popup
-            if (!popupHit && popup_->popupContains(mouseX_, mouseY_))
-                popupHit = popup_;
-            if (popupHit)
-            {
-                MouseEvent me;
-                me.x = mouseX_;
-                me.y = mouseY_;
-                me.button = btn;
-                bubble(popupHit, me, &Widget::onMousePress);
-                // Don't track pressed_ if popup was closed during bubble
-                if (popup_)
-                    pressed_ = popupHit;
-                return;
-            }
-
-            // Click outside popup: close it.
-            // For left-clicks on the popup owner (MenuBar), let owner handle toggle.
-            bool ownerToggle = (btn == 0) && popupOwner_ &&
-                               hitTest(popupOwner_, mouseX_, mouseY_) != nullptr;
-            if (!ownerToggle)
-            {
-                closePopup();
-                // For right-clicks, fall through so a new context menu can open.
-                // For left-clicks, also fall through to normal handling.
-            }
-        }
-
-        // Check float windows (topmost first)
-        for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i)
-        {
-            auto* fw = floats_[i];
-            if (!fw->isVisible()) continue;
-            Widget* fwHit = hitTest(fw, mouseX_, mouseY_);
-            if (fwHit)
-            {
-                bringToFront(fw);
-                MouseEvent me;
-                me.x = mouseX_;
-                me.y = mouseY_;
-                me.button = btn;
-                bubble(fwHit, me, &Widget::onMousePress);
-                pressed_ = fwHit;
-                return;
-            }
-        }
-
-        Widget* hit = hitTest(root_, mouseX_, mouseY_);
-
-        if (hit)
-        {
-            // Right-click → check for context menu (bubble up the chain)
-            if (btn == 1)
-            {
-                Widget* w = hit;
-                while (w)
-                {
-                    if (w->contextMenu())
-                    {
-                        ContextMenu::show(w->contextMenu(), mouseX_, mouseY_, w);
-                        return;
-                    }
-                    w = w->parent();
-                }
-            }
-
-            // Focus management
-            if (hit->acceptsFocus() && hit != focused_)
-                setFocused(hit);
-
-            MouseEvent me;
-            me.x = mouseX_;
-            me.y = mouseY_;
-            me.button = btn;
-            bubble(hit, me, &Widget::onMousePress);
-            pressed_ = hit;
-        }
-        else
-        {
-            setFocused(nullptr);
-        }
-    }
-    else // up
-    {
-        if (pressed_)
-        {
-            MouseEvent me;
-            me.x = mouseX_;
-            me.y = mouseY_;
-            me.button = btn;
-            bubble(pressed_, me, &Widget::onMouseRelease);
-            pressed_ = nullptr;
-
-            // Recalculate hover now that drag ended
-            Widget* hit2 = hitTest(root_, mouseX_, mouseY_);
-            if (hit2 != hovered_)
-                updateHover(hit2);
-        }
-    }
-}
-
-void WidgetApp::handleMouseWheel(SDL_Event& event)
-{
-    if (!hovered_) return;
-
-    MouseEvent me;
-    me.x = mouseX_;
-    me.y = mouseY_;
-    me.scrollX = static_cast<float>(event.wheel.x);
-    me.scrollY = static_cast<float>(event.wheel.y);
-    bubble(hovered_, me, &Widget::onMouseScroll);
-}
-
-void WidgetApp::handleKey(SDL_Event& event, bool down)
-{
-    if (!focused_) return;
-
-    KeyEvent ke;
-    ke.scancode = event.key.keysym.scancode;
-    ke.key      = event.key.keysym.sym;
-    ke.shift    = (event.key.keysym.mod & KMOD_SHIFT) != 0;
-    ke.ctrl     = (event.key.keysym.mod & KMOD_CTRL)  != 0;
-    ke.alt      = (event.key.keysym.mod & KMOD_ALT)   != 0;
-
-    // Bubble up from focused widget
-    Widget* w = focused_;
-    while (w && !ke.consumed)
-    {
-        if (down)
-            w->onKeyPress(ke);
-        else
-            w->onKeyRelease(ke);
-        w = w->parent();
-    }
-}
-
-void WidgetApp::handleTextInput(SDL_Event& event)
-{
-    if (!focused_) return;
-
-    KeyEvent ke;
-    SDL_strlcpy(ke.text, event.text.text, sizeof(ke.text));
-
-    Widget* w = focused_;
-    while (w && !ke.consumed)
-    {
-        w->onTextInput(ke);
-        w = w->parent();
-    }
-}
-
-void WidgetApp::handleEvent(SDL_Event& event)
-{
-    switch (event.type)
-    {
-    case SDL_MOUSEMOTION:
-        handleMouseMotion(event);
-        break;
-    case SDL_MOUSEBUTTONDOWN:
-        handleMouseButton(event, true);
-        break;
-    case SDL_MOUSEBUTTONUP:
-        handleMouseButton(event, false);
-        break;
-    case SDL_MOUSEWHEEL:
-        if (onMouseWheel_ && onMouseWheel_(event.wheel.preciseX, event.wheel.preciseY))
-            break;
-        handleMouseWheel(event);
-        break;
-    case SDL_KEYDOWN:
-        if (event.key.keysym.sym == SDLK_F1)
-        {
-            debugLayout_ = !debugLayout_;
-            return;
-        }
-        if (event.key.keysym.sym == SDLK_F9)
-        {
-            auto& dev = Device::Instance();
-            if (dev.IsRecording())
-                dev.StopGifRecording();
-            else
-                dev.StartGifRecording();
-            return;
-        }
-        if (onKeyDown_ && onKeyDown_(event.key.keysym.sym, event.key.keysym.scancode, event.key.keysym.mod))
-            return;
-        handleKey(event, true);
-        break;
-    case SDL_KEYUP:
-        if (onKeyUp_ && onKeyUp_(event.key.keysym.sym, event.key.keysym.scancode, event.key.keysym.mod))
-            return;
-        handleKey(event, false);
-        break;
-    case SDL_TEXTINPUT:
-        if (onTextInput_ && onTextInput_(event.text.text))
-            return;
-        handleTextInput(event);
-        break;
-    case SDL_WINDOWEVENT:
-        if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
-            event.window.event == SDL_WINDOWEVENT_MAXIMIZED ||
-            event.window.event == SDL_WINDOWEVENT_RESTORED)
-        {
-            SDL_Window* win = Device::Instance().GetWindow();
-            if (!win) break;
-
-            // Prefer event payload to avoid querying transient/intermediate sizes.
-            int nw = event.window.data1;
-            int nh = event.window.data2;
-            if (nw <= 0 || nh <= 0)
-                SDL_GetWindowSize(win, &nw, &nh);
-
-            int newDrawW = drawW_;
-            int newDrawH = drawH_;
-            SDL_GL_GetDrawableSize(win, &newDrawW, &newDrawH);
-
-            // Ignore duplicate resize events that carry no effective change.
-            if (nw == width_ && nh == height_ &&
-                newDrawW == drawW_ && newDrawH == drawH_)
-                break;
-
-            width_  = nw;
-            height_ = nh;
-            drawW_  = newDrawW;
-            drawH_  = newDrawH;
-            Device::Instance().SetSize(width_, height_);
-            needsLayout_ = true;
-        }
-        break;
-    case SDL_QUIT:
-        running_ = false;
-        break;
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
 //  Focus
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -947,16 +929,7 @@ void WidgetApp::setFocused(Widget* w)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FPS
-// ═════════════════════════════════════════════════════════════════════════════
-
-int WidgetApp::fps() const
-{
-    return Device::Instance().GetFPS();
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  Debug layout overlay - recursive wireframe drawing
+//  Debug layout overlay
 // ═════════════════════════════════════════════════════════════════════════════
 
 namespace {
@@ -976,35 +949,26 @@ static Color debugColor(int depth)
     return colors[depth % 7];
 }
 
-void debugPaintWidget(Widget* w, RenderBatch& line, Font& font, int depth)
+void debugPaintWidget(Widget* w, BuGUI::DrawList& dl, int depth)
 {
     if (!w || !w->isVisible()) return;
 
-    Rect abs = w->absoluteRect();
+    BuGUI::Rect abs = { w->absoluteRect().x, w->absoluteRect().y,
+                        w->absoluteRect().w, w->absoluteRect().h };
     Color c = debugColor(depth);
+    dl.addRectOutline(abs, c);
 
-    // Draw widget rect outline
-    line.SetColor(c.r, c.g, c.b, c.a);
-    line.Rectangle(static_cast<int>(abs.x), static_cast<int>(abs.y),
-                   static_cast<int>(abs.w), static_cast<int>(abs.h), false);
-
-    // Draw margin area as dashed inner outline (if margins > 0)
     const Edges& m = w->margins();
     if (m.top > 0 || m.right > 0 || m.bottom > 0 || m.left > 0)
     {
-        // Outer rect = rect + margins (parent allocated this space)
-        line.SetColor(c.r, c.g, c.b, 80);
-        float ox = abs.x - m.left;
-        float oy = abs.y - m.top;
-        float ow = abs.w + m.left + m.right;
-        float oh = abs.h + m.top + m.bottom;
-        line.Rectangle(static_cast<int>(ox), static_cast<int>(oy),
-                       static_cast<int>(ow), static_cast<int>(oh), false);
+        BuGUI::Rect outer = { abs.x - m.left, abs.y - m.top,
+                              abs.w + m.left + m.right, abs.h + m.top + m.bottom };
+        Color dim = {c.r, c.g, c.b, 80};
+        dl.addRectOutline(outer, dim);
     }
 
-    // Recurse children
     for (auto* child : w->children())
-        debugPaintWidget(child, line, font, depth + 1);
+        debugPaintWidget(child, dl, depth + 1);
 }
 
 } // namespace
@@ -1071,83 +1035,73 @@ float applyEasing(EaseType type, float t)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Helper: paint a widget tree with offset + scale (for transitions)
+//  paintTreeInto – layout + paint one widget tree into a DrawList.
+//  No CPU-side offset — camera is handled GPU-side via DrawPass::camera.
 // ═════════════════════════════════════════════════════════════════════════════
 
-void WidgetApp::paintTree(Widget* tree, float w, float h,
-                          float offsetX, float offsetY, float scale)
+// ═════════════════════════════════════════════════════════════════════════════
+//  paintTreeInto – fills background then paints widget tree
+// ═════════════════════════════════════════════════════════════════════════════
+
+void WidgetApp::setStageCamera(const std::string& name, const BuGUI::Camera2D& cam)
+{
+    stageCameras_[name] = cam;
+}
+
+BuGUI::Camera2D WidgetApp::stageCamera(const std::string& name) const
+{
+    auto it = stageCameras_.find(name);
+    return it != stageCameras_.end() ? it->second : BuGUI::Camera2D{};
+}
+
+void WidgetApp::setStageBgColor(const std::string& name, const Color& c)
+{
+    stageBgColors_[name] = c;
+}
+
+Color WidgetApp::stageBgColor(const std::string& name) const
+{
+    auto it = stageBgColors_.find(name);
+    return it != stageBgColors_.end() ? it->second : bgColor_;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  paintTreeInto – fills background then paints widget tree
+// ═════════════════════════════════════════════════════════════════════════════
+
+void WidgetApp::paintTreeInto(Widget* tree, BuGUI::DrawList& dl,
+                               const BuGUI::Font* font, IconAtlas* icons,
+                               float w, float h, const Color& bgColor)
 {
     if (!tree) return;
 
-    // Layout at full screen size
     tree->setRect({0, 0, w, h});
     for (auto* c : tree->children())
         c->setRect({0, 0, w, h});
     tree->layout();
 
-    // Build projection: ortho shifted by offset, scaled from center
-    glm::mat4 ortho = glm::ortho(0.0f, w, h, 0.0f, -1.0f, 1.0f);
-    if (scale != 1.0f)
-    {
-        // Translate to center, scale, translate back, then apply offset
-        glm::mat4 m(1.0f);
-        m = glm::translate(m, glm::vec3(w * 0.5f + offsetX, h * 0.5f + offsetY, 0.0f));
-        m = glm::scale(m, glm::vec3(scale, scale, 1.0f));
-        m = glm::translate(m, glm::vec3(-w * 0.5f, -h * 0.5f, 0.0f));
-        ortho = ortho * m;
-    }
-    else if (offsetX != 0.0f || offsetY != 0.0f)
-    {
-        ortho = glm::ortho(-offsetX, w - offsetX, h - offsetY, -offsetY, -1.0f, 1.0f);
-    }
+    // Fill background so transitions have no holes between stages.
+    dl.addRect({0, 0, w, h}, bgColor);
 
-    fillBatch_->SetMatrix(ortho);
-    lineBatch_->SetMatrix(ortho);
-    textBatch_->SetMatrix(ortho);
-
-    PaintContext ctx{*fillBatch_, *lineBatch_, *textBatch_, *font_, iconAtlas_};
+    PaintContext ctx{dl, font, icons};
     tree->paint(ctx);
-
-    fillBatch_->Render();
-    lineBatch_->Render();
-    textBatch_->Render();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Render
+//  paint – layout + paint the full widget tree, pushing DrawPasses into data.
 // ═════════════════════════════════════════════════════════════════════════════
 
-void WidgetApp::render()
+void WidgetApp::paint(BuGUI::DrawData& data,
+                      const BuGUI::Font* font,
+                      IconAtlas* icons)
 {
-    if (!root_) return;
-
-    // ── Save caller's GL state (like ImGui does) ─────────────────────────
-    GLBackup glBackup;
-    backupGLState(glBackup);
-
-    // The RenderState cache may be stale (caller changed GL state directly),
-    // so invalidate it before we start.
-    auto& rs = RenderState::instance();
-    rs.resetCache();
-
     float w = static_cast<float>(width_);
     float h = static_cast<float>(height_);
+    if (w <= 0 || h <= 0) return;
+    font_  = font;  // cache for text measurement in mouse events
+    drawList_ = &BuGUI::GetDrawList();
 
-    glViewport(0, 0, drawW_, drawH_);
-
-    rs.setClearColor(bgColor_.r / 255.0f, bgColor_.g / 255.0f,
-                     bgColor_.b / 255.0f, bgColor_.a / 255.0f);
-    rs.clear(true, true);
-
-    rs.setDepthTest(false);
-    rs.setBlend(true);
-    rs.setBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    fillBatch_->resetStats();
-    lineBatch_->resetStats();
-    textBatch_->resetStats();
-
-    // ── Layout pass (always before paint, regardless of transition) ───────
+    // Layout pass
     if (needsLayout_ && root_)
     {
         root_->setRect({0, 0, w, h});
@@ -1155,7 +1109,6 @@ void WidgetApp::render()
             c->setRect({0, 0, w, h});
         root_->layout();
 
-        // Also relayout old stage during transitions
         if (transActive_ && transOldRoot_)
         {
             transOldRoot_->setRect({0, 0, w, h});
@@ -1166,232 +1119,221 @@ void WidgetApp::render()
         needsLayout_ = false;
     }
 
-    // ── Transition in progress ───────────────────────────────────────────
+    // Transition
     if (transActive_)
     {
         transProgress_ += dt_ / transDuration_;
-        if (transProgress_ >= 1.0f)
-        {
-            transProgress_ = 1.0f;
-            transActive_   = false;
-            transOldRoot_  = nullptr;
-            transOldStage_.clear();
+        if (transProgress_ >= 1.0f) {
+            transProgress_ = 1.0f; transActive_ = false;
+            transOldRoot_ = nullptr; transOldStage_.clear();
         }
-
         float t = applyEasing(transEaseCur_, transProgress_);
+
+        // Each stage gets its own DrawList + Camera2D.
+        // The base camera comes from the per-stage camera map;
+        // transitions add a pan/scale offset on top.
+        BuGUI::Camera2D baseCur = stageCamera(currentStage_);
+        BuGUI::Camera2D baseOld = stageCamera(transOldStage_);
+
+        BuGUI::Camera2D camOld = baseOld;
+        BuGUI::Camera2D camNew = baseCur;
+
+        BuGUI::DrawList& dlNew  = BuGUI::GetDrawList();
+        BuGUI::DrawList& dlOld  = BuGUI::GetTransDrawList();
 
         switch (transCurrent_)
         {
-        // ── Slide: both move together ────────────────────────────────────
         case TransitionType::SlideLeft:
-            paintTree(transOldRoot_, w, h, -t * w, 0, 1.0f);
-            paintTree(root_,         w, h,  w * (1.0f - t), 0, 1.0f);
+            camOld.x = baseOld.x - t * w;
+            camNew.x = baseCur.x + w * (1.0f - t);
             break;
-
         case TransitionType::SlideRight:
-            paintTree(transOldRoot_, w, h,  t * w, 0, 1.0f);
-            paintTree(root_,         w, h, -w * (1.0f - t), 0, 1.0f);
+            camOld.x = baseOld.x + t * w;
+            camNew.x = baseCur.x - w * (1.0f - t);
             break;
-
         case TransitionType::SlideUp:
-            paintTree(transOldRoot_, w, h, 0, -t * h, 1.0f);
-            paintTree(root_,         w, h, 0,  h * (1.0f - t), 1.0f);
+            camOld.y = baseOld.y - t * h;
+            camNew.y = baseCur.y + h * (1.0f - t);
             break;
-
         case TransitionType::SlideDown:
-            paintTree(transOldRoot_, w, h, 0,  t * h, 1.0f);
-            paintTree(root_,         w, h, 0, -h * (1.0f - t), 1.0f);
+            camOld.y = baseOld.y + t * h;
+            camNew.y = baseCur.y - h * (1.0f - t);
             break;
-
-        // ── Cover: old stays, new slides over ────────────────────────────
         case TransitionType::CoverLeft:
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f);
-            paintTree(root_,         w, h,  w * (1.0f - t), 0, 1.0f);
+            // old stays, new slides in from right
+            camNew.x = baseCur.x + w * (1.0f - t);
             break;
-
         case TransitionType::CoverRight:
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f);
-            paintTree(root_,         w, h, -w * (1.0f - t), 0, 1.0f);
+            camNew.x = baseCur.x - w * (1.0f - t);
             break;
-
         case TransitionType::CoverUp:
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f);
-            paintTree(root_,         w, h, 0,  h * (1.0f - t), 1.0f);
+            camNew.y = baseCur.y + h * (1.0f - t);
             break;
-
         case TransitionType::CoverDown:
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f);
-            paintTree(root_,         w, h, 0, -h * (1.0f - t), 1.0f);
+            camNew.y = baseCur.y - h * (1.0f - t);
             break;
-
-        // ── Reveal: old slides out, new stays behind ─────────────────────
         case TransitionType::RevealLeft:
-            paintTree(root_,         w, h, 0, 0, 1.0f);
-            paintTree(transOldRoot_, w, h, -t * w, 0, 1.0f);
+            // new stays, old slides out left
+            camOld.x = baseOld.x - t * w;
             break;
-
         case TransitionType::RevealRight:
-            paintTree(root_,         w, h, 0, 0, 1.0f);
-            paintTree(transOldRoot_, w, h,  t * w, 0, 1.0f);
+            camOld.x = baseOld.x + t * w;
             break;
-
         case TransitionType::RevealUp:
-            paintTree(root_,         w, h, 0, 0, 1.0f);
-            paintTree(transOldRoot_, w, h, 0, -t * h, 1.0f);
+            camOld.y = baseOld.y - t * h;
             break;
-
         case TransitionType::RevealDown:
-            paintTree(root_,         w, h, 0, 0, 1.0f);
-            paintTree(transOldRoot_, w, h, 0,  t * h, 1.0f);
+            camOld.y = baseOld.y + t * h;
             break;
-
-        // ── Zoom: scale from/to center ───────────────────────────────────
         case TransitionType::ZoomIn:
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f);
-            paintTree(root_,         w, h, 0, 0, t);
+            // new zooms in from 0.5 → 1.0 (pivot = screen centre)
+            camNew.scale = baseCur.scale * (0.5f + 0.5f * t);
+            camNew.pivotX = 0.5f; camNew.pivotY = 0.5f;
             break;
-
         case TransitionType::ZoomOut:
-            paintTree(root_,         w, h, 0, 0, 1.0f);
-            paintTree(transOldRoot_, w, h, 0, 0, 1.0f - t);
+            // old zooms out from 1.0 → 0.5, new behind
+            camOld.scale = baseOld.scale * (1.0f - 0.5f * t);
+            camOld.pivotX = 0.5f; camOld.pivotY = 0.5f;
             break;
-
         default:
             break;
+        }
+
+        // For Reveal: new is below old → push new first.
+        // For Cover/Slide: new is above old → push old first, new second.
+        bool revealType = (transCurrent_ == TransitionType::RevealLeft  ||
+                           transCurrent_ == TransitionType::RevealRight ||
+                           transCurrent_ == TransitionType::RevealUp    ||
+                           transCurrent_ == TransitionType::RevealDown  ||
+                           transCurrent_ == TransitionType::ZoomOut);
+
+        if (revealType)
+        {
+            // new (behind) first
+            paintTreeInto(root_, dlNew, font, icons, w, h, stageBgColor(currentStage_));
+            data.passes.push_back({&dlNew, camNew});
+            paintTreeInto(transOldRoot_, dlOld, font, icons, w, h, stageBgColor(transOldStage_));
+            data.passes.push_back({&dlOld, camOld});
+        }
+        else
+        {
+            // old (behind) first
+            paintTreeInto(transOldRoot_, dlOld, font, icons, w, h, stageBgColor(transOldStage_));
+            data.passes.push_back({&dlOld, camOld});
+            paintTreeInto(root_, dlNew, font, icons, w, h, stageBgColor(currentStage_));
+            data.passes.push_back({&dlNew, camNew});
         }
     }
     else
     {
-        // ── Normal rendering (no transition) ─────────────────────────────
-        fillBatch_->SetOrtho2D(w, h);
-        lineBatch_->SetOrtho2D(w, h);
-        textBatch_->SetOrtho2D(w, h);
+        // Normal render: single pass with this stage's camera
+        BuGUI::DrawList& dl = BuGUI::GetDrawList();
+        BuGUI::Camera2D  cam = stageCamera(currentStage_);
 
-        PaintContext ctx{*fillBatch_, *lineBatch_, *textBatch_, *font_, iconAtlas_};
+        // Fill stage background first so there are no transparent holes.
+        dl.addRect({0, 0, w, h}, stageBgColor(currentStage_));
+
+        PaintContext ctx{dl, font, icons};
         if (root_) root_->paint(ctx);
 
-        fillBatch_->Render();
-        lineBatch_->Render();
-        textBatch_->Render();
-
-        // Paint float windows (above stage, below popup)
+        // Float windows (above stage, below popup)
         for (auto* fw : floats_)
         {
             if (!fw->isVisible()) continue;
             fw->layout();
             fw->paint(ctx);
-            fillBatch_->Render();
-            lineBatch_->Render();
-            textBatch_->Render();
         }
 
-        // Paint popup in separate pass - always renders on top
-        if (popup_)
+        // Popup (always on top) — with open/close animation
+        Widget* popupToPaint = popup_ ? popup_ : popupClosing_;
+        if (popupToPaint)
         {
-            popup_->paint(ctx);
-            fillBatch_->Render();
-            lineBatch_->Render();
-            textBatch_->Render();
+            float rawT = popupAnimProgress_;
+            bool animating = popupAnimOpening_ || popupAnimClosing_;
+            float animT = animating
+                          ? applyEasing(popupAnimEase_, std::max(0.0f, std::min(1.0f, rawT)))
+                          : rawT;
+
+            if (animating && animT < 0.99f) {
+                // Scale from 0.92→1.0, slide from top by (1-t)*8px
+                float scale  = 0.92f + 0.08f * animT;
+                float slideY = (1.0f - animT) * -6.0f;
+
+                Rect pr = popupToPaint->rect();
+                float pivotX = pr.x + pr.w * 0.5f;
+                float pivotY = pr.y;
+
+                float newW = pr.w * scale;
+                float newH = pr.h * scale;
+                float newX = pivotX - newW * 0.5f;
+                float newY = pivotY + slideY;
+
+                // Clip to the final rect so partially-scaled content doesn't overflow
+                Rect clipR = {newX, newY, newW, newH};
+                ctx.pushClip(clipR);
+
+                popupToPaint->setRect({newX, newY, newW, newH});
+                popupToPaint->paint(ctx);
+                popupToPaint->setRect(pr);
+
+                ctx.popClip();
+            } else {
+                popupToPaint->paint(ctx);
+            }
         }
+
+        data.passes.push_back({&dl, cam});
     }
 
-    // Debug layout overlay (F1 to toggle)
-    if (debugLayout_)
+    // Debug layout overlay
+    if (debugLayout_ && root_)
     {
-        lineBatch_->SetOrtho2D(w, h);
-        debugPaintWidget(root_, *lineBatch_, *font_, 0);
-        lineBatch_->Render();
+        // Debug overlay goes into the current (new) stage's DrawList
+        BuGUI::DrawList& dlDbg = BuGUI::GetDrawList();
+        paintDebugOverlay(root_, dlDbg, 0);
     }
 
-    // Overlay callback (stats, debug, etc.)
+    // Overlay callback
     if (overlay_)
     {
-        fillBatch_->SetOrtho2D(w, h);
-        lineBatch_->SetOrtho2D(w, h);
-        textBatch_->SetOrtho2D(w, h);
-        PaintContext octx{*fillBatch_, *lineBatch_, *textBatch_, *font_};
+        BuGUI::DrawList& dlOv = BuGUI::GetDrawList();
+        PaintContext octx{dlOv, font, icons};
         overlay_(octx);
-        fillBatch_->Render();
-        lineBatch_->Render();
-        textBatch_->Render();
+        // If not already in passes (transition case already pushed), ensure
+        // the overlay is in the last pass (it shares the drawList).
     }
 
-    // ── GIF recording indicator ──────────────────────────────────────────
-    if (Device::Instance().IsRecording())
+    // Tooltip
+    if (tooltipVisible_ && tooltipWidget_ && font)
     {
-        fillBatch_->SetOrtho2D(w, h);
-        lineBatch_->SetOrtho2D(w, h);
-        textBatch_->SetOrtho2D(w, h);
-
-        float rx = w - 90.0f, ry = 4.0f;
-
-        // Blinking red dot (1Hz)
-        float blink = Device::Instance().GifElapsed();
-        bool on = (static_cast<int>(blink * 2.0f) % 2) == 0;
-        if (on)
-        {
-            fillBatch_->SetColor(220, 40, 40, 255);
-            fillBatch_->Circle(static_cast<int>(rx + 6), static_cast<int>(ry + 8), 5, true);
-        }
-
-        // "REC" text + elapsed
-        char recBuf[32];
-        int secs = static_cast<int>(Device::Instance().GifElapsed());
-        snprintf(recBuf, sizeof(recBuf), "REC %d:%02d", secs / 60, secs % 60);
-        font_->SetFontSize(13.0f);
-        font_->SetColor(Color(220, 40, 40, 255));
-        font_->SetBatch(textBatch_);
-        font_->Print(recBuf, rx + 14.0f, ry);
-
-        fillBatch_->Render();
-        lineBatch_->Render();
-        textBatch_->Render();
+        BuGUI::DrawList& dlTt = BuGUI::GetDrawList();
+        paintTooltipInto(dlTt, font);
     }
 
-    // ── Tooltip ──────────────────────────────────────────────────────────
-    // Accumulate hover time; show tooltip when delay exceeded
-    if (hovered_ && !hovered_->tooltip().empty())
-    {
-        tooltipTimer_ += dt_;
-        if (tooltipTimer_ >= hovered_->tooltipDelay())
-        {
-            tooltipVisible_ = true;
-            tooltipWidget_  = hovered_;
-        }
-    }
-    else
-    {
-        tooltipTimer_   = 0.0f;
-        tooltipVisible_ = false;
-        tooltipWidget_  = nullptr;
-    }
-    if (tooltipVisible_ && tooltipWidget_)
-        paintTooltip();
-
-    // ── Toast notifications ───────────────────────────────────────────────
+    // Toast notifications
     Toast::tick(dt_);
     if (Toast::hasActive())
     {
-        fillBatch_->SetOrtho2D(w, h);
-        lineBatch_->SetOrtho2D(w, h);
-        textBatch_->SetOrtho2D(w, h);
-        PaintContext tctx{*fillBatch_, *lineBatch_, *textBatch_, *font_, iconAtlas_};
-        Toast::paint(tctx, static_cast<float>(w), static_cast<float>(h));
-        fillBatch_->Render();
-        lineBatch_->Render();
-        textBatch_->Render();
+        BuGUI::DrawList& dlToast = BuGUI::GetDrawList();
+        PaintContext tctx{dlToast, font, icons};
+        Toast::paint(tctx, w, h);
     }
-
-    // ── Restore caller's GL state ─────────────────────────────────────────
-    restoreGLState(glBackup);
-    rs.resetCache();  // cache is stale again after raw GL restore
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Tooltip rendering
+//  paintDebugOverlay
 // ═════════════════════════════════════════════════════════════════════════════
 
-void WidgetApp::paintTooltip()
+void WidgetApp::paintDebugOverlay(Widget* w, BuGUI::DrawList& dl, int depth)
+{
+    debugPaintWidget(w, dl, depth);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  paintTooltipInto
+// ═════════════════════════════════════════════════════════════════════════════
+
+void WidgetApp::paintTooltipInto(BuGUI::DrawList& dl, const BuGUI::Font* font)
 {
     if (!tooltipWidget_ || tooltipWidget_->tooltip().empty()) return;
 
@@ -1401,20 +1343,17 @@ void WidgetApp::paintTooltip()
     float w = static_cast<float>(width_);
     float h = static_cast<float>(height_);
 
-    fillBatch_->SetOrtho2D(w, h);
-    lineBatch_->SetOrtho2D(w, h);
-    textBatch_->SetOrtho2D(w, h);
-
-    font_->SetFontSize(t.fontSize * 0.85f);
-    font_->SetBatch(textBatch_);
-    float textW = font_->GetTextWidth(text.c_str());
-    float textH = t.fontSize * 0.85f;
+    PaintContext ctx{dl, font, nullptr};
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    ctx.font.SetColor(t.tooltipText);
+    float textW = ctx.font.GetTextWidth(text.c_str());
+    float textH = t.fontSize;
 
     float padX = 8.0f, padY = 4.0f;
     float tipW = textW + padX * 2;
     float tipH = textH + padY * 2;
 
-    // Position: below and right of cursor, clamped to screen
     float tx = mouseX_ + 12.0f;
     float ty = mouseY_ + 18.0f;
     if (tx + tipW > w) tx = w - tipW - 2.0f;
@@ -1422,75 +1361,87 @@ void WidgetApp::paintTooltip()
     if (tx < 0) tx = 2.0f;
     if (ty < 0) ty = 2.0f;
 
-    // Background
-    fillBatch_->SetColor(t.tooltipBg.r, t.tooltipBg.g, t.tooltipBg.b, t.tooltipBg.a);
-    fillBatch_->RoundedRectangle(
-        static_cast<int>(tx), static_cast<int>(ty),
-        static_cast<int>(tipW), static_cast<int>(tipH),
-        3.0f, 4, true);
+    ctx.fill.SetColor(t.tooltipBg);
+    ctx.fillRoundedRect(tx, ty, tipW, tipH, 3.0f, 4);
+    ctx.line.SetColor(t.tooltipBorder);
+    ctx.lineRoundedRect(tx, ty, tipW, tipH, 3.0f, 4);
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    ctx.font.SetColor(t.tooltipText);
+    float asc = ctx.font.GetAscender();
+    ctx.font.Print(text.c_str(), tx + padX, ty + padY + asc);
+}
 
-    // Border
-    lineBatch_->SetColor(t.tooltipBorder.r, t.tooltipBorder.g, t.tooltipBorder.b, t.tooltipBorder.a);
-    lineBatch_->RoundedRectangle(
-        static_cast<int>(tx), static_cast<int>(ty),
-        static_cast<int>(tipW), static_cast<int>(tipH),
-        3.0f, 4, false);
+float WidgetApp::textWidth(const char* text) const
+{
+    if (!font_ || !drawList_ || !text) return 0.0f;
+    return drawList_->calcTextSize(*font_, text).x;
+}
 
-    // Text
-    font_->SetColor(t.tooltipText);
-    font_->Print(text.c_str(), tx + padX, ty + padY);
+BuGUI::TextureHandle WidgetApp::loadImageTexture(const char* path, int& outW, int& outH)
+{
+    outW = outH = 0;
+    if (!uploadTex_ || !path) return BuGUI::TextureHandle{0};
 
-    fillBatch_->Render();
-    lineBatch_->Render();
-    textBatch_->Render();
+    BuImage img;
+    if (!img.Load(path) || !img.IsValid()) return BuGUI::TextureHandle{0};
+
+    // Ensure RGBA
+    if (img.components != 4) {
+        BuImage* rgba = img.ConvertToRGBA();
+        if (!rgba || !rgba->IsValid()) { delete rgba; return BuGUI::TextureHandle{0}; }
+        outW = rgba->width;
+        outH = rgba->height;
+        auto tex = uploadTex_(rgba->pixels, rgba->width, rgba->height);
+        delete rgba;
+        return tex;
+    }
+
+    outW = img.width;
+    outH = img.height;
+    return uploadTex_(img.pixels, img.width, img.height);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Main loop
+//  Drag & Drop
 // ═════════════════════════════════════════════════════════════════════════════
 
-int WidgetApp::run()
+void WidgetApp::cancelDrag()
 {
-    if (!inited_) return 1;
-
-    running_ = true;
-    Device& dev = Device::Instance();
-
-    if (onCreate_) onCreate_();
-
-    while (running_)
-    {
- 
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
-            handleEvent(event);
-
- 
-        if (pendingPopupDelete_)
-        {
-            delete pendingPopupDelete_;
-            pendingPopupDelete_ = nullptr;
-        }
-
-        for (auto* fw : pendingFloatDeletes_)
-            delete fw;
-        pendingFloatDeletes_.clear();
-
-        if (!running_) break;
-
-        // User idle callback (update logic, animations)
-        if (onIdle_) onIdle_(dt_);
-
-        // Render
-        render();
-
-        // Swap + update frame timing (m_frame, needed for GetFPS)
-        dev.Flip();
-        dt_ = dev.GetFrameTime();
+    if (dragPayload_) {
+        if (dragSource_)
+            dragSource_->onDragEnd(false);
+        delete dragPayload_;
+        dragPayload_ = nullptr;
     }
+    dragSource_  = nullptr;
+    dragPending_ = false;
+}
 
-    if (onDestroy_) onDestroy_();
-    shutdown();
-    dev.Close();
-    return 0;
+void WidgetApp::dispatchDropEvents(const std::vector<BuGUI::IO::DropEvent>& drops)
+{
+    for (const auto& drop : drops) {
+        // Find the widget under the drop position
+        Widget* target = nullptr;
+        for (int i = static_cast<int>(floats_.size()) - 1; i >= 0; --i) {
+            auto* fw = floats_[i];
+            if (!fw->isVisible()) continue;
+            target = hitTest(fw, drop.x, drop.y);
+            if (target) break;
+        }
+        if (!target)
+            target = hitTest(root_, drop.x, drop.y);
+
+        if (target && !drop.filePaths.empty()) {
+            // Walk up from target to find a handler
+            Widget* w = target;
+            while (w) {
+                bool handled = !w->fileDrop.empty();
+                w->onFileDrop(drop.filePaths);
+                w->fileDrop.emit(drop.filePaths);
+                if (handled) break;  // stop bubbling once a handler is found
+                w = w->parent();
+            }
+        }
+    }
 }

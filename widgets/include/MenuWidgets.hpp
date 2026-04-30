@@ -3,15 +3,74 @@
 #include "Widget.hpp"
 #include "Theme.hpp"
 #include <string>
+#include <vector>
 #include <functional>
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MenuAction — a single item in a Menu
+//    auto* act = menu->addAction("Open");
+//    act->setShortcut("Ctrl+O");
+//    act->triggered.connect([]() { /* ... */ });
+// ═════════════════════════════════════════════════════════════════════════════
 
 class Menu;
 
-struct MenuAction;
+class MenuAction
+{
+public:
+    /// @brief Get the action display text.
+    const std::string& text()      const { return text_; }
+    /// @brief Get the keyboard shortcut string.
+    const std::string& shortcut()  const { return shortcut_; }
+    /// @brief Check if the action is enabled.
+    bool  isEnabled()   const { return enabled_; }
+    /// @brief Check if the action is checkable.
+    bool  isCheckable() const { return checkable_; }
+    /// @brief Check if the action is currently checked.
+    bool  isChecked()   const { return checked_; }
+    /// @brief Check if this is a separator item.
+    bool  isSeparator() const { return separator_; }
+    /// @brief Get the attached submenu (nullptr if none).
+    Menu* submenu()     const { return submenu_; }
+
+    /// @brief Set the display text.
+    void  setText(const std::string& t)     { text_ = t; }
+    /// @brief Set the keyboard shortcut label.
+    void  setShortcut(const std::string& s) { shortcut_ = s; }
+    /// @brief Enable or disable the action.
+    void  setEnabled(bool e)                { enabled_ = e; }
+    /// @brief Set whether the action is checkable.
+    void  setCheckable(bool c)              { checkable_ = c; }
+    /// @brief Set the checked state.
+    void  setChecked(bool c)                { checked_ = c; }
+    /// @brief Attach a submenu (not owned).
+    void  setSubmenu(Menu* m)               { submenu_ = m; }
+
+    /// @brief Emitted when the action is triggered.
+    Signal<> triggered;
+
+private:
+    friend class Menu;
+    MenuAction() = default;
+
+    std::string text_;
+    std::string shortcut_;
+    bool        enabled_   = true;
+    bool        checkable_ = false;
+    bool        checked_   = false;
+    bool        separator_ = false;
+    Menu*       submenu_   = nullptr;
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Menu - popup list of MenuActions (shown via popup overlay)
-//    Used by MenuBar and ContextMenu.
+//  Menu — popup menu with a list of actions
+//
+//    auto* menu = new Menu();  // owned by caller (e.g. MenuBar)
+//    menu->addAction("New", []() { ... })->setShortcut("Ctrl+N");
+//    menu->addSeparator();
+//    menu->addCheckable("Show Grid", true);
+//    menu->exec(x, y);  // show as popup at screen coordinates
+// ═════════════════════════════════════════════════════════════════════════════
 
 class Menu : public Widget
 {
@@ -19,44 +78,60 @@ public:
     Menu();
     ~Menu() override;
 
-    void addAction(const std::string& label, std::function<void()> cb,
-                   const std::string& shortcut = "");
-    void addAction(const std::string& label, std::function<void()> cb,
-                   bool enabled, const std::string& shortcut = "");
-    void addCheckable(const std::string& label, bool checked,
-                      std::function<void(bool)> cb);
-    Menu* addSubmenu(const std::string& label);
-    void addSeparator();
-    void clear();
-    void resetState();  // reset hovered/submenu (call when menu is closed/re-shown)
+    /// @brief Add a text action to the menu.
+    MenuAction* addAction(const std::string& text);
+    /// @brief Add a text action with a callback.
+    MenuAction* addAction(const std::string& text, std::function<void()> cb);
+    /// @brief Add a checkable action.
+    MenuAction* addCheckable(const std::string& text, bool checked = false);
+    /// @brief Add a separator line.
+    MenuAction* addSeparator();
 
-    const std::vector<MenuAction>& actions() const { return actions_; }
+    /// @brief Remove all actions.
+    void        clearActions();
+    /// @brief Get the number of actions.
+    int         actionCount()   const { return static_cast<int>(actions_.size()); }
+    /// @brief Get an action by index.
+    MenuAction* action(int idx) const;
 
-    void layout() override;
-    Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
-    void onMouseLeave() override;
+    /// @brief Show the menu as a popup at screen coordinates.
+    void exec(float x, float y);
+
+    // ── Widget overrides ──────────────────────────────────────────────────
+    void resetPopupState()                     override;
     bool popupContains(float x, float y) const override;
-    void resetPopupState() override { resetState(); }
 
-    Signal<> closed;
+    Vec2f sizeHint() const override;
+    void  layout()   override {}  // positioned by exec()
+    void  paint(PaintContext& ctx) override;
+
+    void onMousePress(MouseEvent& e)  override;
+    void onMouseMove(MouseEvent& e)   override;
+    void onMouseLeave()               override;
 
 private:
-    std::vector<MenuAction> actions_;
-    std::vector<Menu*> ownedSubmenus_;  // submenus owned by this menu
-    int hovered_ = -1;   // index of hovered item
-    int openSub_ = -1;   // index of open submenu (-1 = none)
-    float computeWidth() const;
-    bool hasCheckable() const;
-    void openSubmenu(int index);
-    void closeSubmenu();
+    static constexpr float kSepH   = 9.0f;
+    static constexpr float kIconW  = 22.0f;
+    static constexpr float kPadX   = 12.0f;
+
+    std::vector<MenuAction*> actions_;  // owned
+    int    hoveredIdx_       = -1;
+    Menu*  activeSubmenu_    = nullptr;  // not owned (belongs to MenuAction)
+    int    activeSubmenuIdx_ = -1;
+
+    float  rowY_(int idx) const;
+    int    hitItem_(float screenY) const;
+    float  computeWidth_() const;
+    void   showSubmenu_(int idx);
+    void   hideSubmenu_();
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  MenuBar - horizontal bar of menu buttons (File, Edit, View, ...)
-//    Each button opens a Menu popup below it.
+//  MenuBar — horizontal bar with top-level menus
+//
+//    auto* bar = root->createChild<MenuBar>();
+//    Menu* file = bar->addMenu("File");
+//    file->addAction("New")->setShortcut("Ctrl+N");
 // ═════════════════════════════════════════════════════════════════════════════
 
 class MenuBar : public Widget
@@ -65,63 +140,39 @@ public:
     MenuBar();
     ~MenuBar() override;
 
-    // Add a top-level menu and return it for adding actions
-    Menu* addMenu(const std::string& title);
+    /// @brief Add a top-level menu with a title.
+    Menu*              addMenu(const std::string& title);
+    /// @brief Get the number of menus.
+    int                menuCount()      const { return static_cast<int>(entries_.size()); }
+    /// @brief Get a menu by index.
+    Menu*              menu(int i)      const;
+    /// @brief Get a menu title by index.
+    const std::string& menuTitle(int i) const;
 
-    void layout() override;
     Vec2f sizeHint() const override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
+    void  layout()   override;
+    void  paint(PaintContext& ctx) override;
+
+    void onMousePress(MouseEvent& e)  override;
+    void onMouseMove(MouseEvent& e)   override;
+    void onMouseLeave()               override;
 
 private:
-    struct MenuEntry {
+    struct Entry {
         std::string title;
-        Menu*       menu = nullptr;
-        float       x = 0;     // computed position
-        float       w = 0;     // computed width
+        Menu*       menu  = nullptr;  // owned by MenuBar
+        float       x     = 0;
+        float       w     = 0;
     };
-    std::vector<MenuEntry> entries_;
-    int  activeMenu_ = -1;     // currently open menu index (-1 = none)
-    int  hoveredItem_ = -1;    // hovered bar item
-    bool armed_ = false;       // track if menu bar is in "hover-opens" mode
 
-    void openMenu(int index);
-    void closeMenu();
-    float computeItemWidth(const std::string& title) const;
+    static constexpr float kPadX = 14.0f;
+
+    std::vector<Entry> entries_;
+    int hoveredIdx_ = -1;
+
+    int  hitEntry_(float localX) const;
+    int  openMenuIdx_()          const;  // index of currently open menu, or -1
+    void openMenu_(int idx);
+    void closeMenu_();
+    void computeEntryWidths_();
 };
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  ContextMenu - right-click popup menu
-//    Attach to any widget: widget->setContextMenu(menu);
-//    Or show programmatically: ContextMenu::show(menu, x, y);
-// ═════════════════════════════════════════════════════════════════════════════
-
-class ContextMenu
-{
-public:
-    // Show a menu at screen position (x, y). Takes ownership via popup system.
-    static void show(Menu* menu, float x, float y, Widget* owner = nullptr);
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  MenuItem - a single entry in a Menu
-//    Can be a normal item, separator, or submenu header.
-// ═════════════════════════════════════════════════════════════════════════════
-
-struct MenuAction
-{
-    std::string label;
-    std::string shortcut;    // display text, e.g. "Ctrl+S"
-    bool        enabled = true;
-    bool        separator = false;  // if true, draws a horizontal line
-    bool        checkable = false;  // if true, draws a check mark
-    bool        checked = false;    // state of check mark
-    Menu*       submenu = nullptr;  // if non-null, opens submenu on hover
-    std::function<void()> callback;
-
-    // Convenience constructors
-    static MenuAction Separator() { MenuAction m; m.separator = true; return m; }
-};
-

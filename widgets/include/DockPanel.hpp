@@ -1,13 +1,11 @@
 #pragma once
 
 #include "Widget.hpp"
-#include "Theme.hpp"
-#include <string>
-#include <vector>
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  DockSide - where to dock relative to a panel
 // ─────────────────────────────────────────────────────────────────────────────
+/// @brief Side to dock a panel relative to another.
 enum class DockSide { Left, Right, Top, Bottom, Center };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,14 +20,14 @@ struct DockNode
     // ── Split ─────────────────────────────────────────────────────────────
     LayoutDir  splitDir = LayoutDir::Horizontal;
     float      ratio    = 0.5f;   // fraction for first child
-    DockNode*  first    = nullptr;  // owned, delete in freeNode
-    DockNode*  second   = nullptr;  // owned, delete in freeNode
+    DockNode*  first    = nullptr;
+    DockNode*  second   = nullptr;
 
     // ── Leaf ──────────────────────────────────────────────────────────────
     struct Tab {
         std::string name;
         Widget*     content      = nullptr;
-        float       cachedWidth  = 0.f;   // measured during paint, used in hit-test
+        float       cachedWidth  = 0.f;   // measured during paint
     };
     std::vector<Tab> tabs;
     int currentTab = 0;
@@ -37,10 +35,10 @@ struct DockNode
     // DockPanel-local geometry (assigned in layoutNode)
     Rect rect = {};
 
+    /// @brief Check if the node has no content.
     bool isEmpty() const { return !isSplit && tabs.empty(); }
 
-    // Find the leaf that contains 'name' in this subtree.
-    // If outIdx != nullptr, writes the tab index there.
+    /// @brief Find a tab by name, optionally returning its index.
     DockNode* findTab(const std::string& name, int* outIdx = nullptr);
 };
 
@@ -67,34 +65,39 @@ public:
     DockPanel() = default;
     ~DockPanel() override;
 
-    // ── Panel management ──────────────────────────────────────────────────
-
-    // Add 'content' as a new panel. All panels start in the root leaf.
-    // 'content' is adopted as a child widget of DockPanel.
+    /// @brief Add a widget as a named panel tab.
     void addPanel(const std::string& name, Widget* content);
 
-    // Move the named panel to a new leaf on 'side' of its current leaf.
-    // 'ratio' is the fraction of space given to the NEW leaf.
-    // No-op if the panel is the only one in its leaf (splitOff only makes
-    // sense when at least 2 tabs are present).
+    /// @brief Create and add a typed panel.
+    template <typename T, typename... Args>
+    T* addPanel(const std::string& name, Args&&... args)
+    {
+        auto* w = new T(std::forward<Args>(args)...);
+        addPanel(name, w);
+        return w;
+    }
+
+    /// @brief Split a panel off to a given side with ratio.
     void splitOff(const std::string& tabName, DockSide side, float ratio = 0.5f);
-
-    // Close (delete) a panel by name.
+    /// @brief Close and remove a panel by name.
     void closePanel(const std::string& name);
-
-    // Bring a panel to the front (make it the active tab in its leaf).
+    /// @brief Bring a panel to front in its tab group.
     void showPanel(const std::string& name);
 
-    // ── Visual settings ───────────────────────────────────────────────────
+    /// @brief Set the tab bar height.
     void  setTabBarHeight(float h) { tabBarH_ = h; markDirty(); }
+    /// @brief Get the tab bar height.
     float tabBarHeight()     const { return tabBarH_; }
 
+    /// @brief Set the splitter handle thickness.
     void  setHandleSize(float s)   { handleW_ = s;   markDirty(); }
+    /// @brief Get the splitter handle thickness.
     float handleSize()       const { return handleW_; }
 
-    // ── Signals ───────────────────────────────────────────────────────────
-    Signal<std::string> panelActivated;  // tab brought to front
-    Signal<std::string> panelClosed;     // panel removed
+    /// @brief Emitted when a panel tab is activated.
+    Signal<std::string> panelActivated;
+    /// @brief Emitted when a panel is closed.
+    Signal<std::string> panelClosed;
 
     // ── Widget overrides ──────────────────────────────────────────────────
     void  layout() override;
@@ -108,7 +111,7 @@ public:
 private:
     DockNode* root_    = nullptr;
     float     tabBarH_ = 26.0f;
-    float handleW_ =  5.0f;
+    float     handleW_ =  5.0f;
 
     // ── Tab drag state ─────────────────────────────────────────────────────
     struct DragState {
@@ -136,31 +139,27 @@ private:
 
     // ── Internal helpers ───────────────────────────────────────────────────
     void ensureRoot();
-    void freeNode(DockNode* n);   // recursive delete
+    void freeNode(DockNode* n);
 
     void layoutNode(DockNode* node, const Rect& r);
 
-    // Paint helpers
     void paintNode(DockNode* node, PaintContext& ctx);
     void paintTabBar(DockNode* leaf, const Rect& barR, PaintContext& ctx);
+    void paintDraggedTab(PaintContext& ctx);
     void paintDropOverlay(PaintContext& ctx);
 
-    // Convert DockPanel-local rect > screen rect
     Rect toScreen(const Rect& local) const;
 
-    // Hit tests (sx,sy in screen coords)
     DockNode* hitLeaf      (float sx, float sy) const;
     DockNode* hitLeafImpl  (DockNode* n, float ox, float oy, float sx, float sy) const;
     int       hitTab       (DockNode* leaf, float ox, float oy, float sx, float sy) const;
     DockNode* hitSplitter  (float sx, float sy) const;
     DockNode* hitSplitterImpl(DockNode* n, float ox, float oy, float sx, float sy) const;
 
-    // Compute which DockSide (x,y) is over in leaf's content area
     DockSide computeDropZone(DockNode* leaf, float ox, float oy,
                              float sx, float sy) const;
 
-    // Tree mutation - findRef returns pointer-to-pointer so we can replace the slot
     DockNode** findRef  (DockNode* searchFrom, DockNode* target);
     void       performDrop();
-    void       pruneNode (DockNode*& slot);   // collapse single-child splits
+    void       pruneNode (DockNode*& slot);
 };

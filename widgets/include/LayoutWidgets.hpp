@@ -2,10 +2,9 @@
 
 #include "Widget.hpp"
 #include "Theme.hpp"
+#include "BasicWidgets.hpp"
 #include <string>
 #include <functional>
-
-struct Texture;
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  GridLayout - uniform grid with N columns, rows auto-calculated
@@ -19,12 +18,18 @@ class GridLayout : public Widget
 public:
     explicit GridLayout(int cols = 2);
 
+    /// @brief Set the number of columns.
     void setCols(int c) { cols_ = (c > 0) ? c : 1; markDirty(); }
+    /// @brief Get the number of columns.
     int  cols() const   { return cols_; }
 
+    /// @brief Set uniform horizontal and vertical spacing.
     void setSpacing(float s)  { spacingH_ = spacingV_ = s; }
+    /// @brief Set horizontal and vertical spacing separately.
     void setSpacing(float h, float v) { spacingH_ = h; spacingV_ = v; }
+    /// @brief Get horizontal spacing.
     float spacingH() const    { return spacingH_; }
+    /// @brief Get vertical spacing.
     float spacingV() const    { return spacingV_; }
 
     void setPadding(const Edges& e)                      { padding_ = e; }
@@ -33,6 +38,7 @@ public:
     void setPadding(float t, float r, float b, float l)   { padding_ = Edges(t, r, b, l); }
     const Edges& padding() const { return padding_; }
 
+    /// @brief Get the computed number of rows.
     int rows() const;  // computed from child count
 
     void layout() override;
@@ -75,18 +81,20 @@ public:
         return w;
     }
 
-    // Place an existing widget in a region (takes ownership)
+    /// @brief Place an existing widget in a region (takes ownership).
     void setWidget(BorderRegion region, Widget* w);
 
-    // Get widget in a region (nullptr if empty)
+    /// @brief Get the widget in a region (nullptr if empty).
     Widget* get(BorderRegion region) const;
 
-    // Set region size: positive = fixed px, negative = percentage (e.g. -0.2 = 20%)
-    // Zero = use sizeHint. Center ignores this.
+    /// @brief Set region size: +px, -fraction (e.g. -0.2=20%), 0=sizeHint.
     void setRegionSize(BorderRegion region, float size);
+    /// @brief Get region size configuration.
     float regionSize(BorderRegion region) const;
 
+    /// @brief Set spacing between regions.
     void setSpacing(float s) { spacing_ = s; markDirty(); }
+    /// @brief Get spacing between regions.
     float spacing() const    { return spacing_; }
 
     void setPadding(const Edges& e)                      { padding_ = e; }
@@ -119,24 +127,37 @@ class Collapsible : public Widget
 public:
     explicit Collapsible(const std::string& title = "", bool expanded = true);
 
+    /// @brief Set the section title text.
     void setTitle(const std::string& t) { title_ = t; markDirty(); }
+    /// @brief Get the section title.
     const std::string& title() const    { return title_; }
 
+    /// @brief Expand or collapse the content area.
     void setExpanded(bool e);
+    /// @brief Check if the content area is expanded.
     bool isExpanded() const { return expanded_; }
 
+    /// @brief Set the header bar height.
     void setHeaderHeight(float h) { headerH_ = h; markDirty(); }
+    /// @brief Get the header bar height.
     float headerHeight() const    { return headerH_; }
 
+    /// @brief Set the header background color.
     void setHeaderColor(const Color& c) { headerColor_ = c; }
+    /// @brief Get the header background color.
     const Color& headerColor() const    { return headerColor_; }
 
+    /// @brief Set padding around the content area.
     void setContentPadding(float p) { contentPad_ = p; markDirty(); }
+    /// @brief Get the content padding.
     float contentPadding() const    { return contentPad_; }
 
+    /// @brief Set vertical spacing between content children.
     void setContentSpacing(float s) { contentSpacing_ = s; markDirty(); }
+    /// @brief Get the content spacing.
     float contentSpacing() const    { return contentSpacing_; }
 
+    /// @brief Emitted when expanded/collapsed state changes.
     Signal<bool> expandedChanged;
 
     void layout() override;
@@ -164,14 +185,19 @@ class StatusBar : public Widget
 public:
     StatusBar() = default;
 
+    /// @brief Set the status bar background color.
     void setBgColor(const Color& c)  { bgColor_ = c; }
+    /// @brief Get the background color.
     const Color& bgColor() const     { return bgColor_; }
 
+    /// @brief Set spacing between children.
     void setSpacing(float s) { spacing_ = s; markDirty(); }
+    /// @brief Get the spacing.
     float spacing() const    { return spacing_; }
 
-    // Set a text shown on the left of the bar
+    /// @brief Set a text label shown on the left.
     void setText(const std::string& t) { text_ = t; markDirty(); }
+    /// @brief Get the status text.
     const std::string& text() const    { return text_; }
 
     void layout() override;
@@ -194,13 +220,15 @@ class StackLayout : public Widget
 public:
     StackLayout() = default;
 
-    // Set active child by index (0-based). -1 = none visible.
+    /// @brief Set the active child by index (0-based, -1 = none).
     void setCurrentIndex(int idx);
+    /// @brief Get the active child index.
     int  currentIndex() const { return currentIndex_; }
 
-    // Get current visible widget (nullptr if none)
+    /// @brief Get the currently visible widget (nullptr if none).
     Widget* currentWidget() const;
 
+    /// @brief Emitted when the active index changes.
     Signal<int> currentChanged;
 
     void layout() override;
@@ -229,8 +257,9 @@ public:
         return createChild<T>(std::forward<Args>(args)...);
     }
 
-    // Label column width: positive = fixed px, 0 = auto (widest label)
+    /// @brief Label column width: positive = fixed px, 0 = auto.
     void setLabelWidth(float w) { labelWidth_ = w; markDirty(); }
+    /// @brief Get the label column width.
     float labelWidth() const    { return labelWidth_; }
 
     void setSpacing(float h, float v) { spacingH_ = h; spacingV_ = v; markDirty(); }
@@ -310,26 +339,34 @@ class Splitter : public Widget
 public:
     explicit Splitter(LayoutDir dir = LayoutDir::Horizontal);
 
+    /// @brief Get the layout direction.
     LayoutDir dir() const { return dir_; }
 
-    // Split ratio: 0.0..1.0, how much the first child gets (default 0.5)
+    /// @brief Set the split ratio (0..1, fraction for first child).
     void  setRatio(float r);
+    /// @brief Get the current split ratio.
     float ratio() const { return ratio_; }
 
-    // Clamp ratio to [min, max] range (default 0.0 .. 1.0)
+    /// @brief Set minimum ratio (clamps on set).
     void  setMinRatio(float r) { minRatio_ = r; setRatio(ratio_); }
+    /// @brief Set maximum ratio (clamps on set).
     void  setMaxRatio(float r) { maxRatio_ = r; setRatio(ratio_); }
+    /// @brief Get minimum ratio.
     float minRatio() const     { return minRatio_; }
+    /// @brief Get maximum ratio.
     float maxRatio() const     { return maxRatio_; }
 
-    // Divider thickness in px
+    /// @brief Set divider thickness in pixels.
     void  setHandleSize(float s) { handleSize_ = s; markDirty(); }
+    /// @brief Get divider thickness.
     float handleSize() const     { return handleSize_; }
 
-    // Min size for each panel (prevents collapsing to zero)
+    /// @brief Set minimum panel size to prevent collapse.
     void  setMinSize(float s) { minSize_ = s; }
+    /// @brief Get minimum panel size.
     float minSize() const     { return minSize_; }
 
+    /// @brief Emitted when the ratio changes.
     Signal<float> ratioChanged;
 
     void layout() override;
@@ -379,38 +416,46 @@ public:
         return w;
     }
 
-    // Add an existing widget as a tab page (takes ownership)
+    /// @brief Add an existing widget as a tab page.
     void addTabWidget(const std::string& label, Widget* content);
 
-    // Remove a tab by index (deletes content widget)
+    /// @brief Remove a tab by index (deletes content widget).
     void removeTab(int index);
 
-    // Tab count
+    /// @brief Get the number of tabs.
     int tabCount() const { return static_cast<int>(tabs_.size()); }
 
-    // Current tab
+    /// @brief Set the active tab by index.
     void setCurrentIndex(int idx);
+    /// @brief Get the active tab index.
     int  currentIndex() const { return currentIndex_; }
+    /// @brief Get the content widget of the active tab.
     Widget* currentWidget() const;
 
-    // Tab label
+    /// @brief Set the label for a tab.
     void setTabLabel(int index, const std::string& label);
+    /// @brief Get a tab's label.
     const std::string& tabLabel(int index) const;
 
-    // Tab bar position
+    /// @brief Set the tab bar position.
     void setTabPosition(TabPosition pos);
+    /// @brief Get the tab bar position.
     TabPosition tabPosition() const      { return tabPosition_; }
 
-    // Closable tabs (shows X button)
+    /// @brief Enable close buttons on tabs.
     void setTabsClosable(bool c) { closable_ = c; markDirty(); }
+    /// @brief Check if tabs are closable.
     bool tabsClosable() const    { return closable_; }
 
-    // Tab bar height/width
+    /// @brief Set the tab bar thickness.
     void setTabBarSize(float s) { tabBarSize_ = s; markDirty(); }
+    /// @brief Get the tab bar thickness.
     float tabBarSize() const    { return tabBarSize_; }
 
-    Signal<int> currentChanged;   // index of new active tab
-    Signal<int> tabClosed;        // index of tab that was closed
+    /// @brief Emitted when the active tab changes.
+    Signal<int> currentChanged;
+    /// @brief Emitted when a tab's close button is clicked.
+    Signal<int> tabClosed;
 
     void layout() override;
     Vec2f sizeHint() const override;
@@ -474,9 +519,11 @@ class AnchorLayout : public Widget
 public:
     AnchorLayout() = default;
 
-    // Set anchors for a child widget (must be a child of this layout)
+    /// @brief Set anchor rules for a child widget.
     static void setAnchors(Widget* child, const AnchorRule& rule);
+    /// @brief Get anchor rules for a child.
     static AnchorRule anchors(const Widget* child);
+    /// @brief Check if a child has anchor rules set.
     static bool hasAnchors(const Widget* child);
 
     void setPadding(const Edges& e)                      { padding_ = e; }
@@ -547,6 +594,10 @@ public:
     void  setAnimDuration(float sec) { animDuration_ = sec; }
     float animDuration() const       { return animDuration_; }
 
+    // Easing curve for page transition
+    void     setEaseType(EaseType e) { easeType_ = e; }
+    EaseType easeType() const        { return easeType_; }
+
     Signal<int> pageChanged;
 
     void layout() override;
@@ -570,6 +621,7 @@ private:
 
     float animDuration_  = 0.3f;
     float animProgress_  = 0.0f;   // 0..1
+    EaseType easeType_   = EaseType::OutCubic;
     int   animFrom_      = -1;     // page sliding out
     int   animDir_       = 0;      // -1=slide right, +1=slide left
     bool  animating_     = false;
@@ -584,5 +636,72 @@ private:
     void ensureArrowTexture();
     static unsigned int arrowTexId_;
     static constexpr int kIconSize = 32;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SlidePanel — drawer that slides in from Left/Right edge with easing
+//    Owns one content child (whatever you put inside).
+//    open()/close()/toggle() animate it in/out.
+//    Optional scrim (dim overlay) that fades in and is click-to-close.
+// ═════════════════════════════════════════════════════════════════════════════
+
+class SlidePanel : public Widget
+{
+public:
+    enum Side { Left, Right };
+
+    explicit SlidePanel(Side side = Left, float width = 260.0f);
+
+    /// @brief Open the slide panel.
+    void open();
+    /// @brief Close the slide panel.
+    void close();
+    /// @brief Toggle open/closed state.
+    void toggle();
+    /// @brief Check if the panel is open.
+    bool isOpen() const { return open_; }
+
+    /// @brief Set the panel width.
+    void setWidth(float w)           { panelWidth_ = w; markDirty(); }
+    /// @brief Get the panel width.
+    float panelWidth() const         { return panelWidth_; }
+
+    /// @brief Set which side the panel slides from.
+    void setSide(Side s)             { side_ = s; markDirty(); }
+    /// @brief Get the slide side.
+    Side side() const                { return side_; }
+
+    /// @brief Set animation duration in seconds.
+    void setAnimDuration(float sec)  { animDuration_ = sec; }
+    /// @brief Get animation duration.
+    float animDuration() const       { return animDuration_; }
+
+    /// @brief Set the easing function for animation.
+    void setEaseType(EaseType e)     { easeType_ = e; }
+    /// @brief Get the easing function.
+    EaseType easeType() const        { return easeType_; }
+
+    /// @brief Enable/disable the dim scrim overlay.
+    void setShowScrim(bool s)        { showScrim_ = s; markDirty(); }
+    /// @brief Check if the scrim overlay is shown.
+    bool showScrim() const           { return showScrim_; }
+
+    /// @brief Emitted when the panel opens or closes.
+    Signal<bool> openChanged;
+
+    void layout() override;
+    Vec2f sizeHint() const override;
+    void paint(PaintContext& ctx) override;
+    void onMousePress(MouseEvent& e) override;
+
+private:
+    Side     side_         = Left;
+    float    panelWidth_   = 260.0f;
+    bool     open_         = false;
+    bool     animating_    = false;
+    float    animProgress_ = 0.0f;   // 0=closed, 1=open
+    float    animDuration_ = 0.25f;
+    EaseType easeType_     = EaseType::OutCubic;
+    bool     showScrim_    = true;
 };
 

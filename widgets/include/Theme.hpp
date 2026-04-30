@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Color.hpp"
+#include "BuGUI_base.hpp"
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Theme - centralized colors/sizes for all widgets
@@ -133,11 +133,13 @@ struct Theme
 
     // ── Theme presets ─────────────────────────────────────────────────────
 
+    /// @brief Get the dark theme preset (default).
     static Theme dark()
     {
         return Theme{};  // defaults are the dark theme
     }
 
+    /// @brief Get the light theme preset.
     static Theme light()
     {
         Theme t;
@@ -230,11 +232,13 @@ struct Theme
         return t;
     }
 
+    /// @brief Apply a theme preset to this instance.
     void apply(const Theme& preset)
     {
         *this = preset;
     }
 
+    /// @brief Get the global Theme singleton.
     static Theme& instance()
     {
         static Theme theme;

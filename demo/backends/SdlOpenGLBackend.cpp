@@ -1,8 +1,10 @@
 #include "SdlOpenGLBackend.hpp"
 
-#include "Opengl.hpp"
+#include <Opengl.hpp>
 #include <SDL2/SDL.h>
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 
@@ -85,6 +87,37 @@ bool SdlOpenGLBackend::init(const char* title, int width, int height)
     BuGUI::SetCurrentContext(BuGUI::CreateContext());
     updateDisplaySize();
 
+    // Wire up clipboard callbacks
+    auto& io = BuGUI::GetIO();
+    io.setClipboardText = [](const char* text) {
+        SDL_SetClipboardText(text);
+    };
+    io.getClipboardText = []() -> std::string {
+        char* clip = SDL_GetClipboardText();
+        std::string result = clip ? clip : "";
+        SDL_free(clip);
+        return result;
+    };
+
+    // Wire up file I/O callbacks
+    io.readFile = [](const std::string& path) -> std::string {
+        SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "rb");
+        if (!rw) return "";
+        Sint64 size = SDL_RWsize(rw);
+        if (size <= 0) { SDL_RWclose(rw); return ""; }
+        std::string buf(static_cast<size_t>(size), '\0');
+        SDL_RWread(rw, &buf[0], 1, buf.size());
+        SDL_RWclose(rw);
+        return buf;
+    };
+    io.writeFile = [](const std::string& path, const std::string& data) -> bool {
+        SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "wb");
+        if (!rw) return false;
+        size_t written = SDL_RWwrite(rw, data.c_str(), 1, data.size());
+        SDL_RWclose(rw);
+        return written == data.size();
+    };
+
     return true;
 }
 
@@ -98,11 +131,14 @@ bool SdlOpenGLBackend::beginFrame()
     io.deltaTime = static_cast<float>(t - previousTime_);
     previousTime_ = t;
 
-    processEvents();
+    // Apply cursor requested last frame
+    applyCursor(io.wantedCursor);
 
-    updateDisplaySize();
-
+    // Clear previous frame's transient IO data BEFORE filling new events
     BuGUI::NewFrame();
+
+    processEvents();
+    updateDisplaySize();
     return !shouldClose_;
 }
 
@@ -181,6 +217,9 @@ void SdlOpenGLBackend::shutdown()
         window_ = nullptr;
     }
 
+    for (auto& c : sdlCursors_)
+        if (c) { SDL_FreeCursor(static_cast<SDL_Cursor*>(c)); c = nullptr; }
+
     SDL_Quit();
 }
 
@@ -197,11 +236,13 @@ bool SdlOpenGLBackend::createDeviceObjects()
         layout(location = 1) in vec4 aColor;
         layout(location = 2) in vec2 aUV;
         uniform vec2 uDisplaySize;
+        uniform mat3 uCamera;
         out vec4 vColor;
         out vec2 vUV;
         void main()
         {
-            vec2 p = (aPos / uDisplaySize) * 2.0 - 1.0;
+            vec2 pos = (uCamera * vec3(aPos, 1.0)).xy;
+            vec2 p   = (pos / uDisplaySize) * 2.0 - 1.0;
             gl_Position = vec4(p.x, -p.y, 0.0, 1.0);
             vColor = aColor;
             vUV = aUV;
@@ -339,14 +380,55 @@ void SdlOpenGLBackend::processEvents()
         }
 
         case SDL_MOUSEWHEEL:
-            io.mouseWheelX += static_cast<float>(event.wheel.x);
-            io.mouseWheelY += static_cast<float>(event.wheel.y);
+        {
+            float scale = (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) ? -1.0f : 1.0f;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+            io.mouseWheelX += event.wheel.preciseX * scale;
+            io.mouseWheelY += event.wheel.preciseY * scale;
+#else
+            io.mouseWheelX += static_cast<float>(event.wheel.x) * scale;
+            io.mouseWheelY += static_cast<float>(event.wheel.y) * scale;
+#endif
             break;
+        }
+
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+        {
+            // Use event-embedded mod state — more reliable than SDL_GetModState()
+            SDL_Keymod mod = (SDL_Keymod)event.key.keysym.mod;
+            io.addKeyEvent(
+                event.key.keysym.sym,
+                event.key.keysym.scancode,
+                (mod & KMOD_SHIFT) != 0,
+                (mod & KMOD_CTRL)  != 0,
+                (mod & KMOD_ALT)   != 0,
+                event.type == SDL_KEYDOWN);
+            break;
+        }
 
         case SDL_TEXTINPUT:
             for (const char* p = event.text.text; *p; ++p)
                 io.addInputCharacter(static_cast<unsigned char>(*p));
             break;
+
+        case SDL_DROPFILE:
+        case SDL_DROPTEXT:
+        {
+            if (event.drop.file) {
+                int imx, imy;
+                SDL_GetMouseState(&imx, &imy);
+                float fmx = static_cast<float>(imx);
+                float fmy = static_cast<float>(imy);
+                if (event.type == SDL_DROPFILE) {
+                    io.addDropEvent(fmx, fmy, {std::string(event.drop.file)});
+                } else {
+                    io.addDropEvent(fmx, fmy, {}, std::string(event.drop.file));
+                }
+                SDL_free(event.drop.file);
+            }
+            break;
+        }
 
         default:
             break;
@@ -379,17 +461,27 @@ void SdlOpenGLBackend::updateDisplaySize()
     io.framebufferScaleY = windowH > 0 ? static_cast<float>(drawableH) / static_cast<float>(windowH) : 1.0f;
 }
 
+static std::array<float, 9> cameraToMat3(const BuGUI::Camera2D& cam,
+                                           float displayW, float displayH)
+{
+    float pivX = cam.pivotX * displayW;
+    float pivY = cam.pivotY * displayH;
+    float c    = std::cos(cam.angle) * cam.scale;
+    float s    = std::sin(cam.angle) * cam.scale;
+    float ox   = cam.x - pivX;
+    float oy   = cam.y - pivY;
+    float tx   = c * ox - s * oy + pivX;
+    float ty   = s * ox + c * oy + pivY;
+    return { c, s, 0.0f,
+            -s, c, 0.0f,
+            tx, ty, 1.0f };
+}
+
 void SdlOpenGLBackend::renderDrawData(const BuGUI::DrawData& drawData)
 {
-    if (!drawData.mainList)
+    if (drawData.passes.empty())
         return;
     if (drawData.displayWidth <= 0.0f || drawData.displayHeight <= 0.0f)
-        return;
-
-    const auto& vertices = drawData.mainList->vertices();
-    const auto& indices = drawData.mainList->indices();
-    const auto& commands = drawData.mainList->commands();
-    if (vertices.empty() || indices.empty() || commands.empty())
         return;
 
     glEnable(GL_BLEND);
@@ -399,65 +491,131 @@ void SdlOpenGLBackend::renderDrawData(const BuGUI::DrawData& drawData)
     glEnable(GL_SCISSOR_TEST);
 
     glUseProgram(shader_);
-    GLint displayLoc = glGetUniformLocation(shader_, "uDisplaySize");
-    glUniform2f(displayLoc, drawData.displayWidth, drawData.displayHeight);
+    GLint displayLoc    = glGetUniformLocation(shader_, "uDisplaySize");
+    GLint cameraLoc     = glGetUniformLocation(shader_, "uCamera");
     GLint useTextureLoc = glGetUniformLocation(shader_, "uUseTexture");
-    GLint textureLoc = glGetUniformLocation(shader_, "uTexture");
+    GLint textureLoc    = glGetUniformLocation(shader_, "uTexture");
+    glUniform2f(displayLoc, drawData.displayWidth, drawData.displayHeight);
     glUniform1i(textureLoc, 0);
 
     glBindVertexArray(vao_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(vertices.size() * sizeof(BuGUI::DrawVertex)),
-                 vertices.data(),
-                 GL_STREAM_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)),
-                 indices.data(),
-                 GL_STREAM_DRAW);
-
-    for (const BuGUI::DrawCmd& cmd : commands)
+    for (const BuGUI::DrawPass& pass : drawData.passes)
     {
-        float scaleX = drawData.framebufferScaleX;
-        float scaleY = drawData.framebufferScaleY;
-        float fbW = drawData.displayWidth * scaleX;
-        float fbH = drawData.displayHeight * scaleY;
-        float x0 = std::max(0.0f, cmd.clip.x * scaleX);
-        float y0 = std::max(0.0f, (drawData.displayHeight - cmd.clip.y - cmd.clip.h) * scaleY);
-        float x1 = std::min(fbW, (cmd.clip.x + cmd.clip.w) * scaleX);
-        float y1 = std::min(fbH, (drawData.displayHeight - cmd.clip.y) * scaleY);
+        if (!pass.list) continue;
+        const auto& vertices = pass.list->vertices();
+        const auto& indices  = pass.list->indices();
+        const auto& commands = pass.list->commands();
+        if (vertices.empty() || indices.empty() || commands.empty()) continue;
 
-        int clipX = static_cast<int>(x0);
-        int clipY = static_cast<int>(y0);
-        int clipW = static_cast<int>(x1 - x0);
-        int clipH = static_cast<int>(y1 - y0);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+        glBufferData(GL_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(vertices.size() * sizeof(BuGUI::DrawVertex)),
+                     vertices.data(), GL_STREAM_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(indices.size() * sizeof(uint32_t)),
+                     indices.data(), GL_STREAM_DRAW);
 
-        if (clipW <= 0 || clipH <= 0)
-            continue;
+        auto mat = cameraToMat3(pass.camera, drawData.displayWidth, drawData.displayHeight);
+        glUniformMatrix3fv(cameraLoc, 1, GL_FALSE, mat.data());
 
-        glScissor(clipX, clipY, clipW, clipH);
-        if (cmd.texture)
+        const float camAngle  = pass.camera.angle;
+        const float camScale  = pass.camera.scale;
+        const float pivX      = pass.camera.pivotX * drawData.displayWidth;
+        const float pivY      = pass.camera.pivotY * drawData.displayHeight;
+        const float c         = std::cos(camAngle) * camScale;
+        const float ss        = std::sin(camAngle) * camScale;
+        const float tx        = c * (pass.camera.x - pivX) - ss * (pass.camera.y - pivY) + pivX;
+        const float ty        = ss * (pass.camera.x - pivX) +  c * (pass.camera.y - pivY) + pivY;
+        const bool  noRotation = (camAngle == 0.0f);
+
+        for (const BuGUI::DrawCmd& cmd : commands)
         {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(cmd.texture.value));
-            glUniform1i(useTextureLoc, 1);
-        }
-        else
-        {
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glUniform1i(useTextureLoc, 0);
-        }
+            float scaleX = drawData.framebufferScaleX;
+            float scaleY = drawData.framebufferScaleY;
+            float fbW = drawData.displayWidth  * scaleX;
+            float fbH = drawData.displayHeight * scaleY;
 
-        glDrawElements(GL_TRIANGLES,
-                       static_cast<GLsizei>(cmd.indexCount),
-                       GL_UNSIGNED_INT,
-                       reinterpret_cast<void*>(static_cast<uintptr_t>(cmd.indexOffset * sizeof(uint32_t))));
-    }
+            float cx0, cy0, cx1, cy1;
+            if (noRotation)
+            {
+                cx0 = c * cmd.clip.x                + tx;
+                cy0 = c * cmd.clip.y                + ty;
+                cx1 = c * (cmd.clip.x + cmd.clip.w) + tx;
+                cy1 = c * (cmd.clip.y + cmd.clip.h) + ty;
+                if (cx0 > cx1) std::swap(cx0, cx1);
+                if (cy0 > cy1) std::swap(cy0, cy1);
+            }
+            else
+            {
+                cx0 = 0.0f; cy0 = 0.0f;
+                cx1 = drawData.displayWidth;
+                cy1 = drawData.displayHeight;
+            }
+
+            float x0 = std::max(0.0f, cx0 * scaleX);
+            float y0 = std::max(0.0f, (drawData.displayHeight - cy1) * scaleY);
+            float x1 = std::min(fbW,  cx1 * scaleX);
+            float y1 = std::min(fbH,  (drawData.displayHeight - cy0) * scaleY);
+
+            int clipX = static_cast<int>(x0);
+            int clipY = static_cast<int>(y0);
+            int clipW = static_cast<int>(x1 - x0);
+            int clipH = static_cast<int>(y1 - y0);
+
+            if (clipW <= 0 || clipH <= 0)
+                continue;
+
+            glScissor(clipX, clipY, clipW, clipH);
+            if (cmd.texture)
+            {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(cmd.texture.value));
+                glUniform1i(useTextureLoc, 1);
+            }
+            else
+            {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glUniform1i(useTextureLoc, 0);
+            }
+
+            glDrawElements(GL_TRIANGLES,
+                           static_cast<GLsizei>(cmd.indexCount),
+                           GL_UNSIGNED_INT,
+                           reinterpret_cast<void*>(static_cast<uintptr_t>(cmd.indexOffset * sizeof(uint32_t))));
+        } // commands
+    } // passes
 
     glDisable(GL_SCISSOR_TEST);
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
     glUseProgram(0);
+}
+
+void SdlOpenGLBackend::applyCursor(int cursorType)
+{
+    if (cursorType == activeCursor_)
+        return;
+    activeCursor_ = cursorType;
+
+    // Lazy-create system cursors (indexed by CursorType enum order)
+    static const SDL_SystemCursor sdlMap[] = {
+        SDL_SYSTEM_CURSOR_ARROW,     // 0 Arrow
+        SDL_SYSTEM_CURSOR_IBEAM,     // 1 IBeam
+        SDL_SYSTEM_CURSOR_CROSSHAIR, // 2 Crosshair
+        SDL_SYSTEM_CURSOR_HAND,      // 3 Hand
+        SDL_SYSTEM_CURSOR_SIZEWE,    // 4 ResizeEW
+        SDL_SYSTEM_CURSOR_SIZENS,    // 5 ResizeNS
+        SDL_SYSTEM_CURSOR_SIZENESW,  // 6 ResizeNESW
+        SDL_SYSTEM_CURSOR_SIZENWSE,  // 7 ResizeNWSE
+    };
+    constexpr int kN = static_cast<int>(sizeof(sdlMap) / sizeof(sdlMap[0]));
+    int idx = (cursorType >= 0 && cursorType < kN) ? cursorType : 0;
+
+    if (!sdlCursors_[idx])
+        sdlCursors_[idx] = SDL_CreateSystemCursor(sdlMap[idx]);
+
+    if (sdlCursors_[idx])
+        SDL_SetCursor(static_cast<SDL_Cursor*>(sdlCursors_[idx]));
 }

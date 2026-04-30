@@ -21,6 +21,7 @@ public:
     using SlotFunc = std::function<void(Args...)>;
     using SlotId   = uint32_t;
 
+    /// @brief Connect a slot function, returns a unique ID.
     SlotId connect(SlotFunc fn)
     {
         SlotId id = nextId_++;
@@ -28,6 +29,7 @@ public:
         return id;
     }
 
+    /// @brief Disconnect a slot by its ID.
     void disconnect(SlotId id)
     {
         slots_.erase(
@@ -36,14 +38,17 @@ public:
             slots_.end());
     }
 
+    /// @brief Disconnect all slots.
     void disconnectAll() { slots_.clear(); }
 
+    /// @brief Emit the signal, calling all connected slots.
     void emit(Args... args) const
     {
         for (const auto& s : slots_)
             s.fn(args...);
     }
 
+    /// @brief Check if no slots are connected.
     bool empty() const { return slots_.empty(); }
 
 private:

@@ -1,34 +1,76 @@
 project(bugui_widgets)
 
-option(BUGUI_BUILD_EXTRA_WIDGETS "Build experimental/heavy widgets" OFF)
-
-set(BUGUI_WIDGET_CORE_SOURCES
+# ── Migrated sources (add back one by one as each file is ported) ─────────────
+set(SOURCES
     src/BuGUI.cpp
-)
-
-set(BUGUI_WIDGET_EXTRA_SOURCES
-    src/ViewportWidget.cpp
-    src/Gizmo2D.cpp
-    src/Gizmo3D.cpp
-    src/CurveEditor.cpp
+    src/Widget.cpp
+    src/WidgetApp.cpp
+    src/FileSystem.cpp
+    src/BuImage.cpp
+    src/IconAtlas.cpp
+    src/BasicWidgets.cpp
+    src/LayoutWidgets.cpp
+    src/InputWidgets.cpp
+    src/ScrollWidgets.cpp # needs SDL + widget type registration
+    src/TextInputWidgets.cpp
+    src/ComboBox.cpp
+    src/MenuWidgets.cpp
+    src/DialogWidgets.cpp
+    src/TreePropertyColorWidgets.cpp
+    src/DataWidgets.cpp
+    src/ViewWidgets.cpp
+    src/GizmoWidgets.cpp
+    src/ChartWidgets.cpp
     src/NodeEditor.cpp
     src/Timeline.cpp
-    src/PlotWidget.cpp
-    src/HistogramWidget.cpp
-    src/VUMeter.cpp
-    src/WaveformView.cpp
-    src/SpectrumAnalyzer.cpp
-    src/ADSRWidget.cpp
-    src/PianoRoll.cpp
-    src/AssetBrowser.cpp
+    src/AudioWidgets.cpp
+    src/ThumbnailGrid.cpp
+    src/DirCache.cpp
+    src/FileDialog.cpp
+    src/ConsoleWidget.cpp
     src/DockPanel.cpp
+    src/WidgetSerializer.cpp
+    src/AssetBrowser.cpp
+    src/ToolBar.cpp
+    src/CodeEditor.cpp
+    src/AutomotiveWidgets.cpp
+    src/Animation.cpp
+    src/ItemModel.cpp
+    src/AppWidgets.cpp
+    # src/InputWidgets.cpp
+    # src/LayoutWidgets.cpp
+    # src/TextEdit.cpp
+    # src/MenuWidgets.cpp
+    # src/ScrollWidgets.cpp
+    # src/ViewWidgets.cpp
+    # src/Dialogs.cpp
+    # src/FileDialog.cpp
+    # src/DockPanel.cpp
+    # src/DataGrid.cpp
+    # src/TreeGrid.cpp
+    # src/TreePropertyColor.cpp
+    # src/ListWidgets.cpp (if exists)
+    # src/TextWidgets.cpp (if exists)
+    # ... specialty widgets below
+    # src/Gizmo2D.cpp
+    # src/Gizmo3D.cpp
+    # src/NodeEditor.cpp
+    # src/Timeline.cpp
+    # src/CurveEditor.cpp
+    # src/PianoRoll.cpp
+    # src/Knob.cpp
+    # src/VUMeter.cpp
+    # src/WaveformView.cpp
+    # src/SpectrumAnalyzer.cpp
+    # src/HistogramWidget.cpp
+    # src/PlotWidget.cpp
+    # src/ADSRWidget.cpp
+    # src/GradientEditor.cpp
+    # src/AssetBrowser.cpp
+    # src/ConsoleWidget.cpp
+    # src/ViewportWidget.cpp
+    # src/UIApp.cpp
 )
-
-set(SOURCES ${BUGUI_WIDGET_CORE_SOURCES})
-
-if(BUGUI_BUILD_EXTRA_WIDGETS)
-    list(APPEND SOURCES ${BUGUI_WIDGET_EXTRA_SOURCES})
-endif()
 
 add_library(bugui_widgets STATIC ${SOURCES})
 
@@ -38,5 +80,6 @@ target_include_directories(bugui_widgets PUBLIC
     ${CMAKE_SOURCE_DIR}/vendor/stb
 )
 
-target_link_libraries(bugui_widgets PUBLIC bugui_base)
 target_link_libraries(bugui_widgets PRIVATE bugui_stb)
+
+target_precompile_headers(bugui_widgets PRIVATE src/pch.hpp)

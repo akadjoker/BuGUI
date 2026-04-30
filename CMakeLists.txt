@@ -23,9 +23,10 @@ option(BUGUI_BUILD_TUTORIALS "Build tutorial executables" OFF)
 
 add_subdirectory(vendor/poly2tri)
 add_subdirectory(vendor/stb)
+add_subdirectory(vendor/glad)
 #add_subdirectory(vendor/SDL)
-add_subdirectory(base)
-add_subdirectory(core)
+#add_subdirectory(base)    # removed: Color/FileSystem from core/ no longer needed
+#add_subdirectory(core)    # removed: replaced by bugui_glad + BuGUI_base.hpp
 add_subdirectory(widgets)
 
 if(BUGUI_BUILD_APP AND EXISTS "${CMAKE_SOURCE_DIR}/app/CMakeLists.txt")
@@ -34,6 +35,10 @@ endif()
 
 if(BUGUI_BUILD_DEMO AND EXISTS "${CMAKE_SOURCE_DIR}/demo/CMakeLists.txt")
     add_subdirectory(demo)
+endif()
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/demos/CMakeLists.txt")
+    add_subdirectory(demos)
 endif()
 
 if(BUILD_TESTING AND EXISTS "${CMAKE_SOURCE_DIR}/tests/CMakeLists.txt")

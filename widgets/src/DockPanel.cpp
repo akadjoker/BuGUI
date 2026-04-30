@@ -1,9 +1,20 @@
 #include "DockPanel.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
-#include <cmath>
-#include <cstring>
-#include <algorithm>
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace {
+
+inline float setupFont(PaintContext& ctx, const Color& color, float size = 12.f)
+{
+    ctx.font.SetFontSize(size);
+    ctx.font.SetBatch(&ctx.text);
+    ctx.font.SetColor(color);
+    return ctx.font.GetAscender();
+}
+
+} // anon
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  DockNode helpers
@@ -60,7 +71,6 @@ void DockPanel::addPanel(const std::string& name, Widget* content)
     addChild(content);
     content->setVisible(false);
 
-    // Find first non-split leaf and put the tab there
     DockNode* leaf = root_;
     while (leaf->isSplit) leaf = leaf->first;
 
@@ -82,9 +92,8 @@ void DockPanel::splitOff(const std::string& tabName, DockSide side, float ratio)
     int tabIdx = -1;
     DockNode* leaf = root_->findTab(tabName, &tabIdx);
     if (!leaf || tabIdx < 0) return;
-    if (leaf->tabs.size() < 2) return; // need at least 2 tabs to split one off
+    if (leaf->tabs.size() < 2) return;
 
-    // Remove the tab from the source leaf
     DockNode::Tab movedTab = leaf->tabs[tabIdx];
     leaf->tabs.erase(leaf->tabs.begin() + tabIdx);
     if (leaf->currentTab >= (int)leaf->tabs.size())
@@ -92,17 +101,15 @@ void DockPanel::splitOff(const std::string& tabName, DockSide side, float ratio)
     if (leaf->currentTab >= 0)
         leaf->tabs[leaf->currentTab].content->setVisible(true);
 
-    // Build new leaf for the moved tab
     DockNode* newLeaf = new DockNode();
     newLeaf->isSplit = false;
     newLeaf->tabs.push_back(movedTab);
     newLeaf->currentTab = 0;
     movedTab.content->setVisible(true);
 
-    // Replace the source leaf with a split node
     DockNode* split = new DockNode();
     split->isSplit = true;
-    split->ratio   = 1.0f - ratio; // first child gets the old leaf
+    split->ratio   = 1.0f - ratio;
 
     bool firstIsNew = (side == DockSide::Left || side == DockSide::Top);
     bool horizontal = (side == DockSide::Left || side == DockSide::Right);
@@ -118,14 +125,12 @@ void DockPanel::splitOff(const std::string& tabName, DockSide side, float ratio)
         split->second = newLeaf;
     }
 
-    // Patch parent pointer slot
     if (root_ == leaf) {
         root_ = split;
     } else {
         DockNode** slot = findRef(root_, leaf);
         if (slot) *slot = split;
     }
-
     markDirty();
 }
 
@@ -147,9 +152,7 @@ void DockPanel::closePanel(const std::string& name)
     removeChild(w);
     delete w;
 
-    // Prune empty leaves
     pruneNode(root_);
-
     panelClosed.emit(name);
     markDirty();
 }
@@ -221,7 +224,7 @@ void DockPanel::layout()
 {
     if (!root_) return;
     const Rect b = rect();
-    layoutNode(root_, {0, 0, b.w, b.h});  // 0-based so toScreen() adds abs offset correctly
+    layoutNode(root_, {0, 0, b.w, b.h});
     Widget::layout();
 }
 
@@ -283,11 +286,13 @@ void DockPanel::paint(PaintContext& ctx)
     const Rect b = absoluteRect();
     ctx.pushClip(b);
     paintNode(root_, ctx);
-    if (dropValid_) paintDropOverlay(ctx);
+
+    // Visual drag feedback
+    if (drag_.active) paintDraggedTab(ctx);
+    if (dropValid_)   paintDropOverlay(ctx);
+
     ctx.popClip();
 }
-
-static inline Font::ClipRect toFc(const Rect& r) { return {r.x, r.y, r.w, r.h}; }
 
 void DockPanel::paintNode(DockNode* node, PaintContext& ctx)
 {
@@ -295,10 +300,11 @@ void DockPanel::paintNode(DockNode* node, PaintContext& ctx)
     Rect sr = toScreen(node->rect);
 
     if (node->isSplit) {
-        // Draw splitter handle
-        bool hh    = (hoveredSplit_ == node || (splitDrag_.active && splitDrag_.node == node));
-        Color hc   = hh ? Color(90, 90, 95, 255) : Color(50, 50, 53, 255);
-        ctx.fill.SetColor(hc.r, hc.g, hc.b, hc.a);
+        // Splitter handle
+        bool hovered = (hoveredSplit_ == node ||
+                       (splitDrag_.active && splitDrag_.node == node));
+        Color hc = hovered ? Color(90, 90, 95, 255) : Color(50, 50, 53, 255);
+        ctx.fill.SetColor(hc);
         if (node->splitDir == LayoutDir::Horizontal) {
             Rect f = toScreen(node->first->rect);
             ctx.fillRect(f.x + f.w, sr.y, handleW_, sr.h);
@@ -319,6 +325,17 @@ void DockPanel::paintNode(DockNode* node, PaintContext& ctx)
     Rect barR = { sr.x, sr.y, sr.w, tabBarH_ };
     paintTabBar(node, barR, ctx);
 
+    // Active content — paint children
+    if (node->currentTab >= 0 && node->currentTab < (int)node->tabs.size()) {
+        Widget* w = node->tabs[node->currentTab].content;
+        if (w && w->isVisible()) {
+            Rect contentR = { sr.x, sr.y + tabBarH_, sr.w, sr.h - tabBarH_ };
+            ctx.pushClip(contentR);
+            w->paint(ctx);
+            ctx.popClip();
+        }
+    }
+
     // Border
     ctx.line.SetColor(60, 60, 65, 255);
     ctx.lineRect(sr.x, sr.y, sr.w, sr.h);
@@ -332,18 +349,19 @@ void DockPanel::paintTabBar(DockNode* leaf, const Rect& barR, PaintContext& ctx)
 
     const float padX = 10.f;
     float tx = barR.x + 4.f;
-    Font::ClipRect fc = toFc(barR);
 
     for (int i = 0; i < (int)leaf->tabs.size(); ++i) {
         auto& tab = leaf->tabs[i];
+
+        setupFont(ctx, {200, 200, 200, 255}, 12.f);
         float tw = ctx.font.GetTextWidth(tab.name.c_str()) + padX * 2;
         tab.cachedWidth = tw;
 
-        bool active = (i == leaf->currentTab);
+        bool active   = (i == leaf->currentTab);
         bool dragging = drag_.active && drag_.srcNode == leaf && drag_.srcIdx == i;
 
         if (!dragging) {
-            // Tab background
+            // Tab bg
             if (active) {
                 ctx.fill.SetColor(45, 45, 50, 255);
             } else {
@@ -351,7 +369,7 @@ void DockPanel::paintTabBar(DockNode* leaf, const Rect& barR, PaintContext& ctx)
             }
             ctx.fillRect(tx, barR.y, tw, barR.h);
 
-            // Active indicator line at bottom
+            // Active indicator line
             if (active) {
                 ctx.line.SetColor(120, 160, 220, 255);
                 ctx.drawLine(tx, barR.y + barR.h - 1, tx + tw, barR.y + barR.h - 1);
@@ -359,19 +377,57 @@ void DockPanel::paintTabBar(DockNode* leaf, const Rect& barR, PaintContext& ctx)
 
             // Label
             Color tc = active ? Color(220, 220, 220, 255) : Color(150, 150, 155, 255);
-            ctx.font.SetColor(tc.r, tc.g, tc.b, tc.a);
-            ctx.font.SetClip((int)barR.x, (int)barR.y, (int)barR.w, (int)barR.h);
+            float asc = setupFont(ctx, tc, 12.f);
+            ctx.pushClip(barR);
             ctx.font.Print(tab.name.c_str(),
                            tx + padX,
-                           barR.y + (barR.h - 12.f) * 0.5f,
-                           &fc);
+                           barR.y + (barR.h - 12.f) * 0.5f + asc);
+            ctx.popClip();
         }
         tx += tw + 2.f;
     }
 
-    // Bottom border line
+    // Bottom border
     ctx.line.SetColor(55, 55, 60, 255);
     ctx.drawLine(barR.x, barR.y + barR.h, barR.x + barR.w, barR.y + barR.h);
+}
+
+void DockPanel::paintDraggedTab(PaintContext& ctx)
+{
+    if (!drag_.srcNode || drag_.srcIdx < 0 ||
+        drag_.srcIdx >= (int)drag_.srcNode->tabs.size())
+        return;
+
+    // Only show floating tab if moved beyond threshold
+    float dx = drag_.curX - drag_.startX;
+    float dy = drag_.curY - drag_.startY;
+    if (dx * dx + dy * dy < 36.f) return;
+
+    auto& tab = drag_.srcNode->tabs[drag_.srcIdx];
+    setupFont(ctx, {220, 220, 220, 255}, 12.f);
+    float tw = ctx.font.GetTextWidth(tab.name.c_str()) + 20.f;
+    float th = tabBarH_;
+
+    float fx = drag_.curX - tw * 0.5f;
+    float fy = drag_.curY - th * 0.5f;
+
+    // Shadow
+    ctx.fill.SetColor(0, 0, 0, 80);
+    ctx.fillRoundedRect(fx + 3, fy + 3, tw, th, 4.f);
+
+    // Tab body
+    ctx.fill.SetColor(50, 55, 65, 230);
+    ctx.fillRoundedRect(fx, fy, tw, th, 4.f);
+
+    // Border
+    ctx.line.SetColor(100, 140, 220, 180);
+    ctx.lineRoundedRect(fx, fy, tw, th, 4.f);
+
+    // Label
+    float asc = setupFont(ctx, {220, 230, 240, 255}, 12.f);
+    ctx.font.Print(tab.name.c_str(),
+                   fx + 10.f,
+                   fy + (th - 12.f) * 0.5f + asc);
 }
 
 void DockPanel::paintDropOverlay(PaintContext& ctx)
@@ -379,15 +435,14 @@ void DockPanel::paintDropOverlay(PaintContext& ctx)
     if (!dropNode_) return;
     Rect sr = toScreen(dropNode_->rect);
 
-    // Zone highlight
     Rect zone = sr;
     const float fifth = 0.2f;
     switch (dropZone_) {
-        case DockSide::Left:   zone.w = sr.w * fifth; break;
-        case DockSide::Right:  zone.x = sr.x + sr.w * (1.f - fifth); zone.w = sr.w * fifth; break;
-        case DockSide::Top:    zone.h = sr.h * fifth; break;
-        case DockSide::Bottom: zone.y = sr.y + sr.h * (1.f - fifth); zone.h = sr.h * fifth; break;
-        case DockSide::Center: break;
+    case DockSide::Left:   zone.w = sr.w * fifth; break;
+    case DockSide::Right:  zone.x = sr.x + sr.w * (1.f - fifth); zone.w = sr.w * fifth; break;
+    case DockSide::Top:    zone.h = sr.h * fifth; break;
+    case DockSide::Bottom: zone.y = sr.y + sr.h * (1.f - fifth); zone.h = sr.h * fifth; break;
+    case DockSide::Center: break;
     }
 
     ctx.fill.SetColor(80, 120, 200, 60);
@@ -427,7 +482,7 @@ int DockPanel::hitTab(DockNode* leaf, float ox, float oy, float sx, float sy) co
     float tx = barR.x + 4.f;
     for (int i = 0; i < (int)leaf->tabs.size(); ++i) {
         float tw = leaf->tabs[i].cachedWidth;
-        if (tw <= 0) tw = 60.f; // fallback before first paint
+        if (tw <= 0) tw = 60.f;
         if (sx >= tx && sx < tx + tw) return i;
         tx += tw + 2.f;
     }
@@ -445,7 +500,6 @@ DockNode* DockPanel::hitSplitterImpl(DockNode* n, float ox, float oy,
                                       float sx, float sy) const
 {
     if (!n || !n->isSplit) return nullptr;
-    // Check splitter handle rect
     if (n->splitDir == LayoutDir::Horizontal) {
         Rect f = { ox + n->first->rect.x, oy + n->first->rect.y,
                    n->first->rect.w, n->first->rect.h };
@@ -485,7 +539,7 @@ void DockPanel::onMousePress(MouseEvent& e)
     const Rect abs = absoluteRect();
     float ox = abs.x, oy = abs.y;
 
-    // Check splitter first
+    // Splitter drag
     DockNode* spl = hitSplitter(e.x, e.y);
     if (spl) {
         splitDrag_.active     = true;
@@ -496,20 +550,28 @@ void DockPanel::onMousePress(MouseEvent& e)
         return;
     }
 
-    // Check tab bar
+    // Tab bar click
     DockNode* leaf = hitLeaf(e.x, e.y);
     if (!leaf) return;
     int tabIdx = hitTab(leaf, ox, oy, e.x, e.y);
     if (tabIdx >= 0) {
-        // Activate tab
-        for (auto& t : leaf->tabs) t.content->setVisible(false);
-        leaf->currentTab = tabIdx;
-        leaf->tabs[tabIdx].content->setVisible(true);
-        panelActivated.emit(leaf->tabs[tabIdx].name);
-        markDirty();
-        layout();
+        // Single-tab leaf: nothing to switch or drag
+        if (leaf->tabs.size() <= 1) {
+            e.consumed = true;
+            return;
+        }
 
-        // Begin drag
+        // Switch tab (skip if already active)
+        if (tabIdx != leaf->currentTab) {
+            for (auto& t : leaf->tabs) t.content->setVisible(false);
+            leaf->currentTab = tabIdx;
+            leaf->tabs[tabIdx].content->setVisible(true);
+            panelActivated.emit(leaf->tabs[tabIdx].name);
+            markDirty();
+            layout();
+        }
+
+        // Begin drag (allow even on active tab for rearranging)
         drag_.active  = true;
         drag_.srcNode = leaf;
         drag_.srcIdx  = tabIdx;
@@ -551,29 +613,26 @@ void DockPanel::onMouseMove(MouseEvent& e)
         float delta = ((n->splitDir == LayoutDir::Horizontal) ? e.x : e.y)
                     - splitDrag_.startMouse;
         float newRatio = splitDrag_.startRatio + delta / total;
-        n->ratio = std::clamp(newRatio, 0.05f, 0.95f);
+        n->ratio = std::max(0.05f, std::min(0.95f, newRatio));
         markDirty();
         layout();
         return;
     }
 
-    // Update hovered splitter for cursor
     hoveredSplit_ = hitSplitter(e.x, e.y);
 
     if (drag_.active) {
         drag_.curX = e.x;
         drag_.curY = e.y;
 
-        // Only activate drop overlay if moved at least 6px
         float dx = e.x - drag_.startX, dy = e.y - drag_.startY;
-        if (std::sqrt(dx*dx + dy*dy) > 6.f) {
+        if (dx * dx + dy * dy > 36.f) {
             DockNode* target = hitLeaf(e.x, e.y);
             if (target && target != drag_.srcNode) {
                 dropNode_  = target;
                 dropZone_  = computeDropZone(target, abs.x, abs.y, e.x, e.y);
                 dropValid_ = true;
             } else if (target == drag_.srcNode) {
-                // reorder within same leaf - no overlay
                 dropValid_ = false;
                 dropNode_  = nullptr;
             } else {
@@ -594,7 +653,7 @@ void DockPanel::onMouseLeave()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  performDrop - merge or split based on drop zone
+//  performDrop
 // ─────────────────────────────────────────────────────────────────────────────
 
 void DockPanel::performDrop()
@@ -609,7 +668,7 @@ void DockPanel::performDrop()
         drag_.srcNode->currentTab = (int)drag_.srcNode->tabs.size() - 1;
     for (auto& t : drag_.srcNode->tabs) t.content->setVisible(false);
     if (!drag_.srcNode->tabs.empty())
-        drag_.srcNode->tabs[drag_.srcNode->currentTab].content->setVisible(true);  // show new active
+        drag_.srcNode->tabs[drag_.srcNode->currentTab].content->setVisible(true);
 
     if (dropZone_ == DockSide::Center) {
         // Merge into target leaf
@@ -619,9 +678,8 @@ void DockPanel::performDrop()
         movedTab.content->setVisible(true);
     } else {
         // Split
-        float ratio = 0.5f;
         bool firstIsNew = (dropZone_ == DockSide::Left || dropZone_ == DockSide::Top);
-        bool horiz = (dropZone_ == DockSide::Left || dropZone_ == DockSide::Right);
+        bool horiz      = (dropZone_ == DockSide::Left || dropZone_ == DockSide::Right);
 
         DockNode* newLeaf = new DockNode();
         newLeaf->isSplit = false;
@@ -634,11 +692,11 @@ void DockPanel::performDrop()
         split->splitDir = horiz ? LayoutDir::Horizontal : LayoutDir::Vertical;
 
         if (firstIsNew) {
-            split->ratio  = ratio;
+            split->ratio  = 0.5f;
             split->first  = newLeaf;
             split->second = dropNode_;
         } else {
-            split->ratio  = 1.f - ratio;
+            split->ratio  = 0.5f;
             split->first  = dropNode_;
             split->second = newLeaf;
         }
@@ -651,6 +709,5 @@ void DockPanel::performDrop()
         }
     }
 
-    // Prune any empty leaves left behind
     pruneNode(root_);
 }

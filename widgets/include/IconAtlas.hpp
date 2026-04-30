@@ -2,21 +2,23 @@
 
 // Legacy widget-system icon atlas.
 //
-// This belongs to the old Texture/Pixmap/RenderBatch path and is only kept for
+// This belongs to the old Texture/BuImage/RenderBatch path and is only kept for
 // BUGUI_BUILD_EXTRA_WIDGETS while the migration is in progress. New BuGUI code
 // should use BuGUI::DrawList::addIcon() for vector icons or FontAtlas merged
 // icon glyphs for richer icon sets.
 
-#include "Math.hpp"
+#include "BuGUI_base.hpp"
+#include "BuGUI.hpp"     // BuGUI::TextureHandle
+#include "BuImage.hpp"   // BuGUI::BuImage
 #include <vector>
 
-struct Texture;
-class Pixmap;
+// IconAtlas holds a TextureHandle (opaque uintptr_t) filled in by the backend.
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Icon identifiers
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// @brief Identifiers for built-in pixel icons in the atlas.
 enum class IconId
 {
     None = 0,
@@ -54,11 +56,18 @@ enum class IconId
     ViewDetail,
     ViewList,
     ViewGrid,
+    // Transport / media controls
+    Play,
+    Pause,
+    Stop,
+    StepForward,
+    StepBack,
+    Record,
     COUNT  // must be last
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  IconAtlas - renders all icons into a single RGBA Pixmap at startup,
+//  IconAtlas - renders all icons into a single RGBA BuImage at startup,
 //  uploads as one GL texture.  Widgets draw icons as textured quads.
 //
 //  Usage:
@@ -76,63 +85,78 @@ public:
     IconAtlas() = default;
     ~IconAtlas();
 
-    // Generate all icons at the given cell size and upload as GL texture.
-    // Call once after GL context is ready.
-    void init(int cellSize = 24);
+    /// @brief Generate all icons into a BuImage (caller uploads to GPU).
+    BuGUI::BuImage* buildImage(int cellSize = 24);
 
-    // Has init() been called?
-    bool ready() const { return tex_ != nullptr; }
+    /// @brief Check if the atlas has been initialized.
+    bool ready() const { return (bool)tex_; }
 
-    // The single GPU texture containing all icons.
-    Texture* texture() const { return tex_; }
+    /// @brief Get the opaque GPU texture handle.
+    BuGUI::TextureHandle texture() const { return tex_; }
 
-    // Source rect (in pixel coords) for an icon within the atlas texture.
+    /// @brief Set the texture handle after GPU upload.
+    void setTexture(BuGUI::TextureHandle h, int w, int h_) { tex_ = h; atlasW_ = w; atlasH_ = h_; }
+
+    /// @brief Get the atlas texture width in pixels.
+    int textureWidth()  const { return atlasW_; }
+    /// @brief Get the atlas texture height in pixels.
+    int textureHeight() const { return atlasH_; }
+
+    /// @brief Get the source rect for an icon within the atlas.
     FloatRect srcRect(IconId id) const;
 
-    // Atlas cell size (icons are square).
+    /// @brief Get the icon cell size in pixels.
     int cellSize() const { return cellSize_; }
 
 private:
-    void drawAllIcons(Pixmap& pm);
-    void drawIcon(Pixmap& pm, IconId id, int ox, int oy, int sz);
+    void drawAllIcons(BuImage& pm);
+    void drawIcon(BuImage& pm, IconId id, int ox, int oy, int sz);
 
     // Per-icon drawing helpers (ox,oy = cell origin, sz = cell size)
-    void drawFolder     (Pixmap& pm, int ox, int oy, int sz);
-    void drawFolderOpen (Pixmap& pm, int ox, int oy, int sz);
-    void drawFile       (Pixmap& pm, int ox, int oy, int sz);
-    void drawFileCode   (Pixmap& pm, int ox, int oy, int sz);
-    void drawBook       (Pixmap& pm, int ox, int oy, int sz);
-    void drawGear       (Pixmap& pm, int ox, int oy, int sz);
-    void drawStar       (Pixmap& pm, int ox, int oy, int sz);
-    void drawHeart      (Pixmap& pm, int ox, int oy, int sz);
-    void drawSearch     (Pixmap& pm, int ox, int oy, int sz);
-    void drawPlus       (Pixmap& pm, int ox, int oy, int sz);
-    void drawMinus      (Pixmap& pm, int ox, int oy, int sz);
-    void drawCheck      (Pixmap& pm, int ox, int oy, int sz);
-    void drawCross      (Pixmap& pm, int ox, int oy, int sz);
-    void drawArrowRight (Pixmap& pm, int ox, int oy, int sz);
-    void drawArrowDown  (Pixmap& pm, int ox, int oy, int sz);
-    void drawArrowUp    (Pixmap& pm, int ox, int oy, int sz);
-    void drawArrowLeft  (Pixmap& pm, int ox, int oy, int sz);
-    void drawEye        (Pixmap& pm, int ox, int oy, int sz);
-    void drawEyeOff     (Pixmap& pm, int ox, int oy, int sz);
-    void drawLock       (Pixmap& pm, int ox, int oy, int sz);
-    void drawUnlock     (Pixmap& pm, int ox, int oy, int sz);
-    void drawRefresh    (Pixmap& pm, int ox, int oy, int sz);
-    void drawTrash      (Pixmap& pm, int ox, int oy, int sz);
-    void drawEdit       (Pixmap& pm, int ox, int oy, int sz);
-    void drawHome       (Pixmap& pm, int ox, int oy, int sz);
-    void drawUser       (Pixmap& pm, int ox, int oy, int sz);
-    void drawWarning    (Pixmap& pm, int ox, int oy, int sz);
-    void drawInfo       (Pixmap& pm, int ox, int oy, int sz);
-    void drawError      (Pixmap& pm, int ox, int oy, int sz);
-    void drawFileImage  (Pixmap& pm, int ox, int oy, int sz);
-    void drawFileArchive(Pixmap& pm, int ox, int oy, int sz);
-    void drawViewDetail (Pixmap& pm, int ox, int oy, int sz);
-    void drawViewList   (Pixmap& pm, int ox, int oy, int sz);
-    void drawViewGrid   (Pixmap& pm, int ox, int oy, int sz);
+    void drawFolder     (BuImage& pm, int ox, int oy, int sz);
+    void drawFolderOpen (BuImage& pm, int ox, int oy, int sz);
+    void drawFile       (BuImage& pm, int ox, int oy, int sz);
+    void drawFileCode   (BuImage& pm, int ox, int oy, int sz);
+    void drawBook       (BuImage& pm, int ox, int oy, int sz);
+    void drawGear       (BuImage& pm, int ox, int oy, int sz);
+    void drawStar       (BuImage& pm, int ox, int oy, int sz);
+    void drawHeart      (BuImage& pm, int ox, int oy, int sz);
+    void drawSearch     (BuImage& pm, int ox, int oy, int sz);
+    void drawPlus       (BuImage& pm, int ox, int oy, int sz);
+    void drawMinus      (BuImage& pm, int ox, int oy, int sz);
+    void drawCheck      (BuImage& pm, int ox, int oy, int sz);
+    void drawCross      (BuImage& pm, int ox, int oy, int sz);
+    void drawArrowRight (BuImage& pm, int ox, int oy, int sz);
+    void drawArrowDown  (BuImage& pm, int ox, int oy, int sz);
+    void drawArrowUp    (BuImage& pm, int ox, int oy, int sz);
+    void drawArrowLeft  (BuImage& pm, int ox, int oy, int sz);
+    void drawEye        (BuImage& pm, int ox, int oy, int sz);
+    void drawEyeOff     (BuImage& pm, int ox, int oy, int sz);
+    void drawLock       (BuImage& pm, int ox, int oy, int sz);
+    void drawUnlock     (BuImage& pm, int ox, int oy, int sz);
+    void drawRefresh    (BuImage& pm, int ox, int oy, int sz);
+    void drawTrash      (BuImage& pm, int ox, int oy, int sz);
+    void drawEdit       (BuImage& pm, int ox, int oy, int sz);
+    void drawHome       (BuImage& pm, int ox, int oy, int sz);
+    void drawUser       (BuImage& pm, int ox, int oy, int sz);
+    void drawWarning    (BuImage& pm, int ox, int oy, int sz);
+    void drawInfo       (BuImage& pm, int ox, int oy, int sz);
+    void drawError      (BuImage& pm, int ox, int oy, int sz);
+    void drawFileImage  (BuImage& pm, int ox, int oy, int sz);
+    void drawFileArchive(BuImage& pm, int ox, int oy, int sz);
+    void drawViewDetail (BuImage& pm, int ox, int oy, int sz);
+    void drawViewList   (BuImage& pm, int ox, int oy, int sz);
+    void drawViewGrid   (BuImage& pm, int ox, int oy, int sz);
+    void drawPlay       (BuImage& pm, int ox, int oy, int sz);
+    void drawPause      (BuImage& pm, int ox, int oy, int sz);
+    void drawStop       (BuImage& pm, int ox, int oy, int sz);
+    void drawStepForward(BuImage& pm, int ox, int oy, int sz);
+    void drawStepBack   (BuImage& pm, int ox, int oy, int sz);
+    void drawRecord     (BuImage& pm, int ox, int oy, int sz);
 
-    Texture* tex_ = nullptr;
-    int cellSize_ = 24;
-    int cols_ = 0;   // number of columns in the atlas
+    BuGUI::TextureHandle tex_;
+    int atlasW_    = 0;
+    int atlasH_    = 0;
+    int cellSize_  = 24;
+    int cols_      = 0;
 };

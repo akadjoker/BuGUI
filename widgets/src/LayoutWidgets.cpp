@@ -1,6 +1,5 @@
- #include "Widgets.hpp"
-#include "WidgetApp.hpp"
-#include "Batch.hpp"
+#include "pch.hpp"
+#include "LayoutWidgets.hpp"
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  GridLayout
@@ -252,11 +251,6 @@ void BorderLayout::paint(PaintContext& ctx)
 //  Collapsible
 // ═════════════════════════════════════════════════════════════════════════════
 
-static Font::ClipRect toFontClipLayout(const Rect& r)
-{
-    return {r.x, r.y, r.w, r.h};
-}
-
 Collapsible::Collapsible(const std::string& title, bool expanded)
     : title_(title), expanded_(expanded)
 {
@@ -396,17 +390,17 @@ void Collapsible::paint(PaintContext& ctx)
 
     // ── Title text ───────────────────────────────────────────────────────
     float textX = triX + triSize + 6.0f;
-    float textY = abs.y + (headerH_ - t.fontSize) * 0.5f;
+    float asc   = ctx.font.GetAscender();
+    float textY = abs.y + (headerH_ + asc) * 0.5f;
 
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
     ctx.font.SetBatch(&ctx.text);
 
-    Rect textRect = {textX, textY, abs.w, t.fontSize};
+    Rect textRect = {textX, textY - asc, abs.w, asc};
     if (!ctx.isClipped(textRect))
     {
-        auto fc = toFontClipLayout(ctx.clipRect());
-        ctx.font.Print(title_.c_str(), textX, textY, &fc);
+        ctx.font.Print(title_.c_str(), textX, textY);
     }
 
     // ── Content (children) - only if expanded ────────────────────────────
@@ -485,35 +479,23 @@ void StatusBar::paint(PaintContext& ctx)
         ctx.font.SetColor(t.textDisabled);
         ctx.font.SetBatch(&ctx.text);
         float ty = abs.y + (abs.h - t.fontSize * 0.85f) * 0.5f;
-        auto fc = toFontClipLayout(ctx.clipRect());
-        ctx.font.Print(text_.c_str(), abs.x + t.padding, ty, &fc);
+        ctx.font.Print(text_.c_str(), abs.x + t.padding, ty);
     }
 
-    // Resize grip - only when resizable AND not maximized
-    if (WidgetApp::instance().isResizable() && !WidgetApp::instance().isMaximized())
+    // Resize grip — three diagonal lines at bottom-right corner (Windows style)
     {
-        float gs = abs.h * 0.65f;  // grip area size
-        float rx = abs.x + abs.w;
-        float ry = abs.y + abs.h;
-
-        Color gc(100, 100, 105, 180);
-        ctx.line.SetColor(gc.r, gc.g, gc.b, gc.a);
-
-        // 3 diagonal lines from bottom-right corner
-        for (int i = 0; i < 3; ++i)
-        {
-            float off = (i + 1) * (gs / 3.5f);
-            ctx.line.Line2D(
-                static_cast<int>(rx - off), static_cast<int>(ry - 1),
-                static_cast<int>(rx - 1),   static_cast<int>(ry - off));
-        }
+        float gx = abs.x + abs.w - 2.0f;
+        float gy = abs.y + abs.h - 2.0f;
+        ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b,
+                          static_cast<uint8_t>(t.borderColor.a * 2 / 3));
+        ctx.drawLine(gx - 10.0f, gy, gx, gy - 10.0f);
+        ctx.drawLine(gx -  6.0f, gy, gx, gy -  6.0f);
+        ctx.drawLine(gx -  2.0f, gy, gx, gy -  2.0f);
     }
 
     // Children
-    ctx.pushClip(abs);
     for (auto* c : children_)
         c->paint(ctx);
-    ctx.popClip();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -669,10 +651,8 @@ void FormLayout::paint(PaintContext& ctx)
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
 
-    ctx.pushClip(abs);
     for (auto* c : children_)
         c->paint(ctx);
-    ctx.popClip();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -745,10 +725,8 @@ void FlowLayout::paint(PaintContext& ctx)
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
 
-    ctx.pushClip(abs);
     for (auto* c : children_)
         c->paint(ctx);
-    ctx.popClip();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -773,12 +751,8 @@ void Overlay::layout()
     for (auto* c : children_)
     {
         if (!c->isVisible()) continue;
-        // Children with explicit size keep it; others fill
-        float cw = c->rect().w > 0 ? c->rect().w : rect_.w;
-        float ch = c->rect().h > 0 ? c->rect().h : rect_.h;
-        float cx = c->rect().x;
-        float cy = c->rect().y;
-        c->setRect({cx, cy, cw, ch});
+        // All layers fill the full overlay area
+        c->setRect({0, 0, rect_.w, rect_.h});
         c->layout();
     }
 }
@@ -1316,20 +1290,11 @@ void TabLayout::paint(PaintContext& ctx)
         ctx.font.SetColor(active ? t.textColor : t.textDisabled);
         ctx.font.SetBatch(&ctx.text);
 
-        float textX, textY;
-        if (horiz)
-        {
-            textX = absTr.x + t.padding;
-            textY = absTr.y + (absTr.h - t.fontSize * 0.9f) * 0.5f;
-        }
-        else
-        {
-            textX = absTr.x + 4.0f;
-            textY = absTr.y + (absTr.h - t.fontSize * 0.9f) * 0.5f;
-        }
+        float asc   = ctx.font.GetAscender();
+        float textX = horiz ? absTr.x + t.padding : absTr.x + 4.0f;
+        float textY = absTr.y + (absTr.h + asc) * 0.5f;  // baseline-correct centering
 
-        auto fc = toFontClipLayout(ctx.clipRect());
-        ctx.font.Print(tabs_[i].label.c_str(), textX, textY, &fc);
+        ctx.font.Print(tabs_[i].label.c_str(), textX, textY);
 
         // Close button (X)
         if (closable_)
@@ -1412,7 +1377,12 @@ void TabLayout::onMousePress(MouseEvent& e)
             }
         }
 
-        // Click on tab label → switch
+        // Click on tab label → switch (skip if already active or only 1 tab)
+        if (i == currentIndex_ || tabs_.size() <= 1)
+        {
+            e.consumed = true;
+            return;
+        }
         setCurrentIndex(i);
         e.consumed = true;
         return;
@@ -1499,4 +1469,513 @@ void AnchorLayout::paint(PaintContext& ctx)
     for (auto* c : children_)
         c->paint(ctx);
     ctx.popClip();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Carousel
+// ═════════════════════════════════════════════════════════════════════════════
+
+unsigned int Carousel::arrowTexId_ = 0;
+
+Carousel::Carousel() = default;
+
+void Carousel::addPageWidget(Widget* page)
+{
+    pages_.push_back(page);
+    addChild(page);
+    markDirty();
+    WidgetApp::instance().requestLayout();
+}
+
+void Carousel::removePage(int index)
+{
+    if (index < 0 || index >= static_cast<int>(pages_.size())) return;
+    Widget* p = pages_[index];
+    pages_.erase(pages_.begin() + index);
+    auto it = std::find(children_.begin(), children_.end(), p);
+    if (it != children_.end()) children_.erase(it);
+    delete p;
+    if (currentPage_ >= static_cast<int>(pages_.size()))
+        currentPage_ = static_cast<int>(pages_.size()) - 1;
+    if (currentPage_ < 0) currentPage_ = 0;
+    markDirty();
+}
+
+Rect Carousel::contentRect() const
+{
+    float dy = (showDots_ && !pages_.empty()) ? dotsHeight() : 0.0f;
+    return {0, 0, rect_.w, rect_.h - dy};
+}
+
+Rect Carousel::arrowRect(bool rightSide) const
+{
+    Rect cr = contentRect();
+    float aw = 36.0f;
+    float ah = 60.0f;
+    float ay = (cr.h - ah) * 0.5f;
+    if (rightSide)
+        return {cr.w - aw - 4.0f, ay, aw, ah};
+    else
+        return {4.0f, ay, aw, ah};
+}
+
+void Carousel::startAnim(int from, int to, int dir)
+{
+    animFrom_     = from;
+    animDir_      = dir;
+    animProgress_ = 0.0f;
+    animating_    = true;
+    currentPage_  = to;
+    markDirty();
+}
+
+void Carousel::setCurrentPage(int idx)
+{
+    if (pages_.empty()) return;
+    int n = static_cast<int>(pages_.size());
+    idx = idx < 0 ? 0 : (idx >= n ? n - 1 : idx);
+    if (idx == currentPage_) return;
+    int dir = (idx > currentPage_) ? 1 : -1;
+    startAnim(currentPage_, idx, dir);
+    pageChanged.emit(currentPage_);
+}
+
+void Carousel::next()
+{
+    if (pages_.empty()) return;
+    int n = static_cast<int>(pages_.size());
+    int next = currentPage_ + 1;
+    if (next >= n)
+    {
+        if (!loop_) return;
+        next = 0;
+    }
+    startAnim(currentPage_, next, 1);
+    pageChanged.emit(currentPage_);
+}
+
+void Carousel::prev()
+{
+    if (pages_.empty()) return;
+    int n = static_cast<int>(pages_.size());
+    int prev = currentPage_ - 1;
+    if (prev < 0)
+    {
+        if (!loop_) return;
+        prev = n - 1;
+    }
+    startAnim(currentPage_, prev, -1);
+    pageChanged.emit(currentPage_);
+}
+
+Widget::Vec2f Carousel::sizeHint() const
+{
+    return {rect_.w > 0 ? rect_.w : 200.0f,
+            rect_.h > 0 ? rect_.h : 200.0f};
+}
+
+void Carousel::layout()
+{
+    Rect cr = contentRect();
+    for (auto* p : pages_)
+    {
+        p->setRect({0, 0, cr.w, cr.h});
+        p->layout();
+    }
+}
+
+void Carousel::paint(PaintContext& ctx)
+{
+    if (!visible_) return;
+    Rect abs = absoluteRect();
+    if (ctx.isClipped(abs)) return;
+
+    const auto& theme = Theme::instance();
+
+    // Advance animation
+    if (animating_)
+    {
+        float dt = WidgetApp::instance().deltaTime();
+        float step = (animDuration_ > 0.0f) ? (dt / animDuration_) : 1.0f;
+        animProgress_ += step;
+        if (animProgress_ >= 1.0f)
+        {
+            animProgress_ = 1.0f;
+            animating_    = false;
+            animFrom_     = -1;
+        }
+        markDirty();
+    }
+
+    // Auto-play
+    if (autoPlay_ && !animating_ && !pages_.empty())
+    {
+        autoTimer_ += WidgetApp::instance().deltaTime();
+        if (autoTimer_ >= autoInterval_)
+        {
+            autoTimer_ = 0.0f;
+            next();
+        }
+        markDirty();
+    }
+
+    Rect cr  = contentRect();
+    Rect cra = {abs.x, abs.y, cr.w, cr.h};    ctx.pushClip(cra);
+
+    // Draw current page (and sliding-out page during animation)
+    if (!pages_.empty())
+    {
+        float slideW = cr.w;
+
+        if (animating_ && animFrom_ >= 0 && animFrom_ < static_cast<int>(pages_.size()))
+        {
+            float t    = applyEasing(easeType_, animProgress_);
+            float curOff = -animDir_ * slideW * (1.0f - t);
+            float oldOff =  animDir_ * slideW * t;
+
+            Widget* oldPage = pages_[animFrom_];
+            Widget* curPage = pages_[currentPage_];
+
+            float savedOldX = oldPage->rect().x;
+            float savedCurX = curPage->rect().x;
+
+            oldPage->setRect({oldOff, 0, cr.w, cr.h});
+            curPage->setRect({curOff, 0, cr.w, cr.h});
+
+            oldPage->paint(ctx);
+            curPage->paint(ctx);
+
+            oldPage->setRect({savedOldX, 0, cr.w, cr.h});
+            curPage->setRect({savedCurX, 0, cr.w, cr.h});
+        }
+        else
+        {
+            Widget* p = pages_[currentPage_];
+            p->setRect({0, 0, cr.w, cr.h});
+            p->paint(ctx);
+        }
+    }
+
+    ctx.popClip();
+
+    // Arrows
+    if (showArrows_)
+    {
+        auto paintArrow = [&](bool right)
+        {
+            Rect ar = arrowRect(right);
+            ar.x += abs.x;
+            ar.y += abs.y;
+            bool hov = (right ? hoveredArrow_ == 1 : hoveredArrow_ == -1);
+            uint8_t a = hov ? 200 : 120;
+            ctx.fill.SetColor(20, 20, 30, a);
+            ctx.fillRoundedRect(ar.x, ar.y, ar.w, ar.h, 4.0f, 4);
+            ctx.line.SetColor(200, 200, 200, a);
+            // Draw triangle arrow
+            float cx_ = ar.x + ar.w * 0.5f;
+            float cy_ = ar.y + ar.h * 0.5f;
+            float s   = 8.0f;
+            if (right)
+                ctx.fillTriangle(cx_ - s * 0.5f, cy_ - s, cx_ + s * 0.5f, cy_, cx_ - s * 0.5f, cy_ + s);
+            else
+                ctx.fillTriangle(cx_ + s * 0.5f, cy_ - s, cx_ - s * 0.5f, cy_, cx_ + s * 0.5f, cy_ + s);
+        };
+        paintArrow(false);
+        paintArrow(true);
+    }
+
+    // Dots
+    if (showDots_ && !pages_.empty())
+    {
+        int n         = static_cast<int>(pages_.size());
+        float dotR    = 5.0f;
+        float dotGap  = 14.0f;
+        float totalW  = n * dotGap - (dotGap - dotR * 2.0f);
+        float startX  = abs.x + (rect_.w - totalW) * 0.5f + dotR;
+        float dotY    = abs.y + cr.h + dotsHeight() * 0.5f;
+
+        for (int i = 0; i < n; ++i)
+        {
+            float dx = startX + i * dotGap;
+            if (i == currentPage_)
+            {
+                ctx.fill.SetColor(220, 220, 240, 255);
+                ctx.fillCircle(dx, dotY, dotR);
+            }
+            else
+            {
+                ctx.fill.SetColor(100, 100, 120, 200);
+                ctx.fillCircle(dx, dotY, dotR - 1.5f);
+            }
+        }
+    }
+}
+
+void Carousel::onMousePress(MouseEvent& e)
+{
+    if (pages_.empty()) return;
+
+    Rect abs = absoluteRect();
+    float lx = e.x - abs.x;
+    float ly = e.y - abs.y;
+
+    // Arrow clicks
+    if (showArrows_)
+    {
+        if (arrowRect(false).contains(lx, ly))
+        {
+            prev();
+            e.consumed = true;
+            return;
+        }
+        if (arrowRect(true).contains(lx, ly))
+        {
+            next();
+            e.consumed = true;
+            return;
+        }
+    }
+
+    // Dot clicks
+    if (showDots_)
+    {
+        Rect cr = contentRect();
+        int n        = static_cast<int>(pages_.size());
+        float dotR   = 5.0f;
+        float dotGap = 14.0f;
+        float totalW = n * dotGap - (dotGap - dotR * 2.0f);
+        float startX = (rect_.w - totalW) * 0.5f + dotR;
+        float dotY   = cr.h + dotsHeight() * 0.5f;
+
+        for (int i = 0; i < n; ++i)
+        {
+            float dx = startX + i * dotGap;
+            float distX = lx - dx;
+            float distY = ly - dotY;
+            if (distX * distX + distY * distY <= (dotR + 4.0f) * (dotR + 4.0f))
+            {
+                setCurrentPage(i);
+                e.consumed = true;
+                return;
+            }
+        }
+    }
+}
+
+void Carousel::onMouseMove(MouseEvent& e)
+{
+    int oldHover = hoveredArrow_;
+    hoveredArrow_ = 0;
+    bool overInteractive = false;
+
+    Rect abs = absoluteRect();
+    float lx = e.x - abs.x;
+    float ly = e.y - abs.y;
+
+    if (showArrows_)
+    {
+        if (arrowRect(false).contains(lx, ly))
+        {
+            hoveredArrow_ = -1;
+            overInteractive = true;
+        }
+        else if (arrowRect(true).contains(lx, ly))
+        {
+            hoveredArrow_ = 1;
+            overInteractive = true;
+        }
+    }
+
+    // Check dot hover
+    if (!overInteractive && showDots_ && !pages_.empty())
+    {
+        Rect cr = contentRect();
+        int n        = static_cast<int>(pages_.size());
+        float dotR   = 5.0f;
+        float dotGap = 14.0f;
+        float totalW = n * dotGap - (dotGap - dotR * 2.0f);
+        float startX = (rect_.w - totalW) * 0.5f + dotR;
+        float dotY   = cr.h + dotsHeight() * 0.5f;
+
+        for (int i = 0; i < n; ++i)
+        {
+            float dx = startX + i * dotGap;
+            float distX = lx - dx;
+            float distY = ly - dotY;
+            if (distX * distX + distY * distY <= (dotR + 4.0f) * (dotR + 4.0f))
+            {
+                overInteractive = true;
+                break;
+            }
+        }
+    }
+
+    setCursor(overInteractive ? CursorType::Hand : CursorType::Arrow);
+    if (hoveredArrow_ != oldHover) markDirty();
+}
+
+void Carousel::onMouseLeave()
+{
+    hoveredArrow_ = 0;
+    setCursor(CursorType::Arrow);
+    markDirty();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SlidePanel
+// ═════════════════════════════════════════════════════════════════════════════
+
+SlidePanel::SlidePanel(Side side, float width)
+    : side_(side), panelWidth_(width)
+{
+    visible_ = false;   // starts closed — hitTest skips it
+}
+
+void SlidePanel::open()
+{
+    if (open_ && !animating_) return;
+    open_      = true;
+    animating_ = true;
+    visible_   = true;   // make hittable
+    // animProgress_ keeps its current value so reverse is smooth
+    openChanged.emit(true);
+    markDirty();
+}
+
+void SlidePanel::close()
+{
+    if (!open_ && !animating_) return;
+    open_      = false;
+    animating_ = true;
+    openChanged.emit(false);
+    markDirty();
+}
+
+void SlidePanel::toggle()
+{
+    if (open_) close(); else open();
+}
+
+Widget::Vec2f SlidePanel::sizeHint() const
+{
+    return {rect_.w > 0 ? rect_.w : 300.0f,
+            rect_.h > 0 ? rect_.h : 200.0f};
+}
+
+void SlidePanel::layout()
+{
+    // The SlidePanel itself fills its parent rect (it's an overlay).
+    // Its first child is the drawer content, sized to panelWidth_ x full height.
+    if (children_.empty()) return;
+
+    Widget* content = children_[0];
+    content->setRect({0, 0, panelWidth_, rect_.h});
+    content->layout();
+}
+
+void SlidePanel::paint(PaintContext& ctx)
+{
+    if (!visible_) return;
+
+    // Advance animation
+    if (animating_)
+    {
+        float dt   = WidgetApp::instance().deltaTime();
+        float step = (animDuration_ > 0.0f) ? (dt / animDuration_) : 1.0f;
+
+        if (open_)
+        {
+            animProgress_ += step;
+            if (animProgress_ >= 1.0f) { animProgress_ = 1.0f; animating_ = false; }
+        }
+        else
+        {
+            animProgress_ -= step;
+            if (animProgress_ <= 0.0f) {
+                animProgress_ = 0.0f;
+                animating_ = false;
+                visible_ = false;   // fully closed — hitTest skips us
+            }
+        }
+        markDirty();
+    }
+
+    // Nothing to draw when fully closed
+    if (animProgress_ <= 0.0f && !animating_) return;
+
+    Rect abs = absoluteRect();
+    float t = applyEasing(easeType_, animProgress_);
+
+    // Scrim (dim background)
+    if (showScrim_)
+    {
+        uint8_t alpha = static_cast<uint8_t>(120.0f * t);
+        ctx.fill.SetColor(0, 0, 0, alpha);
+        ctx.fill.Rectangle(abs.x, abs.y, abs.w, abs.h, true);
+    }
+
+    // Drawer offset
+    float drawerX;
+    if (side_ == Left)
+        drawerX = abs.x + (t - 1.0f) * panelWidth_;   // slides from left
+    else
+        drawerX = abs.x + abs.w - t * panelWidth_;     // slides from right
+
+    Rect drawerRect = {drawerX, abs.y, panelWidth_, abs.h};
+    ctx.pushClip(drawerRect);
+
+    // Draw panel background
+    const auto& theme = Theme::instance();
+    ctx.fill.SetColor(theme.drawerBg.r, theme.drawerBg.g, theme.drawerBg.b, theme.drawerBg.a);
+    ctx.fill.Rectangle(drawerRect.x, drawerRect.y, drawerRect.w, drawerRect.h, true);
+
+    // Draw content child offset
+    if (!children_.empty())
+    {
+        Widget* content = children_[0];
+        // Temporarily shift child for painting
+        float savedX = content->rect().x;
+        content->setRect({drawerX - abs.x, 0, panelWidth_, abs.h});
+        content->paint(ctx);
+        content->setRect({savedX, 0, panelWidth_, abs.h});
+    }
+
+    // Right/left border line
+    ctx.line.SetColor(theme.drawerBorder.r, theme.drawerBorder.g, theme.drawerBorder.b, theme.drawerBorder.a);
+    if (side_ == Left)
+        ctx.line.Line2D(drawerRect.x + drawerRect.w, drawerRect.y,
+                        drawerRect.x + drawerRect.w, drawerRect.y + drawerRect.h);
+    else
+        ctx.line.Line2D(drawerRect.x, drawerRect.y,
+                        drawerRect.x, drawerRect.y + drawerRect.h);
+
+    ctx.popClip();
+}
+
+void SlidePanel::onMousePress(MouseEvent& e)
+{
+    if (animProgress_ <= 0.0f) return;  // fully closed, ignore
+
+    Rect abs = absoluteRect();
+    float t = applyEasing(easeType_, animProgress_);
+
+    // Compute drawer rect in screen coords
+    float drawerX;
+    if (side_ == Left)
+        drawerX = abs.x + (t - 1.0f) * panelWidth_;
+    else
+        drawerX = abs.x + abs.w - t * panelWidth_;
+
+    Rect drawerRect = {drawerX, abs.y, panelWidth_, abs.h};
+
+    // If click is outside drawer, close it
+    if (e.x < drawerRect.x || e.x > drawerRect.x + drawerRect.w ||
+        e.y < drawerRect.y || e.y > drawerRect.y + drawerRect.h)
+    {
+        close();
+        e.consumed = true;
+        return;
+    }
+
+    // Otherwise bubble to children normally
 }

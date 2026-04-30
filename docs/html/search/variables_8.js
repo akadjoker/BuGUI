@@ -1,0 +1,20 @@
+var searchData=
+[
+  ['i_0',['I',['../namespaceBuGUI_1_1Key.html#a250772763d455033e5f7ea439a964e5d',1,'BuGUI::Key']]],
+  ['iconid_1',['iconId',['../structTreeGrid_1_1Node.html#a74c14e970aeb59309044323e5eebf445',1,'TreeGrid::Node']]],
+  ['iconname_2',['iconName',['../structTreeModel_1_1Node.html#a89b2053bad0517c572885be9a4bf96e4',1,'TreeModel::Node']]],
+  ['icons_3',['icons',['../structPaintContext.html#aee37b978efcb5b2f8ec568f7cbee7f83',1,'PaintContext']]],
+  ['id_5f_4',['id_',['../classWidget.html#a1e47660d7ce7bed2901e560bc7bf8c4d',1,'Widget']]],
+  ['index_5',['index',['../structPropertyGrid_1_1PropCombo.html#af0dee2012381d1ebcfe9dfd03f3dc8c8',1,'PropertyGrid::PropCombo']]],
+  ['indexcount_6',['indexCount',['../structBuGUI_1_1DrawCmd.html#af98c7bfa5982f9943ba8b69d6ecd3d86',1,'BuGUI::DrawCmd']]],
+  ['indexoffset_7',['indexOffset',['../structBuGUI_1_1DrawCmd.html#a063645136102b3188e8845e0ddee3f7f',1,'BuGUI::DrawCmd']]],
+  ['inputbg_8',['inputBg',['../structTheme.html#a23f368b313e91e84fbc6b70cfe3c059c',1,'Theme']]],
+  ['inputbghover_9',['inputBgHover',['../structTheme.html#a756ceac334cefc8cde9a59f1778e6bf3',1,'Theme']]],
+  ['inputborder_10',['inputBorder',['../structTheme.html#adc6e0f8a5e06927f6d92d63a3aba0e4e',1,'Theme']]],
+  ['inputborderhover_11',['inputBorderHover',['../structTheme.html#af91ef72cff3b24d3f2f4099e7fbc3443',1,'Theme']]],
+  ['inputchars_12',['inputChars',['../structBuGUI_1_1IO.html#aee6c00aec58b72ae7a4a13b322218004',1,'BuGUI::IO']]],
+  ['inputheight_13',['inputHeight',['../structTheme.html#aec8949fbe522145f3174e827d2b6b2ba',1,'Theme']]],
+  ['isdir_14',['isDir',['../structDirCache_1_1DirNode.html#a405010e7bb14275472795fa374f29882',1,'DirCache::DirNode']]],
+  ['issplit_15',['isSplit',['../structDockNode.html#a14591e01d618dd6c2ce404fee5227f5f',1,'DockNode']]],
+  ['itemclicked_16',['itemClicked',['../classBreadcrumbs.html#a0811eddfd7a26b0e8077786e74c83904',1,'Breadcrumbs']]]
+];

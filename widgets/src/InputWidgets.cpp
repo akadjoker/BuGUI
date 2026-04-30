@@ -1,21 +1,12 @@
-#include "Widgets.hpp"
-#include "WidgetApp.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
-#include "Utf8.hpp"
-
-
-#include <SDL2/SDL.h>
-#include <algorithm>
-#include <cstring>
-#include <cmath>
+#include "pch.hpp"
+#include "InputWidgets.hpp"
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Slider
 // ═════════════════════════════════════════════════════════════════════════════
 
 Slider::Slider(float minVal, float maxVal, float value)
-    : min_(minVal), max_(maxVal), value_(value) 
+    : min_(minVal), max_(maxVal), value_(value)
 {
     acceptsFocus_ = true;
     cursor_ = CursorType::Hand;
@@ -25,7 +16,7 @@ void Slider::setRange(float minVal, float maxVal) { min_ = minVal; max_ = maxVal
 
 void Slider::setValue(float v)
 {
-    v = Clamp(v, min_, max_);
+    v = std::clamp(v, min_, max_);
     if (v != value_)
     {
         value_ = v;
@@ -60,19 +51,16 @@ void Slider::paint(PaintContext& ctx)
         float trackW = 4.0f;
         float trackX = abs.x + (abs.w - trackW) * 0.5f;
 
-        // Track
         Rect trackRect = {trackX, abs.y, trackW, abs.h};
         Rect clippedTrack;
         if (ctx.clipRectIntersect(trackRect, clippedTrack))
         {
             Color trackC = focused_ ? t.sliderTrackFocused : (hovered_ ? t.sliderTrackHover : t.sliderTrack);
-            ctx.fill.SetColor(trackC.r, trackC.g, trackC.b, trackC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedTrack.x), static_cast<int>(clippedTrack.y),
-                                       static_cast<int>(clippedTrack.w), static_cast<int>(clippedTrack.h),
-                                       2.0f, 4, true);
+            ctx.fill.SetColor(trackC);
+            ctx.fill.RoundedRectangle(clippedTrack.x, clippedTrack.y,
+                                      clippedTrack.w, clippedTrack.h, 2.0f, 4, true);
         }
 
-        // Fill (from bottom up)
         float fillH = abs.h * ratio;
         float fillY = abs.y + abs.h - fillH;
         Rect fillRect = {trackX, fillY, trackW, fillH};
@@ -80,13 +68,11 @@ void Slider::paint(PaintContext& ctx)
         if (ctx.clipRectIntersect(fillRect, clippedFill))
         {
             Color fillC = hovered_ ? t.sliderFillHover : t.sliderFill;
-            ctx.fill.SetColor(fillC.r, fillC.g, fillC.b, fillC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedFill.x), static_cast<int>(clippedFill.y),
-                                       static_cast<int>(clippedFill.w), static_cast<int>(clippedFill.h),
-                                       2.0f, 4, true);
+            ctx.fill.SetColor(fillC);
+            ctx.fill.RoundedRectangle(clippedFill.x, clippedFill.y,
+                                      clippedFill.w, clippedFill.h, 2.0f, 4, true);
         }
 
-        // Thumb
         float thumbR = std::min(abs.w, 24.0f) * 0.4f;
         float thumbX = abs.x + abs.w * 0.5f;
         float thumbY = fillY;
@@ -94,7 +80,7 @@ void Slider::paint(PaintContext& ctx)
         if (!ctx.isClipped(thumbBounds))
         {
             Color thumbC = pressed_ ? t.sliderThumbPressed : (hovered_ ? t.sliderThumbHover : t.sliderThumb);
-            ctx.fill.SetColor(thumbC.r, thumbC.g, thumbC.b, thumbC.a);
+            ctx.fill.SetColor(thumbC);
             ctx.fillCircle(thumbX, thumbY, thumbR);
         }
     }
@@ -109,10 +95,9 @@ void Slider::paint(PaintContext& ctx)
         if (ctx.clipRectIntersect(trackRect, clippedTrack))
         {
             Color trackC = focused_ ? t.sliderTrackFocused : (hovered_ ? t.sliderTrackHover : t.sliderTrack);
-            ctx.fill.SetColor(trackC.r, trackC.g, trackC.b, trackC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedTrack.x), static_cast<int>(clippedTrack.y),
-                                       static_cast<int>(clippedTrack.w), static_cast<int>(clippedTrack.h),
-                                       2.0f, 4, true);
+            ctx.fill.SetColor(trackC);
+            ctx.fill.RoundedRectangle(clippedTrack.x, clippedTrack.y,
+                                      clippedTrack.w, clippedTrack.h, 2.0f, 4, true);
         }
 
         float fillW = abs.w * ratio;
@@ -121,10 +106,9 @@ void Slider::paint(PaintContext& ctx)
         if (ctx.clipRectIntersect(fillRect, clippedFill))
         {
             Color fillC = hovered_ ? t.sliderFillHover : t.sliderFill;
-            ctx.fill.SetColor(fillC.r, fillC.g, fillC.b, fillC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedFill.x), static_cast<int>(clippedFill.y),
-                                       static_cast<int>(clippedFill.w), static_cast<int>(clippedFill.h),
-                                       2.0f, 4, true);
+            ctx.fill.SetColor(fillC);
+            ctx.fill.RoundedRectangle(clippedFill.x, clippedFill.y,
+                                      clippedFill.w, clippedFill.h, 2.0f, 4, true);
         }
 
         float thumbR = abs.h * 0.4f;
@@ -134,7 +118,7 @@ void Slider::paint(PaintContext& ctx)
         if (!ctx.isClipped(thumbBounds))
         {
             Color thumbC = pressed_ ? t.sliderThumbPressed : (hovered_ ? t.sliderThumbHover : t.sliderThumb);
-            ctx.fill.SetColor(thumbC.r, thumbC.g, thumbC.b, thumbC.a);
+            ctx.fill.SetColor(thumbC);
             ctx.fillCircle(thumbX, thumbY, thumbR);
         }
     }
@@ -147,9 +131,8 @@ void Slider::paint(PaintContext& ctx)
         if (ctx.clipRectIntersect(ringRect, clippedRing))
         {
             ctx.line.SetColor(t.focusColor.r, t.focusColor.g, t.focusColor.b, 80);
-            ctx.line.RoundedRectangle(static_cast<int>(clippedRing.x), static_cast<int>(clippedRing.y),
-                                       static_cast<int>(clippedRing.w), static_cast<int>(clippedRing.h),
-                                       3.0f, 6, false);
+            ctx.line.RoundedRectangle(clippedRing.x, clippedRing.y,
+                                      clippedRing.w, clippedRing.h, 3.0f, 6, false);
         }
     }
 
@@ -187,12 +170,12 @@ void Slider::updateFromMouse(float localX, float localY)
     if (orientation_ == LayoutDir::Vertical)
     {
         if (rect_.h <= 0.0f) return;
-        ratio = 1.0f - Clamp(localY / rect_.h, 0.0f, 1.0f);  // bottom=0, top=1
+        ratio = 1.0f - std::clamp(localY / rect_.h, 0.0f, 1.0f);
     }
     else
     {
         if (rect_.w <= 0.0f) return;
-        ratio = Clamp(localX / rect_.w, 0.0f, 1.0f);
+        ratio = std::clamp(localX / rect_.w, 0.0f, 1.0f);
     }
     setValue(min_ + ratio * (max_ - min_));
 }
@@ -206,7 +189,7 @@ ProgressBar::ProgressBar(float minVal, float maxVal, float value)
 
 void ProgressBar::setValue(float v)
 {
-    v = Clamp(v, min_, max_);
+    v = std::clamp(v, min_, max_);
     if (v != value_)
     {
         value_ = v;
@@ -245,10 +228,8 @@ void ProgressBar::paint(PaintContext& ctx)
     Rect clipped;
     if (ctx.clipRectIntersect(abs, clipped))
     {
-        ctx.fill.SetColor(t.sliderTrack.r, t.sliderTrack.g, t.sliderTrack.b, t.sliderTrack.a);
-        ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
-                                   3.0f, 6, true);
+        ctx.fill.SetColor(t.sliderTrack);
+        ctx.fill.RoundedRectangle(clipped.x, clipped.y, clipped.w, clipped.h, 3.0f, 6, true);
     }
 
     // Fill bar
@@ -260,10 +241,9 @@ void ProgressBar::paint(PaintContext& ctx)
         Rect clippedFill;
         if (ctx.clipRectIntersect(fillRect, clippedFill))
         {
-            ctx.fill.SetColor(barColor_.r, barColor_.g, barColor_.b, barColor_.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedFill.x), static_cast<int>(clippedFill.y),
-                                       static_cast<int>(clippedFill.w), static_cast<int>(clippedFill.h),
-                                       3.0f, 6, true);
+            ctx.fill.SetColor(barColor_);
+            ctx.fill.RoundedRectangle(clippedFill.x, clippedFill.y,
+                                      clippedFill.w, clippedFill.h, 3.0f, 6, true);
         }
     }
     else
@@ -273,32 +253,25 @@ void ProgressBar::paint(PaintContext& ctx)
         Rect clippedFill;
         if (ctx.clipRectIntersect(fillRect, clippedFill))
         {
-            ctx.fill.SetColor(barColor_.r, barColor_.g, barColor_.b, barColor_.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(clippedFill.x), static_cast<int>(clippedFill.y),
-                                       static_cast<int>(clippedFill.w), static_cast<int>(clippedFill.h),
-                                       3.0f, 6, true);
+            ctx.fill.SetColor(barColor_);
+            ctx.fill.RoundedRectangle(clippedFill.x, clippedFill.y,
+                                      clippedFill.w, clippedFill.h, 3.0f, 6, true);
         }
     }
 
     // Border
     if (ctx.clipRectIntersect(abs, clipped))
     {
-        ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
-        ctx.line.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
-                                   3.0f, 6, false);
+        ctx.line.SetColor(t.borderColor);
+        ctx.line.RoundedRectangle(clipped.x, clipped.y, clipped.w, clipped.h, 3.0f, 6, false);
     }
 
     // Status text (horizontal only)
     if (!text_.empty() && !vert)
     {
-        ctx.font.SetFontSize(t.fontSize * 0.8f);
-        ctx.font.SetColor(textColor_);
-        ctx.font.SetBatch(&ctx.text);
-
-        float textW = ctx.font.GetTextWidth(text_.c_str());
         float textH = ctx.font.GetFontSize();
-        float tx, ty = abs.y + (abs.h - textH) * 0.5f;
+        float textW = ctx.font.GetTextWidth(text_.c_str());
+        float tx, ty = abs.y + (abs.h + ctx.font.GetAscender()) * 0.5f;
 
         switch (textAlign_)
         {
@@ -314,596 +287,627 @@ void ProgressBar::paint(PaintContext& ctx)
             break;
         }
 
-        float fc[4];
-        ctx.fontClip(fc);
-        Font::ClipRect clip{fc[0], fc[1], fc[2], fc[3]};
-        ctx.font.Print(text_.c_str(), tx, ty, &clip);
+        ctx.font.SetColor(textColor_);
+        Rect textRect = {tx, ty - textH, textW, textH};
+        if (!ctx.isClipped(textRect))
+            ctx.font.Print(text_.c_str(), tx, ty);
     }
 
     Widget::paint(ctx);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ListBox - scrollable list of selectable items
+//  SpinBox
 // ═════════════════════════════════════════════════════════════════════════════
 
-static const std::string kEmptyItem;
-
-ListBox::ListBox()
+SpinBox::SpinBox(float minVal, float maxVal, float value, float step)
+    : min_(minVal), max_(maxVal), value_(value), step_(step)
 {
     acceptsFocus_ = true;
-    scrollable_   = true;
-    cursor_       = CursorType::Hand;
+    setSize(120, 28);
 }
 
-// ── Scrollbar helpers ────────────────────────────────────────────────────
-bool  ListBox::needsScrollBar() const { return totalHeight() > rect_.h; }
-float ListBox::totalHeight()    const { return items_.size() * rowHeight_; }
-float ListBox::maxScroll()      const { float m = totalHeight() - rect_.h; return m > 0 ? m : 0; }
-
-float ListBox::thumbLength(float trackH) const
+void SpinBox::setValue(float v)
 {
-    float total = totalHeight();
-    if (total <= 0) return trackH;
-    float len = (rect_.h / total) * trackH;
-    return len < 16.0f ? 16.0f : len;
-}
-
-float ListBox::thumbPos(float trackH) const
-{
-    float mx = maxScroll();
-    if (mx <= 0) return 0;
-    float tLen = thumbLength(trackH);
-    return (scrollOffset_ / mx) * (trackH - tLen);
-}
-
-void ListBox::addItem(const std::string& text)
-{
-    items_.push_back(text);
+    v = std::max(min_, std::min(max_, v));
+    if (v == value_) return;
+    value_ = v;
     markDirty();
+    onValueChanged.emit(value_);
 }
 
-void ListBox::insertItem(int index, const std::string& text)
+void SpinBox::setRange(float minVal, float maxVal)
 {
-    if (index < 0) index = 0;
-    if (index > static_cast<int>(items_.size())) index = static_cast<int>(items_.size());
-    items_.insert(items_.begin() + index, text);
-    if (selectedIndex_ >= index) ++selectedIndex_;
-    markDirty();
+    min_ = minVal;
+    max_ = maxVal;
+    setValue(value_);
 }
 
-void ListBox::removeItem(int index)
+float SpinBox::buttonWidth() const { return rect_.h; }
+
+std::string SpinBox::formatValue() const
 {
-    if (index < 0 || index >= static_cast<int>(items_.size())) return;
-    items_.erase(items_.begin() + index);
-    if (selectedIndex_ == index)
-    {
-        selectedIndex_ = -1;
-        selectionChanged.emit(-1);
-    }
-    else if (selectedIndex_ > index)
-        --selectedIndex_;
-    markDirty();
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.*f", decimals_, static_cast<double>(value_));
+    std::string result;
+    if (!prefix_.empty()) result += prefix_;
+    result += buf;
+    if (!suffix_.empty()) result += suffix_;
+    return result;
 }
 
-void ListBox::clear()
+SpinBox::HitZone SpinBox::hitZone(float localX) const
 {
-    items_.clear();
-    selectedIndex_ = -1;
-    scrollOffset_  = 0;
-    markDirty();
+    float bw = buttonWidth();
+    if (localX < bw)               return Minus;
+    if (localX > rect_.w - bw)     return Plus;
+    return Value;
 }
 
-const std::string& ListBox::itemText(int index) const
-{
-    if (index >= 0 && index < static_cast<int>(items_.size()))
-        return items_[index];
-    return kEmptyItem;
-}
+Widget::Vec2f SpinBox::sizeHint() const { return {120.0f, 28.0f}; }
 
-void ListBox::setItemText(int index, const std::string& text)
-{
-    if (index >= 0 && index < static_cast<int>(items_.size()))
-    {
-        items_[index] = text;
-        markDirty();
-    }
-}
-
-void ListBox::setSelectedIndex(int idx)
-{
-    if (idx < -1) idx = -1;
-    if (idx >= static_cast<int>(items_.size())) idx = static_cast<int>(items_.size()) - 1;
-    if (selectedIndex_ != idx)
-    {
-        selectedIndex_ = idx;
-        selectionChanged.emit(idx);
-        markDirty();
-    }
-}
-
-Widget::Vec2f ListBox::sizeHint() const
-{
-    const auto& t = Theme::instance();
-    float w = 120.0f;
-    for (auto& item : items_)
-    {
-        float tw = item.size() * t.fontSize * 0.6f + t.padding * 2;
-        if (tw > w) w = tw;
-    }
-    float h = std::min(static_cast<int>(items_.size()), 8) * rowHeight_ + 2;
-    return {w, h};
-}
-
-void ListBox::paint(PaintContext& ctx)
+void SpinBox::paint(PaintContext& ctx)
 {
     if (!visible_) return;
-
+    const auto& t = Theme::instance();
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
-
-    const auto& t = Theme::instance();
-    int n = static_cast<int>(items_.size());
-    bool sb = needsScrollBar();
-    float contentW = sb ? abs.w - t.scrollbarWidth : abs.w;
+    Rect clipped;
+    float bw = buttonWidth();
 
     // Background
-    Rect clipped;
-    if (ctx.clipRectIntersect(abs, clipped))
-    {
+    if (ctx.clipRectIntersect(abs, clipped)) {
         ctx.fill.SetColor(t.inputBg.r, t.inputBg.g, t.inputBg.b, t.inputBg.a);
-        ctx.fill.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                           static_cast<int>(clipped.w), static_cast<int>(clipped.h), true);
-
-        // Border (clipped to viewport)
-        Color brd = focused_ ? t.focusColor : (hovered_ ? t.inputBorderHover : t.inputBorder);
-        ctx.line.SetColor(brd.r, brd.g, brd.b, brd.a);
-        ctx.line.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                           static_cast<int>(clipped.w), static_cast<int>(clipped.h), false);
+        ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                   t.borderRadius, 6, true);
     }
 
-    // Clip items (leave space for scrollbar)
-    Rect itemClip = {abs.x, abs.y, contentW, abs.h};
-    ctx.pushClip(itemClip);
-
-    int firstVisible = static_cast<int>(scrollOffset_ / rowHeight_);
-    int lastVisible  = static_cast<int>((scrollOffset_ + abs.h) / rowHeight_) + 1;
-    if (firstVisible < 0) firstVisible = 0;
-    if (lastVisible > n)  lastVisible  = n;
-
-    for (int i = firstVisible; i < lastVisible; ++i)
-    {
-        float ry = abs.y + i * rowHeight_ - scrollOffset_;
-        Rect rowR = {abs.x, ry, contentW, rowHeight_};
-
-        if (ctx.isClipped(rowR)) continue;
-
-        // Selection highlight
-        if (i == selectedIndex_)
-        {
-            Rect selClip;
-            if (ctx.clipRectIntersect(rowR, selClip))
-            {
-                ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g,
-                                  t.selectionColor.b, t.selectionColor.a);
-                ctx.fill.Rectangle(static_cast<int>(selClip.x), static_cast<int>(selClip.y),
-                                   static_cast<int>(selClip.w), static_cast<int>(selClip.h), true);
-            }
-        }
-
-        // Item text
-        ctx.font.SetFontSize(t.fontSize * 0.9f);
-        ctx.font.SetColor(i == selectedIndex_ ? t.textColor : t.textDisabled);
-        ctx.font.SetBatch(&ctx.text);
-        float tx = abs.x + t.padding;
-        float ty = ry + (rowHeight_ - t.fontSize * 0.9f) * 0.5f;
-
-        float fc[4];
-        ctx.fontClip(fc);
-        Font::ClipRect clip{fc[0], fc[1], fc[2], fc[3]};
-        ctx.font.Print(items_[i].c_str(), tx, ty, &clip);
+    // Minus button
+    Rect minusR = {abs.x, abs.y, bw, abs.h};
+    if (ctx.clipRectIntersect(minusR, clipped)) {
+        ctx.fill.SetColor(t.buttonNormal.r, t.buttonNormal.g, t.buttonNormal.b, t.buttonNormal.a);
+        ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                   t.borderRadius, 6, true);
     }
+    // Minus glyph
+    float mcy = abs.y + abs.h * 0.5f;
+    float mcx = abs.x + bw * 0.5f;
+    ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a);
+    ctx.line.Line2D(mcx - 4, mcy, mcx + 4, mcy);
 
-    ctx.popClip();
+    // Plus button
+    Rect plusR = {abs.x + abs.w - bw, abs.y, bw, abs.h};
+    if (ctx.clipRectIntersect(plusR, clipped)) {
+        ctx.fill.SetColor(t.buttonNormal.r, t.buttonNormal.g, t.buttonNormal.b, t.buttonNormal.a);
+        ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                   t.borderRadius, 6, true);
+    }
+    // Plus glyph
+    float pcx = abs.x + abs.w - bw * 0.5f;
+    float pcy = abs.y + abs.h * 0.5f;
+    ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a);
+    ctx.line.Line2D(pcx - 4, pcy, pcx + 4, pcy);
+    ctx.line.Line2D(pcx, pcy - 4, pcx, pcy + 4);
 
-    // ── Scrollbar ────────────────────────────────────────────────────────
-    if (sb)
-    {
-        float sbX = abs.x + contentW;
-        Rect trackRect = {sbX, abs.y, t.scrollbarWidth, abs.h};
+    // Value text
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    std::string txt = formatValue();
+    float tw = ctx.font.GetTextWidth(txt.c_str());
+    float asc = ctx.font.GetAscender();
+    float tx = abs.x + bw + (abs.w - 2 * bw - tw) * 0.5f;
+    float ty = abs.y + (abs.h + asc) * 0.5f;
+    ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
+    ctx.font.Print(txt.c_str(), tx, ty);
 
-        // Track
-        Rect trackClip;
-        if (ctx.clipRectIntersect(trackRect, trackClip))
-        {
-            ctx.fill.SetColor(t.sliderTrack.r, t.sliderTrack.g, t.sliderTrack.b, t.sliderTrack.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(trackClip.x), static_cast<int>(trackClip.y),
-                                       static_cast<int>(trackClip.w), static_cast<int>(trackClip.h),
-                                       3.0f, 4, true);
-        }
-
-        // Thumb
-        float tLen = thumbLength(abs.h);
-        float tPos = thumbPos(abs.h);
-        Rect thumbRect = {sbX + 1, abs.y + tPos, t.scrollbarWidth - 2, tLen};
-
-        Rect thumbClip;
-        if (ctx.clipRectIntersect(thumbRect, thumbClip))
-        {
-            Color thumbC = draggingThumb_ ? t.sliderThumbPressed : (hovered_ ? t.sliderThumbHover : t.sliderThumb);
-            ctx.fill.SetColor(thumbC.r, thumbC.g, thumbC.b, thumbC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(thumbClip.x), static_cast<int>(thumbClip.y),
-                                       static_cast<int>(thumbClip.w), static_cast<int>(thumbClip.h),
-                                       3.0f, 4, true);
-        }
+    // Border
+    Color bc = isFocused() ? t.focusColor : (isHovered() ? t.inputBorderHover : t.inputBorder);
+    if (ctx.clipRectIntersect(abs, clipped)) {
+        ctx.line.SetColor(bc.r, bc.g, bc.b, bc.a);
+        ctx.line.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                   t.borderRadius, 6, false);
     }
 }
 
-void ListBox::onMousePress(MouseEvent& e)
+void SpinBox::onMousePress(MouseEvent& e)
 {
-    if (!enabled_) return;
-
-    const auto& t = Theme::instance();
-    Rect abs = absoluteRect();
-
-    // Click on scrollbar?
-    if (needsScrollBar())
-    {
-        float sbX = abs.x + abs.w - t.scrollbarWidth;
-        if (e.x >= sbX)
-        {
-            float localY = e.y - abs.y;
-            float tPos = thumbPos(abs.h);
-            float tLen = thumbLength(abs.h);
-
-            if (localY >= tPos && localY <= tPos + tLen)
-            {
-                draggingThumb_ = true;
-                dragOffset_ = localY - tPos;
-            }
-            else
-            {
-                // Page jump
-                float pageSize = rect_.h * 0.8f;
-                if (localY < tPos)
-                    scrollOffset_ -= pageSize;
-                else
-                    scrollOffset_ += pageSize;
-                float mx = maxScroll();
-                if (scrollOffset_ < 0) scrollOffset_ = 0;
-                if (scrollOffset_ > mx) scrollOffset_ = mx;
-                markDirty();
-            }
-            e.consumed = true;
-            return;
-        }
+    auto zone = hitZone(e.localX);
+    if (zone == Minus) {
+        setValue(value_ - step_);
+    } else if (zone == Plus) {
+        setValue(value_ + step_);
+    } else {
+        // Start drag on value area
+        dragging_   = true;
+        dragStartY_ = e.y;
+        dragStartV_ = value_;
     }
-
-    float localY = e.y - abs.y + scrollOffset_;
-    int idx = static_cast<int>(localY / rowHeight_);
-
-    if (idx >= 0 && idx < static_cast<int>(items_.size()))
-        setSelectedIndex(idx);
-
     e.consumed = true;
 }
 
-void ListBox::onMouseScroll(MouseEvent& e)
+void SpinBox::onMouseRelease(MouseEvent& e)
 {
-    float totalH = items_.size() * rowHeight_;
-    float viewH  = rect_.h;
-    if (totalH <= viewH) { scrollOffset_ = 0; return; }
-
-    scrollOffset_ -= e.scrollY * rowHeight_ * 0.5f;
-    if (scrollOffset_ < 0) scrollOffset_ = 0;
-    if (scrollOffset_ > totalH - viewH) scrollOffset_ = totalH - viewH;
-
+    dragging_ = false;
     e.consumed = true;
-    markDirty();
 }
 
-void ListBox::onMouseRelease(MouseEvent& e)
+void SpinBox::onMouseMove(MouseEvent& e)
 {
-    if (draggingThumb_)
-    {
-        draggingThumb_ = false;
-        markDirty();
+    if (dragging_) {
+        float dy = dragStartY_ - e.y;  // up = increase
+        float delta = dy * step_ * dragSens_;
+        setValue(dragStartV_ + delta);
         e.consumed = true;
     }
 }
 
-void ListBox::onMouseMove(MouseEvent& e)
+void SpinBox::onMouseScroll(MouseEvent& e)
 {
-    if (draggingThumb_)
-    {
-        Rect abs = absoluteRect();
-        float localY = e.y - abs.y;
-        float tLen = thumbLength(abs.h);
-        float trackSpace = abs.h - tLen;
-        if (trackSpace > 0)
-        {
-            float ratio = (localY - dragOffset_) / trackSpace;
-            if (ratio < 0) ratio = 0;
-            if (ratio > 1) ratio = 1;
-            scrollOffset_ = ratio * maxScroll();
-        }
+    if (isHovered() || isFocused()) {
+        setValue(value_ + e.scrollY * step_);
         e.consumed = true;
-        markDirty();
+    }
+}
+
+void SpinBox::onKeyPress(KeyEvent& e)
+{
+    if (e.key == BuGUI::Key::Up) {
+        setValue(value_ + step_);
+        e.consumed = true;
+    } else if (e.key == BuGUI::Key::Down) {
+        setValue(value_ - step_);
+        e.consumed = true;
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ComboBox - dropdown selector
+//  CalendarPopup_ — internal popup for DatePicker
 // ═════════════════════════════════════════════════════════════════════════════
 
-// ── Internal popup widget ────────────────────────────────────────────────
-class ComboPopup_ : public Widget
+static int daysInMonth(int year, int month)
+{
+    static const int d[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+    if (month == 2 && (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)))
+        return 29;
+    return d[month];
+}
+
+static int dayOfWeek(int year, int month, int day)
+{
+    // Tomohiko Sakamoto's algorithm (0=Sun, 1=Mon, ..., 6=Sat)
+    static const int t[] = {0,3,2,5,0,3,5,1,4,6,2,4};
+    if (month < 3) year--;
+    return (year + year/4 - year/100 + year/400 + t[month-1] + day) % 7;
+}
+
+class CalendarPopup_ : public Widget
 {
 public:
-    ComboPopup_(ComboBox* owner, const std::vector<std::string>& items,
-                int selected, int maxVis, float rowH)
-        : owner_(owner), items_(items), selected_(selected), rowHeight_(rowH)
+    CalendarPopup_(DatePicker* owner, const Date& d)
+        : owner_(owner), viewYear_(d.year), viewMonth_(d.month), selected_(d)
     {
         acceptsFocus_ = true;
-        scrollable_   = true;
-        int vis = std::min(static_cast<int>(items.size()), maxVis);
-        float h = vis * rowH + 2;
-        // rect_ is set by caller in absolute coords
-        (void)h; // height set externally
+        yearPageStart_ = (d.year / 12) * 12;  // page of 12 years
+    }
+
+    bool popupContains(float x, float y) const override
+    {
+        Rect abs = absoluteRect();
+        return abs.contains(x, y);
     }
 
     void paint(PaintContext& ctx) override
     {
-        Rect abs = absoluteRect();
         const auto& t = Theme::instance();
+        Rect abs = absoluteRect();
+        Rect clipped;
 
         // Background + border
-        ctx.fill.SetColor(t.panelColor.r, t.panelColor.g, t.panelColor.b, 255);
-        ctx.fill.RoundedRectangle(static_cast<int>(abs.x), static_cast<int>(abs.y),
-                                   static_cast<int>(abs.w), static_cast<int>(abs.h),
-                                   t.borderRadius, 6, true);
-        ctx.line.SetColor(t.inputBorderHover.r, t.inputBorderHover.g, t.inputBorderHover.b, 255);
-        ctx.line.Rectangle(static_cast<int>(abs.x), static_cast<int>(abs.y),
-                           static_cast<int>(abs.w), static_cast<int>(abs.h), false);
+        if (ctx.clipRectIntersect(abs, clipped)) {
+            ctx.fill.SetColor(t.panelColor.r, t.panelColor.g, t.panelColor.b, 250);
+            ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                       static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                       t.borderRadius, 6, true);
+            ctx.line.SetColor(t.inputBorderHover.r, t.inputBorderHover.g, t.inputBorderHover.b, 255);
+            ctx.line.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                       static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                       t.borderRadius, 6, false);
+        }
 
-        // Items
         ctx.pushClip(abs);
-        int n = static_cast<int>(items_.size());
-        int first = static_cast<int>(scrollOff_ / rowHeight_);
-        int last  = static_cast<int>((scrollOff_ + abs.h) / rowHeight_) + 1;
-        if (first < 0) first = 0;
-        if (last > n)  last  = n;
 
-        for (int i = first; i < last; ++i)
-        {
-            float ry = abs.y + i * rowHeight_ - scrollOff_;
-            Rect rowR = {abs.x, ry, abs.w, rowHeight_};
-            if (ctx.isClipped(rowR)) continue;
+        if (mode_ == YearPick)
+            paintYearPicker(ctx, abs);
+        else
+            paintCalendar(ctx, abs);
 
-            // Hover / selected highlight
-            bool isHov = (i == hovered_);
-            bool isSel = (i == selected_);
-            if (isHov || isSel)
-            {
+        ctx.popClip();
+    }
+
+    // ── Calendar (day) view ──────────────────────────────────────────────
+    void paintCalendar(PaintContext& ctx, const Rect& abs)
+    {
+        const auto& t = Theme::instance();
+        float pad   = 8.0f;
+        float cellW = (abs.w - pad * 2) / 7.0f;
+        float cellH = 22.0f;
+        float headerH = 28.0f;
+
+        ctx.font.SetFontSize(t.fontSize);
+        ctx.font.SetBatch(&ctx.text);
+        float asc = ctx.font.GetAscender();
+
+        float hx = abs.x + pad;
+        float hy = abs.y + pad;
+
+        // Left arrow  — prev month
+        arrowLeftRect_ = {hx, hy, cellW, headerH};
+        ctx.font.SetColor(t.focusColor);
+        float tw = ctx.font.GetTextWidth("<");
+        ctx.font.Print("<", hx + (cellW - tw) * 0.5f, hy + (headerH + asc) * 0.5f);
+
+        // Right arrow — next month
+        float rx = abs.x + abs.w - pad - cellW;
+        arrowRightRect_ = {rx, hy, cellW, headerH};
+        tw = ctx.font.GetTextWidth(">");
+        ctx.font.Print(">", rx + (cellW - tw) * 0.5f, hy + (headerH + asc) * 0.5f);
+
+        // Month + year label (clickable — switches to year picker)
+        static const char* months[] = {"", "Jan","Feb","Mar","Apr","May","Jun",
+                                           "Jul","Aug","Sep","Oct","Nov","Dec"};
+        char label[32];
+        std::snprintf(label, sizeof(label), "%s %d", months[viewMonth_], viewYear_);
+        ctx.font.SetColor(t.focusColor);  // hint it's clickable
+        tw = ctx.font.GetTextWidth(label);
+        float lx = abs.x + (abs.w - tw) * 0.5f;
+        float ly = hy + (headerH + asc) * 0.5f;
+        ctx.font.Print(label, lx, ly);
+        headerLabelRect_ = {lx - 4, hy, tw + 8, headerH};
+
+        // Day-of-week headers
+        float dy = hy + headerH + 4;
+        static const char* dow[] = {"Su","Mo","Tu","We","Th","Fr","Sa"};
+        ctx.font.SetColor(Color(140, 140, 160, 255));
+        for (int i = 0; i < 7; ++i) {
+            float dx = abs.x + pad + i * cellW;
+            tw = ctx.font.GetTextWidth(dow[i]);
+            ctx.font.Print(dow[i], dx + (cellW - tw) * 0.5f, dy + (cellH + asc) * 0.5f);
+        }
+
+        // Day grid
+        int numDays = daysInMonth(viewYear_, viewMonth_);
+        int startDow = dayOfWeek(viewYear_, viewMonth_, 1);
+        float gy = dy + cellH + 2;
+
+        int row = 0, col = startDow;
+        for (int d = 1; d <= numDays; ++d) {
+            float gx = abs.x + pad + col * cellW;
+            float cy2 = gy + row * cellH;
+            bool isSel = (d == selected_.day && viewMonth_ == selected_.month && viewYear_ == selected_.year);
+
+            if (isSel) {
+                Rect cellR = {gx, cy2, cellW, cellH};
                 Rect rc;
-                if (ctx.clipRectIntersect(rowR, rc))
-                {
-                    Color c = isSel ? t.selectionColor : Color(t.buttonHover.r, t.buttonHover.g, t.buttonHover.b, 120);
-                    ctx.fill.SetColor(c.r, c.g, c.b, c.a);
-                    ctx.fill.Rectangle(static_cast<int>(rc.x), static_cast<int>(rc.y),
-                                       static_cast<int>(rc.w), static_cast<int>(rc.h), true);
+                if (ctx.clipRectIntersect(cellR, rc)) {
+                    ctx.fill.SetColor(t.focusColor.r, t.focusColor.g, t.focusColor.b, 200);
+                    ctx.fill.RoundedRectangle(static_cast<int>(rc.x + 2), static_cast<int>(rc.y + 1),
+                                               static_cast<int>(rc.w - 4), static_cast<int>(rc.h - 2),
+                                               3, 4, true);
                 }
             }
 
-            ctx.font.SetFontSize(t.fontSize);
-            ctx.font.SetColor(t.textColor);
-            ctx.font.SetBatch(&ctx.text);
-            float fc[4]; ctx.fontClip(fc);
-            Font::ClipRect clip{fc[0], fc[1], fc[2], fc[3]};
-            ctx.font.Print(items_[i].c_str(), abs.x + t.padding, ry + (rowHeight_ - t.fontSize) * 0.5f, &clip);
+            char buf[4];
+            std::snprintf(buf, sizeof(buf), "%d", d);
+            tw = ctx.font.GetTextWidth(buf);
+            ctx.font.SetColor(isSel ? Color(255,255,255,255) : t.textColor);
+            ctx.font.Print(buf, gx + (cellW - tw) * 0.5f, cy2 + (cellH + asc) * 0.5f);
+
+            col++;
+            if (col >= 7) { col = 0; row++; }
         }
-        ctx.popClip();
+
+        gridY_        = gy;
+        gridStartX_   = abs.x + pad;
+        gridCellW_    = cellW;
+        gridCellH_    = cellH;
+        gridStartDow_ = startDow;
+    }
+
+    // ── Year picker view (4×3 grid of 12 years) ─────────────────────────
+    void paintYearPicker(PaintContext& ctx, const Rect& abs)
+    {
+        const auto& t = Theme::instance();
+        float pad     = 8.0f;
+        float headerH = 28.0f;
+        float cellW   = (abs.w - pad * 2) / 4.0f;
+        float cellH   = 28.0f;
+
+        ctx.font.SetFontSize(t.fontSize);
+        ctx.font.SetBatch(&ctx.text);
+        float asc = ctx.font.GetAscender();
+
+        float hx = abs.x + pad;
+        float hy = abs.y + pad;
+
+        // Left arrow — prev 12 years
+        arrowLeftRect_ = {hx, hy, cellW, headerH};
+        ctx.font.SetColor(t.focusColor);
+        float tw = ctx.font.GetTextWidth("<");
+        ctx.font.Print("<", hx + (cellW - tw) * 0.5f, hy + (headerH + asc) * 0.5f);
+
+        // Right arrow — next 12 years
+        float rx = abs.x + abs.w - pad - cellW;
+        arrowRightRect_ = {rx, hy, cellW, headerH};
+        tw = ctx.font.GetTextWidth(">");
+        ctx.font.Print(">", rx + (cellW - tw) * 0.5f, hy + (headerH + asc) * 0.5f);
+
+        // Range label
+        char rangeLabel[32];
+        std::snprintf(rangeLabel, sizeof(rangeLabel), "%d - %d", yearPageStart_, yearPageStart_ + 11);
+        ctx.font.SetColor(t.textColor);
+        tw = ctx.font.GetTextWidth(rangeLabel);
+        ctx.font.Print(rangeLabel, abs.x + (abs.w - tw) * 0.5f, hy + (headerH + asc) * 0.5f);
+
+        // 4×3 year grid
+        float gy = hy + headerH + 8;
+        yrGridY_     = gy;
+        yrGridX_     = abs.x + pad;
+        yrGridCellW_ = cellW;
+        yrGridCellH_ = cellH;
+
+        for (int i = 0; i < 12; ++i) {
+            int yr  = yearPageStart_ + i;
+            int col = i % 4;
+            int row = i / 4;
+            float gx  = abs.x + pad + col * cellW;
+            float cy2 = gy + row * cellH;
+
+            bool isSel = (yr == viewYear_);
+            if (isSel) {
+                Rect cellR = {gx, cy2, cellW, cellH};
+                Rect rc;
+                if (ctx.clipRectIntersect(cellR, rc)) {
+                    ctx.fill.SetColor(t.focusColor.r, t.focusColor.g, t.focusColor.b, 200);
+                    ctx.fill.RoundedRectangle(static_cast<int>(rc.x + 2), static_cast<int>(rc.y + 1),
+                                               static_cast<int>(rc.w - 4), static_cast<int>(rc.h - 2),
+                                               3, 4, true);
+                }
+            }
+
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "%d", yr);
+            tw = ctx.font.GetTextWidth(buf);
+            ctx.font.SetColor(isSel ? Color(255,255,255,255) : t.textColor);
+            ctx.font.Print(buf, gx + (cellW - tw) * 0.5f, cy2 + (cellH + asc) * 0.5f);
+        }
     }
 
     void onMousePress(MouseEvent& e) override
     {
-        Rect abs = absoluteRect();
-        float localY = e.y - abs.y + scrollOff_;
-        int idx = static_cast<int>(localY / rowHeight_);
-        if (idx >= 0 && idx < static_cast<int>(items_.size()))
-        {
-            owner_->setSelectedIndex(idx);
-        }
-        owner_->closeDropdown();
-        e.consumed = true;
+        if (mode_ == YearPick)
+            onMousePressYear(e);
+        else
+            onMousePressCalendar(e);
     }
 
-    void onMouseMove(MouseEvent& e) override
+    void onMousePressCalendar(MouseEvent& e)
     {
-        Rect abs = absoluteRect();
-        float localY = e.y - abs.y + scrollOff_;
-        int idx = static_cast<int>(localY / rowHeight_);
-        if (idx < 0 || idx >= static_cast<int>(items_.size())) idx = -1;
-        if (idx != hovered_)
-        {
-            hovered_ = idx;
+        // Header label click → switch to year picker
+        if (headerLabelRect_.contains(e.x, e.y)) {
+            mode_ = YearPick;
+            yearPageStart_ = (viewYear_ / 12) * 12;
             markDirty();
+            e.consumed = true;
+            return;
         }
-    }
 
-    void onMouseScroll(MouseEvent& e) override
-    {
-        float totalH = items_.size() * rowHeight_;
-        float viewH  = rect_.h;
-        if (totalH <= viewH) return;
-        scrollOff_ -= e.scrollY * rowHeight_ * 0.5f;
-        if (scrollOff_ < 0) scrollOff_ = 0;
-        float mx = totalH - viewH;
-        if (scrollOff_ > mx) scrollOff_ = mx;
+        // Left arrow
+        if (arrowLeftRect_.contains(e.x, e.y)) {
+            viewMonth_--;
+            if (viewMonth_ < 1) { viewMonth_ = 12; viewYear_--; }
+            markDirty();
+            e.consumed = true;
+            return;
+        }
+        // Right arrow
+        if (arrowRightRect_.contains(e.x, e.y)) {
+            viewMonth_++;
+            if (viewMonth_ > 12) { viewMonth_ = 1; viewYear_++; }
+            markDirty();
+            e.consumed = true;
+            return;
+        }
+
+        // Day grid
+        if (e.y >= gridY_) {
+            int col = static_cast<int>((e.x - gridStartX_) / gridCellW_);
+            int row = static_cast<int>((e.y - gridY_) / gridCellH_);
+            if (col >= 0 && col < 7) {
+                int day = row * 7 + col - gridStartDow_ + 1;
+                int numDays = daysInMonth(viewYear_, viewMonth_);
+                if (day >= 1 && day <= numDays) {
+                    Date nd{viewYear_, viewMonth_, day};
+                    owner_->setDate(nd);
+                    owner_->closeCalendar();
+                    e.consumed = true;
+                    return;
+                }
+            }
+        }
         e.consumed = true;
-        markDirty();
     }
 
-    void onMouseLeave() override
+    void onMousePressYear(MouseEvent& e)
     {
-        hovered_ = -1;
-        markDirty();
+        // Left arrow — prev 12
+        if (arrowLeftRect_.contains(e.x, e.y)) {
+            yearPageStart_ -= 12;
+            markDirty();
+            e.consumed = true;
+            return;
+        }
+        // Right arrow — next 12
+        if (arrowRightRect_.contains(e.x, e.y)) {
+            yearPageStart_ += 12;
+            markDirty();
+            e.consumed = true;
+            return;
+        }
+
+        // Year grid hit
+        if (e.y >= yrGridY_) {
+            int col = static_cast<int>((e.x - yrGridX_) / yrGridCellW_);
+            int row = static_cast<int>((e.y - yrGridY_) / yrGridCellH_);
+            if (col >= 0 && col < 4 && row >= 0 && row < 3) {
+                int idx = row * 4 + col;
+                viewYear_ = yearPageStart_ + idx;
+                mode_ = Calendar;
+                markDirty();
+                e.consumed = true;
+                return;
+            }
+        }
+        e.consumed = true;
+    }
+
+    void onKeyPress(KeyEvent& e) override
+    {
+        if (e.key == BuGUI::Key::Escape) {
+            if (mode_ == YearPick) {
+                mode_ = Calendar;
+                markDirty();
+            } else {
+                owner_->closeCalendar();
+            }
+            e.consumed = true;
+        }
     }
 
 private:
-    ComboBox* owner_;
-    std::vector<std::string> items_;
-    int   selected_ = -1;
-    int   hovered_  = -1;
-    float rowHeight_ = 24.0f;
-    float scrollOff_ = 0.0f;
+    DatePicker* owner_;
+    int  viewYear_, viewMonth_;
+    Date selected_;
+
+    enum Mode { Calendar, YearPick };
+    Mode mode_ = Calendar;
+
+    // Calendar hit-test
+    Rect arrowLeftRect_{}, arrowRightRect_{}, headerLabelRect_{};
+    float gridY_       = 0;
+    float gridStartX_  = 0;
+    float gridCellW_   = 0;
+    float gridCellH_   = 0;
+    int   gridStartDow_ = 0;
+
+    // Year picker hit-test
+    int   yearPageStart_ = 2020;
+    float yrGridY_     = 0;
+    float yrGridX_     = 0;
+    float yrGridCellW_ = 0;
+    float yrGridCellH_ = 0;
 };
 
-// ── ComboBox implementation ──────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+//  DatePicker
+// ═════════════════════════════════════════════════════════════════════════════
 
-static const std::string kEmptyCombo;
-
-ComboBox::ComboBox()
+DatePicker::DatePicker()
 {
     acceptsFocus_ = true;
-    cursor_ = CursorType::Hand;
+    setSize(150, 28);
 }
 
-void ComboBox::addItem(const std::string& text)     { items_.push_back(text); markDirty(); }
-void ComboBox::insertItem(int index, const std::string& text)
+void DatePicker::setDate(const Date& d)
 {
-    if (index < 0) index = 0;
-    if (index > static_cast<int>(items_.size())) index = static_cast<int>(items_.size());
-    items_.insert(items_.begin() + index, text);
-    if (selectedIndex_ >= index) ++selectedIndex_;
+    if (d == date_) return;
+    date_ = d;
     markDirty();
-}
-void ComboBox::removeItem(int index)
-{
-    if (index < 0 || index >= static_cast<int>(items_.size())) return;
-    items_.erase(items_.begin() + index);
-    if (selectedIndex_ == index) { selectedIndex_ = -1; selectionChanged.emit(-1); }
-    else if (selectedIndex_ > index) --selectedIndex_;
-    markDirty();
-}
-void ComboBox::clear()                { items_.clear(); selectedIndex_ = -1; markDirty(); }
-
-const std::string& ComboBox::itemText(int index) const
-{
-    if (index >= 0 && index < static_cast<int>(items_.size())) return items_[index];
-    return kEmptyCombo;
+    onDateChanged.emit(d.year, d.month, d.day);
 }
 
-void ComboBox::setItemText(int index, const std::string& text)
+void DatePicker::setDate(int year, int month, int day)
 {
-    if (index >= 0 && index < static_cast<int>(items_.size()))
-    { items_[index] = text; markDirty(); }
+    setDate(Date{year, month, day});
 }
 
-const std::string& ComboBox::currentText() const
+std::string DatePicker::formatDate() const
 {
-    return itemText(selectedIndex_);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", date_.year, date_.month, date_.day);
+    return buf;
 }
 
-void ComboBox::setSelectedIndex(int idx)
-{
-    if (idx < -1) idx = -1;
-    if (idx >= static_cast<int>(items_.size())) idx = static_cast<int>(items_.size()) - 1;
-    if (selectedIndex_ != idx)
-    {
-        selectedIndex_ = idx;
-        selectionChanged.emit(idx);
-        markDirty();
-    }
-}
+Widget::Vec2f DatePicker::sizeHint() const { return {150.0f, 28.0f}; }
 
-Widget::Vec2f ComboBox::sizeHint() const
-{
-    const auto& t = Theme::instance();
-    float w = 100.0f;
-    for (auto& it : items_)
-    {
-        float tw = it.size() * t.fontSize * 0.6f + t.padding * 3 + 16; // +16 for arrow
-        if (tw > w) w = tw;
-    }
-    return {w, t.fontSize + t.padding * 2};
-}
-
-void ComboBox::paint(PaintContext& ctx)
+void DatePicker::paint(PaintContext& ctx)
 {
     if (!visible_) return;
+    const auto& t = Theme::instance();
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
-
-    const auto& t = Theme::instance();
-
-    // Background + Border (clipped to viewport)
     Rect clipped;
-    if (ctx.clipRectIntersect(abs, clipped))
-    {
-        Color bg = pressed_ ? t.buttonPressed : (hovered_ ? t.buttonHover : t.buttonNormal);
-        ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
+
+    // Background
+    if (ctx.clipRectIntersect(abs, clipped)) {
+        ctx.fill.SetColor(t.inputBg.r, t.inputBg.g, t.inputBg.b, t.inputBg.a);
         ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
                                    static_cast<int>(clipped.w), static_cast<int>(clipped.h),
                                    t.borderRadius, 6, true);
-
-        Color brd = focused_ ? t.focusColor : (hovered_ ? t.inputBorderHover : t.buttonBorder);
-        ctx.line.SetColor(brd.r, brd.g, brd.b, brd.a);
-        ctx.line.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                           static_cast<int>(clipped.w), static_cast<int>(clipped.h), false);
     }
 
     // Text
-    if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(items_.size()))
-    {
-        ctx.font.SetFontSize(t.fontSize);
-        ctx.font.SetColor(t.textColor);
-        ctx.font.SetBatch(&ctx.text);
-        float ty = abs.y + (abs.h - t.fontSize) * 0.5f;
-        float fc[4]; ctx.fontClip(fc);
-        Font::ClipRect clip{fc[0], fc[1], fc[2], fc[3]};
-        ctx.font.Print(items_[selectedIndex_].c_str(), abs.x + t.padding, ty, &clip);
-    }
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    std::string txt = formatDate();
+    float asc = ctx.font.GetAscender();
+    ctx.font.SetColor(t.textColor);
+    ctx.font.Print(txt.c_str(), abs.x + t.padding, abs.y + (abs.h + asc) * 0.5f);
 
-    // Arrow (chevron ▼)
-    float arrowSz = 6.0f;
-    float ax = abs.x + abs.w - t.padding - arrowSz * 2;
-    float ay = abs.y + abs.h * 0.5f - arrowSz * 0.3f;
-    ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a);
-    ctx.line.Line2D(static_cast<int>(ax), static_cast<int>(ay),
-                    static_cast<int>(ax + arrowSz), static_cast<int>(ay + arrowSz));
-    ctx.line.Line2D(static_cast<int>(ax + arrowSz), static_cast<int>(ay + arrowSz),
-                    static_cast<int>(ax + arrowSz * 2), static_cast<int>(ay));
+    // Calendar icon (small grid hint)
+    float ix = abs.x + abs.w - 20;
+    float iy = abs.y + abs.h * 0.5f;
+    ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, 160);
+    ctx.line.Rectangle(static_cast<int>(ix), static_cast<int>(iy - 5),
+                       12, 10, false);
+    ctx.line.Line2D(ix, iy - 2, ix + 12, iy - 2);
+
+    // Border
+    Color bc = isFocused() ? t.focusColor : (isHovered() ? t.inputBorderHover : t.inputBorder);
+    if (ctx.clipRectIntersect(abs, clipped)) {
+        ctx.line.SetColor(bc.r, bc.g, bc.b, bc.a);
+        ctx.line.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
+                                   static_cast<int>(clipped.w), static_cast<int>(clipped.h),
+                                   t.borderRadius, 6, false);
+    }
 }
 
-void ComboBox::onMousePress(MouseEvent& e)
+void DatePicker::onMousePress(MouseEvent& e)
 {
     if (!enabled_) return;
-    if (open_)
-        closeDropdown();
-    else
-        openDropdown();
+    if (open_) closeCalendar(); else openCalendar();
     e.consumed = true;
 }
 
-void ComboBox::openDropdown()
+void DatePicker::openCalendar()
 {
-    if (open_ || items_.empty()) return;
+    if (open_) return;
     open_ = true;
 
     Rect abs = absoluteRect();
-    float rowH = 24.0f;
-    int vis = std::min(static_cast<int>(items_.size()), maxVisible_);
-    float popH = vis * rowH + 2;
+    float popW = 7 * 32.0f + 16;  // 7 cols * ~32px + padding
+    float popH = 8 * 22.0f + 40;  // header + dow + 6 rows + padding
 
-    auto* popup = new ComboPopup_(this, items_, selectedIndex_, maxVisible_, rowH);
-    popup->setRect({abs.x, abs.y + abs.h, abs.w, popH});
-
+    auto* popup = new CalendarPopup_(this, date_);
+    popup->setRect({abs.x, abs.y + abs.h + 2, popW, popH});
     WidgetApp::instance().showPopup(popup, this);
     markDirty();
 }
 
-void ComboBox::closeDropdown()
+void DatePicker::closeCalendar()
 {
     if (!open_) return;
     open_ = false;
@@ -912,743 +916,221 @@ void ComboBox::closeDropdown()
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  ListWidget - scrollable list with widget rows
+//  TimePicker
 // ═════════════════════════════════════════════════════════════════════════════
 
-ListWidget::ListWidget()
+TimePicker::TimePicker()
 {
     acceptsFocus_ = true;
-    scrollable_   = true;
+    setSize(130, 28);
 }
 
-void ListWidget::addRowWidget(Widget* w)
+void TimePicker::setTime(const Time& t)
 {
-    w->setSize(0, rowHeight_);
-    addChild(w);
-}
-
-void ListWidget::removeRow(int index)
-{
-    if (index < 0 || index >= static_cast<int>(children_.size())) return;
-    Widget* w = children_[index];
-    removeChild(w);  // removeChild already deletes
-    if (selectedIndex_ == index) { selectedIndex_ = -1; selectionChanged.emit(-1); }
-    else if (selectedIndex_ > index) --selectedIndex_;
+    if (t == time_) return;
+    time_ = t;
     markDirty();
+    onTimeChanged.emit(t.hour, t.minute, t.second);
 }
 
-void ListWidget::clearRows()
+void TimePicker::setTime(int h, int m, int s)
 {
-    while (!children_.empty())
-        removeChild(children_.back());  // removeChild already deletes
-    selectedIndex_ = -1;
-    scrollOffset_  = 0;
-    markDirty();
+    setTime(Time{
+        std::max(0, std::min(23, h)),
+        std::max(0, std::min(59, m)),
+        std::max(0, std::min(59, s))
+    });
 }
 
-Widget* ListWidget::row(int index) const
+float TimePicker::fieldWidth() const
 {
-    if (index >= 0 && index < static_cast<int>(children_.size())) return children_[index];
-    return nullptr;
+    return 30.0f;
 }
 
-void ListWidget::setSelectedIndex(int idx)
+float TimePicker::separatorWidth() const
 {
-    if (idx < -1) idx = -1;
-    if (idx >= static_cast<int>(children_.size())) idx = static_cast<int>(children_.size()) - 1;
-    if (selectedIndex_ != idx)
-    {
-        selectedIndex_ = idx;
-        selectionChanged.emit(idx);
-        markDirty();
+    return 12.0f;
+}
+
+TimePicker::Field TimePicker::hitField(float localX) const
+{
+    float fw = fieldWidth();
+    float sw = separatorWidth();
+    float pad = 6.0f;
+    if (localX < pad + fw) return Hour;
+    if (localX < pad + fw + sw + fw) return Minute;
+    return Second;
+}
+
+void TimePicker::adjustField(Field f, int delta)
+{
+    Time t = time_;
+    switch (f) {
+        case Hour:   t.hour   = (t.hour   + delta + 24) % 24; break;
+        case Minute: t.minute = (t.minute + delta + 60) % 60; break;
+        case Second: t.second = (t.second + delta + 60) % 60; break;
     }
+    setTime(t);
 }
 
-bool  ListWidget::needsScrollBar() const { return totalHeight() > rect_.h; }
-float ListWidget::totalHeight()    const { return children_.size() * rowHeight_; }
-float ListWidget::maxScroll()      const { float m = totalHeight() - rect_.h; return m > 0 ? m : 0; }
-
-float ListWidget::thumbLength(float trackH) const
+std::string TimePicker::formatTime() const
 {
-    float total = totalHeight();
-    if (total <= 0) return trackH;
-    float len = (rect_.h / total) * trackH;
-    return len < 16.0f ? 16.0f : len;
+    char buf[16];
+    if (showSeconds_)
+        std::snprintf(buf, sizeof(buf), "%02d:%02d:%02d", time_.hour, time_.minute, time_.second);
+    else
+        std::snprintf(buf, sizeof(buf), "%02d:%02d", time_.hour, time_.minute);
+    return buf;
 }
 
-float ListWidget::thumbPos(float trackH) const
+Widget::Vec2f TimePicker::sizeHint() const
 {
-    float mx = maxScroll();
-    if (mx <= 0) return 0;
-    float tLen = thumbLength(trackH);
-    return (scrollOffset_ / mx) * (trackH - tLen);
+    float fw  = fieldWidth();
+    float sw  = separatorWidth();
+    float pad = 6.0f;
+    int fields = showSeconds_ ? 3 : 2;
+    float w = pad * 2 + fields * fw + (fields - 1) * sw;
+    return {w, 28.0f};
 }
 
-void ListWidget::layout()
-{
-    const auto& t = Theme::instance();
-    bool sb = needsScrollBar();
-    float contentW = sb ? rect_.w - t.scrollbarWidth : rect_.w;
-
-    for (int i = 0; i < static_cast<int>(children_.size()); ++i)
-    {
-        Widget* w = children_[i];
-        float ry = i * rowHeight_ - scrollOffset_;
-        w->setRect({0, ry, contentW, rowHeight_});
-        w->layout();
-    }
-}
-
-Widget::Vec2f ListWidget::sizeHint() const
-{
-    float h = std::min(static_cast<int>(children_.size()), 8) * rowHeight_ + 2;
-    return {200.0f, h};
-}
-
-void ListWidget::paint(PaintContext& ctx)
+void TimePicker::paint(PaintContext& ctx)
 {
     if (!visible_) return;
-
+    const auto& t = Theme::instance();
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
-
-    const auto& t = Theme::instance();
-    int n = static_cast<int>(children_.size());
-    bool sb = needsScrollBar();
-    float contentW = sb ? abs.w - t.scrollbarWidth : abs.w;
+    Rect clipped;
 
     // Background
-    Rect clipped;
-    if (ctx.clipRectIntersect(abs, clipped))
-    {
+    if (ctx.clipRectIntersect(abs, clipped)) {
         ctx.fill.SetColor(t.inputBg.r, t.inputBg.g, t.inputBg.b, t.inputBg.a);
-        ctx.fill.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                           static_cast<int>(clipped.w), static_cast<int>(clipped.h), true);
-
-        Color brd = focused_ ? t.focusColor : (hovered_ ? t.inputBorderHover : t.inputBorder);
-        ctx.line.SetColor(brd.r, brd.g, brd.b, brd.a);
-        ctx.line.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                           static_cast<int>(clipped.w), static_cast<int>(clipped.h), false);
-    }
-
-    // Clip items
-    Rect itemClip = {abs.x, abs.y, contentW, abs.h};
-    ctx.pushClip(itemClip);
-
-    int firstVisible = static_cast<int>(scrollOffset_ / rowHeight_);
-    int lastVisible  = static_cast<int>((scrollOffset_ + abs.h) / rowHeight_) + 1;
-    if (firstVisible < 0) firstVisible = 0;
-    if (lastVisible > n)  lastVisible  = n;
-
-    for (int i = firstVisible; i < lastVisible; ++i)
-    {
-        float ry = abs.y + i * rowHeight_ - scrollOffset_;
-        Rect rowR = {abs.x, ry, contentW, rowHeight_};
-
-        if (ctx.isClipped(rowR)) continue;
-
-        // Selection highlight
-        if (i == selectedIndex_)
-        {
-            Rect selClip;
-            if (ctx.clipRectIntersect(rowR, selClip))
-            {
-                ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g,
-                                  t.selectionColor.b, t.selectionColor.a);
-                ctx.fill.Rectangle(static_cast<int>(selClip.x), static_cast<int>(selClip.y),
-                                   static_cast<int>(selClip.w), static_cast<int>(selClip.h), true);
-            }
-        }
-
-        // Paint row widget
-        children_[i]->paint(ctx);
-    }
-
-    ctx.popClip();
-
-    // Scrollbar
-    if (sb)
-    {
-        float sbX = abs.x + contentW;
-        Rect trackRect = {sbX, abs.y, t.scrollbarWidth, abs.h};
-        Rect trackClip;
-        if (ctx.clipRectIntersect(trackRect, trackClip))
-        {
-            ctx.fill.SetColor(t.sliderTrack.r, t.sliderTrack.g, t.sliderTrack.b, t.sliderTrack.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(trackClip.x), static_cast<int>(trackClip.y),
-                                       static_cast<int>(trackClip.w), static_cast<int>(trackClip.h),
-                                       3.0f, 4, true);
-        }
-        float tLen = thumbLength(abs.h);
-        float tPos = thumbPos(abs.h);
-        Rect thumbRect = {sbX + 1, abs.y + tPos, t.scrollbarWidth - 2, tLen};
-        Rect thumbClip;
-        if (ctx.clipRectIntersect(thumbRect, thumbClip))
-        {
-            Color thumbC = draggingThumb_ ? t.sliderThumbPressed : (hovered_ ? t.sliderThumbHover : t.sliderThumb);
-            ctx.fill.SetColor(thumbC.r, thumbC.g, thumbC.b, thumbC.a);
-            ctx.fill.RoundedRectangle(static_cast<int>(thumbClip.x), static_cast<int>(thumbClip.y),
-                                       static_cast<int>(thumbClip.w), static_cast<int>(thumbClip.h),
-                                       3.0f, 4, true);
-        }
-    }
-}
-
-void ListWidget::onMousePress(MouseEvent& e)
-{
-    if (!enabled_) return;
-
-    const auto& t = Theme::instance();
-    Rect abs = absoluteRect();
-
-    // Click on scrollbar?
-    if (needsScrollBar())
-    {
-        float sbX = abs.x + abs.w - t.scrollbarWidth;
-        if (e.x >= sbX)
-        {
-            float localY = e.y - abs.y;
-            float tPos = thumbPos(abs.h);
-            float tLen = thumbLength(abs.h);
-            if (localY >= tPos && localY <= tPos + tLen)
-            {
-                draggingThumb_ = true;
-                dragOffset_ = localY - tPos;
-            }
-            else
-            {
-                float pageSize = rect_.h * 0.8f;
-                if (localY < tPos) scrollOffset_ -= pageSize;
-                else               scrollOffset_ += pageSize;
-                float mx = maxScroll();
-                if (scrollOffset_ < 0)  scrollOffset_ = 0;
-                if (scrollOffset_ > mx) scrollOffset_ = mx;
-                markDirty();
-            }
-            e.consumed = true;
-            return;
-        }
-    }
-
-    float localY = e.y - abs.y + scrollOffset_;
-    int idx = static_cast<int>(localY / rowHeight_);
-    if (idx >= 0 && idx < static_cast<int>(children_.size()))
-        setSelectedIndex(idx);
-    e.consumed = true;
-}
-
-void ListWidget::onMouseScroll(MouseEvent& e)
-{
-    float viewH = rect_.h;
-    if (totalHeight() <= viewH) { scrollOffset_ = 0; return; }
-    scrollOffset_ -= e.scrollY * rowHeight_ * 0.5f;
-    if (scrollOffset_ < 0) scrollOffset_ = 0;
-    float mx = maxScroll();
-    if (scrollOffset_ > mx) scrollOffset_ = mx;
-    e.consumed = true;
-    markDirty();
-}
-
-void ListWidget::onMouseRelease(MouseEvent& e)
-{
-    if (draggingThumb_)
-    {
-        draggingThumb_ = false;
-        markDirty();
-        e.consumed = true;
-    }
-}
-
-void ListWidget::onMouseMove(MouseEvent& e)
-{
-    if (draggingThumb_)
-    {
-        Rect abs = absoluteRect();
-        float localY = e.y - abs.y;
-        float tLen = thumbLength(abs.h);
-        float trackSpace = abs.h - tLen;
-        if (trackSpace > 0)
-        {
-            float ratio = (localY - dragOffset_) / trackSpace;
-            if (ratio < 0) ratio = 0;
-            if (ratio > 1) ratio = 1;
-            scrollOffset_ = ratio * maxScroll();
-        }
-        e.consumed = true;
-        markDirty();
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  TextInput - single-line text field
-// ═════════════════════════════════════════════════════════════════════════════
-
-TextInput::TextInput(const std::string& text, Mode mode)
-    : text_(text), mode_(mode)
-{
-    acceptsFocus_ = true;
-    setCursor(CursorType::IBeam);
-    cursor_ = utf8Length(text_);
-    selStart_ = selEnd_ = cursor_;
-}
-
-void TextInput::setText(const std::string& t)
-{
-    if (text_ == t) return;
-    text_ = t;
-    int len = utf8Length(text_);
-    if (cursor_ > len) cursor_ = len;
-    selStart_ = selEnd_ = cursor_;
-    scrollX_ = 0;
-    markDirty();
-    textChanged.emit(text_);
-}
-
-void TextInput::selectAll()
-{
-    selStart_ = 0;
-    selEnd_ = utf8Length(text_);
-    cursor_ = selEnd_;
-    markDirty();
-}
-
-void TextInput::clearSelection()
-{
-    selStart_ = selEnd_ = cursor_;
-    markDirty();
-}
-
-std::string TextInput::selectedText() const
-{
-    if (selStart_ == selEnd_) return {};
-    int lo = std::min(selStart_, selEnd_);
-    int hi = std::max(selStart_, selEnd_);
-    return utf8Substr(text_, lo, hi);
-}
-
-void TextInput::setCursorPos(int pos)
-{
-    int len = utf8Length(text_);
-    cursor_ = std::clamp(pos, 0, len);
-    selStart_ = selEnd_ = cursor_;
-    markDirty();
-}
-
-Widget::Vec2f TextInput::sizeHint() const
-{
-    auto& t = Theme::instance();
-    return {120.0f, t.inputHeight};
-}
-
-std::string TextInput::displayText() const
-{
-    if (mode_ == Mode::Password)
-    {
-        int len = utf8Length(text_);
-        std::string result;
-        result.reserve(len * 3);
-        for (int i = 0; i < len; ++i)
-            result += "\xe2\x80\xa2";
-        return result;
-    }
-    return text_;
-}
-
-int TextInput::hitTestChar(PaintContext& ctx, float localX) const
-{
-    std::string disp = displayText();
-    int len = utf8Length(text_);
-    float pad = Theme::instance().padding;
-    float x = pad - scrollX_;
-
-    ctx.font.SetFontSize(Theme::instance().fontSize);
-
-    for (int i = 0; i < len; ++i)
-    {
-        std::string ch = utf8Substr(disp, i, i + 1);
-        float cw = ctx.font.GetTextWidth(ch.c_str());
-        if (localX < x + cw * 0.5f)
-            return i;
-        x += cw;
-    }
-    return len;
-}
-
-float TextInput::cursorXOffset(PaintContext& ctx, int pos) const
-{
-    std::string disp = displayText();
-    std::string sub = utf8Substr(disp, 0, pos);
-    ctx.font.SetFontSize(Theme::instance().fontSize);
-    return ctx.font.GetTextWidth(sub.c_str());
-}
-
-void TextInput::deleteSelection()
-{
-    if (selStart_ == selEnd_) return;
-    int lo = std::min(selStart_, selEnd_);
-    int hi = std::max(selStart_, selEnd_);
-    size_t byteStart = utf8ByteOffset(text_, lo);
-    size_t byteEnd   = utf8ByteOffset(text_, hi);
-    text_.erase(byteStart, byteEnd - byteStart);
-    cursor_ = lo;
-    selStart_ = selEnd_ = cursor_;
-}
-
-void TextInput::insertText(const std::string& t)
-{
-    if (mode_ == Mode::ReadOnly) return;
-
-    if (mode_ == Mode::NumberOnly)
-    {
-        for (char c : t)
-            if (!isNumberChar(c)) return;
-    }
-
-    deleteSelection();
-    size_t bytePos = utf8ByteOffset(text_, cursor_);
-    text_.insert(bytePos, t);
-    cursor_ += utf8Length(t);
-    selStart_ = selEnd_ = cursor_;
-    markDirty();
-    textChanged.emit(text_);
-}
-
-void TextInput::ensureCursorVisible(PaintContext& ctx)
-{
-    float pad = Theme::instance().padding;
-    float fieldW = rect_.w - pad * 2;
-    float cx = cursorXOffset(ctx, cursor_);
-
-    if (cx - scrollX_ < 0)
-        scrollX_ = cx;
-    else if (cx - scrollX_ > fieldW)
-        scrollX_ = cx - fieldW;
-}
-
-void TextInput::clampCursor()
-{
-    int len = utf8Length(text_);
-    if (cursor_ < 0) cursor_ = 0;
-    if (cursor_ > len) cursor_ = len;
-}
-
-bool TextInput::isNumberChar(char c) const
-{
-    return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+';
-}
-
-void TextInput::paint(PaintContext& ctx)
-{
-    auto& t = Theme::instance();
-    Rect abs = absoluteRect();
-    Rect clipped;
-    float pad = t.padding;
-
-    blinkTimer_ += WidgetApp::instance().deltaTime();
-    if (blinkTimer_ > 1.0f) blinkTimer_ -= 1.0f;
-
-    // Background
-    Color bg = isFocused() ? t.inputBgHover : (isHovered() ? t.inputBgHover : t.inputBg);
-    if (ctx.clipRectIntersect(abs, clipped))
-    {
-        ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
         ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
                                    static_cast<int>(clipped.w), static_cast<int>(clipped.h),
                                    t.borderRadius, 6, true);
     }
 
+    ctx.font.SetFontSize(t.fontSize);
+    ctx.font.SetBatch(&ctx.text);
+    float asc = ctx.font.GetAscender();
+    float fw  = fieldWidth();
+    float sw  = separatorWidth();
+    float pad = 6.0f;
+    float x   = abs.x + pad;
+    float cy  = abs.y + (abs.h + asc) * 0.5f;
+
+    auto drawField = [&](const char* text, Field field, float fx) {
+        bool active = isFocused() && activeField_ == field;
+        // Highlight active field
+        if (active) {
+            float tw2 = ctx.font.GetTextWidth(text);
+            Rect hlR = {fx - 2, abs.y + 3, tw2 + 4, abs.h - 6};
+            Rect hlC;
+            if (ctx.clipRectIntersect(hlR, hlC)) {
+                ctx.fill.SetColor(t.focusColor.r, t.focusColor.g, t.focusColor.b, 60);
+                ctx.fill.RoundedRectangle(static_cast<int>(hlC.x), static_cast<int>(hlC.y),
+                                           static_cast<int>(hlC.w), static_cast<int>(hlC.h),
+                                           2, 4, true);
+            }
+        }
+        ctx.font.SetColor(active ? t.focusColor : t.textColor);
+        ctx.font.Print(text, fx, cy);
+    };
+
+    char hh[4], mm[4], ss[4];
+    std::snprintf(hh, sizeof(hh), "%02d", time_.hour);
+    std::snprintf(mm, sizeof(mm), "%02d", time_.minute);
+    std::snprintf(ss, sizeof(ss), "%02d", time_.second);
+
+    drawField(hh, Hour, x);
+    x += fw;
+
+    // Separator ":"
+    ctx.font.SetColor(Color(120, 120, 130, 255));
+    float stw = ctx.font.GetTextWidth(":");
+    ctx.font.Print(":", x + (sw - stw) * 0.5f, cy);
+    x += sw;
+
+    drawField(mm, Minute, x);
+    x += fw;
+
+    if (showSeconds_) {
+        ctx.font.SetColor(Color(120, 120, 130, 255));
+        ctx.font.Print(":", x + (sw - stw) * 0.5f, cy);
+        x += sw;
+        drawField(ss, Second, x);
+    }
+
+    // Up/down arrows on right side
+    float arrowX = abs.x + abs.w - 14;
+    float midY   = abs.y + abs.h * 0.5f;
+    ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, 160);
+    // Up triangle
+    ctx.line.Line2D(arrowX, midY - 3, arrowX + 4, midY - 7);
+    ctx.line.Line2D(arrowX + 4, midY - 7, arrowX + 8, midY - 3);
+    // Down triangle
+    ctx.line.Line2D(arrowX, midY + 3, arrowX + 4, midY + 7);
+    ctx.line.Line2D(arrowX + 4, midY + 7, arrowX + 8, midY + 3);
+
     // Border
     Color bc = isFocused() ? t.focusColor : (isHovered() ? t.inputBorderHover : t.inputBorder);
-    if (ctx.clipRectIntersect(abs, clipped))
-    {
+    if (ctx.clipRectIntersect(abs, clipped)) {
         ctx.line.SetColor(bc.r, bc.g, bc.b, bc.a);
         ctx.line.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
                                    static_cast<int>(clipped.w), static_cast<int>(clipped.h),
                                    t.borderRadius, 6, false);
     }
-
-    // Text area
-    Rect textArea = {abs.x + pad, abs.y, abs.w - pad * 2, abs.h};
-    ctx.font.SetFontSize(t.fontSize);
-    ctx.font.SetBatch(&ctx.text);
-
-    ensureCursorVisible(ctx);
-
-    float textX = textArea.x - scrollX_;
-    float textY = abs.y + (abs.h - t.fontSize) * 0.5f;
-
-    Font::ClipRect clip{textArea.x, textArea.y, textArea.w, textArea.h};
-
-    if (text_.empty() && !isFocused() && !placeholder_.empty())
-    {
-        ctx.font.SetColor(Color(t.textDisabled.r, t.textDisabled.g, t.textDisabled.b, 128));
-        ctx.font.Print(placeholder_.c_str(), textX, textY, &clip);
-    }
-    else
-    {
-        // Selection highlight
-        if (hasSelection() && isFocused())
-        {
-            int lo = std::min(selStart_, selEnd_);
-            int hi = std::max(selStart_, selEnd_);
-            float selX1 = textArea.x + cursorXOffset(ctx, lo) - scrollX_;
-            float selX2 = textArea.x + cursorXOffset(ctx, hi) - scrollX_;
-            float sx1 = std::max(selX1, textArea.x);
-            float sx2 = std::min(selX2, textArea.x + textArea.w);
-            if (sx1 < sx2)
-            {
-                ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g, t.selectionColor.b, t.selectionColor.a);
-                ctx.fill.Rectangle(static_cast<int>(sx1), static_cast<int>(abs.y + 2),
-                                    static_cast<int>(sx2 - sx1), static_cast<int>(abs.h - 4), true);
-            }
-        }
-
-        // Text
-        std::string disp = displayText();
-        ctx.font.SetColor(t.textColor);
-        ctx.font.Print(disp.c_str(), textX, textY, &clip);
-
-        // Cursor
-        if (isFocused() && blinkTimer_ < 0.5f && mode_ != Mode::ReadOnly)
-        {
-            float cx = textArea.x + cursorXOffset(ctx, cursor_) - scrollX_;
-            if (cx >= textArea.x && cx <= textArea.x + textArea.w)
-            {
-                ctx.line.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a);
-                ctx.line.Line2D(static_cast<int>(cx), static_cast<int>(abs.y + 3),
-                                static_cast<int>(cx), static_cast<int>(abs.y + abs.h - 3));
-            }
-        }
-    }
 }
 
-void TextInput::onMousePress(MouseEvent& e)
+void TimePicker::onMousePress(MouseEvent& e)
 {
-    Rect abs = absoluteRect();
-    if (e.localX < 0 || e.localX > abs.w || e.localY < 0 || e.localY > abs.h)
+    if (!enabled_) return;
+
+    // Check up/down arrow area
+    if (e.localX > rect_.w - 18) {
+        float midY = rect_.h * 0.5f;
+        if (e.localY < midY)
+            adjustField(activeField_, 1);   // up
+        else
+            adjustField(activeField_, -1);  // down
+        e.consumed = true;
         return;
+    }
 
-    auto& app = WidgetApp::instance();
-    PaintContext ctx{app.fillBatch(), app.lineBatch(), app.textBatch(), app.font()};
-
-    ctx.font.SetFontSize(Theme::instance().fontSize);
-    cursor_ = hitTestChar(ctx, e.localX);
-    selStart_ = selEnd_ = cursor_;
-    dragging_ = true;
-    blinkTimer_ = 0;
+    // Determine which field was clicked
+    activeField_ = hitField(e.localX);
     markDirty();
     e.consumed = true;
 }
 
-void TextInput::onMouseRelease(MouseEvent& e)
+void TimePicker::onMouseScroll(MouseEvent& e)
 {
-    if (dragging_)
-    {
-        dragging_ = false;
+    if (isHovered() || isFocused()) {
+        int delta = (e.scrollY > 0) ? 1 : -1;
+        adjustField(activeField_, delta);
         e.consumed = true;
     }
 }
 
-void TextInput::onMouseMove(MouseEvent& e)
+void TimePicker::onKeyPress(KeyEvent& e)
 {
-    if (dragging_)
-    {
-        auto& app = WidgetApp::instance();
-        PaintContext ctx{app.fillBatch(), app.lineBatch(), app.textBatch(), app.font()};
-
-        ctx.font.SetFontSize(Theme::instance().fontSize);
-        cursor_ = hitTestChar(ctx, e.localX);
-        selEnd_ = cursor_;
-        blinkTimer_ = 0;
-        markDirty();
+    if (e.key == BuGUI::Key::Up) {
+        adjustField(activeField_, 1);
+        e.consumed = true;
+    } else if (e.key == BuGUI::Key::Down) {
+        adjustField(activeField_, -1);
+        e.consumed = true;
+    } else if (e.key == BuGUI::Key::Left) {
+        if (activeField_ > Hour) {
+            activeField_ = static_cast<Field>(activeField_ - 1);
+            markDirty();
+        }
+        e.consumed = true;
+    } else if (e.key == BuGUI::Key::Right) {
+        int maxField = showSeconds_ ? Second : Minute;
+        if (activeField_ < maxField) {
+            activeField_ = static_cast<Field>(activeField_ + 1);
+            markDirty();
+        }
         e.consumed = true;
     }
-}
-
-void TextInput::onKeyPress(KeyEvent& e)
-{
-    if (mode_ == Mode::ReadOnly && e.key != SDLK_c)
-    {
-        if (!e.ctrl) return;
-    }
-
-    int len = utf8Length(text_);
-    blinkTimer_ = 0;
-
-    if (e.ctrl)
-    {
-        switch (e.key)
-        {
-        case SDLK_a:
-            selectAll();
-            e.consumed = true;
-            return;
-        case SDLK_c:
-        {
-            std::string sel = selectedText();
-            if (!sel.empty())
-                SDL_SetClipboardText(sel.c_str());
-            e.consumed = true;
-            return;
-        }
-        case SDLK_x:
-        {
-            if (mode_ == Mode::ReadOnly) { e.consumed = true; return; }
-            std::string sel = selectedText();
-            if (!sel.empty())
-            {
-                SDL_SetClipboardText(sel.c_str());
-                deleteSelection();
-                markDirty();
-                textChanged.emit(text_);
-            }
-            e.consumed = true;
-            return;
-        }
-        case SDLK_v:
-        {
-            if (mode_ == Mode::ReadOnly) { e.consumed = true; return; }
-            char* clip = SDL_GetClipboardText();
-            if (clip && clip[0])
-            {
-                std::string paste(clip);
-                paste.erase(std::remove(paste.begin(), paste.end(), '\n'), paste.end());
-                paste.erase(std::remove(paste.begin(), paste.end(), '\r'), paste.end());
-                insertText(paste);
-            }
-            SDL_free(clip);
-            e.consumed = true;
-            return;
-        }
-        default: break;
-        }
-    }
-
-    switch (e.key)
-    {
-    case SDLK_LEFT:
-        if (cursor_ > 0)
-        {
-            if (e.shift)
-            {
-                cursor_--;
-                selEnd_ = cursor_;
-            }
-            else
-            {
-                if (hasSelection())
-                    cursor_ = std::min(selStart_, selEnd_);
-                else
-                    cursor_--;
-                selStart_ = selEnd_ = cursor_;
-            }
-        }
-        else if (!e.shift)
-            selStart_ = selEnd_ = cursor_;
-        markDirty();
-        e.consumed = true;
-        break;
-
-    case SDLK_RIGHT:
-        if (cursor_ < len)
-        {
-            if (e.shift)
-            {
-                cursor_++;
-                selEnd_ = cursor_;
-            }
-            else
-            {
-                if (hasSelection())
-                    cursor_ = std::max(selStart_, selEnd_);
-                else
-                    cursor_++;
-                selStart_ = selEnd_ = cursor_;
-            }
-        }
-        else if (!e.shift)
-            selStart_ = selEnd_ = cursor_;
-        markDirty();
-        e.consumed = true;
-        break;
-
-    case SDLK_HOME:
-        cursor_ = 0;
-        if (e.shift) selEnd_ = cursor_;
-        else selStart_ = selEnd_ = cursor_;
-        markDirty();
-        e.consumed = true;
-        break;
-
-    case SDLK_END:
-        cursor_ = len;
-        if (e.shift) selEnd_ = cursor_;
-        else selStart_ = selEnd_ = cursor_;
-        markDirty();
-        e.consumed = true;
-        break;
-
-    case SDLK_BACKSPACE:
-        if (mode_ == Mode::ReadOnly) { e.consumed = true; break; }
-        if (hasSelection())
-        {
-            deleteSelection();
-        }
-        else if (cursor_ > 0)
-        {
-            size_t byteEnd = utf8ByteOffset(text_, cursor_);
-            cursor_--;
-            size_t byteStart = utf8ByteOffset(text_, cursor_);
-            text_.erase(byteStart, byteEnd - byteStart);
-            selStart_ = selEnd_ = cursor_;
-        }
-        markDirty();
-        textChanged.emit(text_);
-        e.consumed = true;
-        break;
-
-    case SDLK_DELETE:
-        if (mode_ == Mode::ReadOnly) { e.consumed = true; break; }
-        if (hasSelection())
-        {
-            deleteSelection();
-        }
-        else if (cursor_ < len)
-        {
-            size_t byteStart = utf8ByteOffset(text_, cursor_);
-            size_t byteEnd = utf8ByteOffset(text_, cursor_ + 1);
-            text_.erase(byteStart, byteEnd - byteStart);
-            selStart_ = selEnd_ = cursor_;
-        }
-        markDirty();
-        textChanged.emit(text_);
-        e.consumed = true;
-        break;
-
-    case SDLK_RETURN:
-    case SDLK_KP_ENTER:
-        submitted.emit(text_);
-        e.consumed = true;
-        break;
-
-    case SDLK_ESCAPE:
-        clearSelection();
-        e.consumed = true;
-        break;
-
-    default:
-        break;
-    }
-}
-
-void TextInput::onTextInput(KeyEvent& e)
-{
-    if (mode_ == Mode::ReadOnly) { e.consumed = true; return; }
-
-    std::string t(e.text);
-    if (t.empty()) return;
-
-    insertText(t);
-    blinkTimer_ = 0;
-    e.consumed = true;
 }

@@ -1,13 +1,10 @@
 #pragma once
 
-#include "Widget.hpp"
-#include "Theme.hpp"
-#include <string>
 #include "ViewWidgets.hpp"
-#include <functional>
-#include <set>
+#include "DirCache.hpp"
+#include "Signal.hpp"
+#include "IconAtlas.hpp"
 
-struct Texture;
 class BoxLayout;
 class Label;
 class TextInput;
@@ -15,7 +12,7 @@ class Button;
 class ImageButton;
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  FileDialog - cross-platform file/folder picker as a FloatWindow popup
+//  FileDialog — cross-platform file/folder picker as a FloatWindow popup
 //
 //    auto* fd = app.addFloat<FileDialog>("Open File");
 //    fd->setMode(FileDialog::Mode::Open);
@@ -23,186 +20,191 @@ class ImageButton;
 //    fd->accepted.connect([](const std::string& path) { ... });
 //
 //  Features:
-//    - Open / Save / SelectFolder modes
-//    - Breadcrumb path navigation
-//    - Sort by name / size / date (click headers)
+//    - Open / Save / SelectFolder / OpenImage modes
+//    - Breadcrumb navigation
+//    - Sort by name / size / date
 //    - Hidden files toggle
-//    - File extension filter
-//    - Bookmarks sidebar (Home, Desktop, /, custom)
-//    - Recent files list
-//    - Icons from IconAtlas
+//    - Extension filter
+//    - Bookmarks sidebar
+//    - Detail / List / Icon views
+//    - Image preview (via WidgetApp texture service)
+//    - DirCache backend for fast browsing
 // ═════════════════════════════════════════════════════════════════════════════
-
 
 class FileDialog : public FloatWindow
 {
 public:
-    enum class Mode { Open, Save, SelectFolder, OpenImage, SaveImage };
+    enum class Mode { Open, Save, SelectFolder, OpenImage };
     enum class ViewMode { Detail, List, Icon };
 
     explicit FileDialog(const std::string& title = "Open File");
     ~FileDialog() override;
 
-    // ── Configuration ────────────────────────────────────────────────────
+    /// @brief Set the dialog mode (Open, Save, SelectFolder, OpenImage).
     void setMode(Mode m);
+    /// @brief Get the dialog mode.
     Mode mode() const { return mode_; }
 
+    /// @brief Set the file listing view mode.
     void setViewMode(ViewMode vm);
+    /// @brief Get the view mode.
     ViewMode viewMode() const { return viewMode_; }
 
+    /// @brief Navigate to a directory path.
     void setPath(const std::string& path);
-    std::string path() const { return currentPath_; }
+    /// @brief Get the current directory path.
+    const std::string& path() const { return currentPath_; }
 
-    // Filter: semicolon-separated extensions, e.g. "*.cpp;*.hpp;*.h"
+    /// @brief Set extension filter (e.g. "*.cpp;*.hpp").
     void setFilter(const std::string& filter);
-    std::string filter() const { return filter_; }
+    /// @brief Get the extension filter.
+    const std::string& filter() const { return filter_; }
 
+    /// @brief Show or hide hidden files.
     void setShowHidden(bool show);
+    /// @brief Check if hidden files are shown.
     bool showHidden() const { return showHidden_; }
 
-    void setMultiSelect(bool ms);
-    bool multiSelect() const { return multiSelect_; }
+    /// @brief Enable multi-file selection.
+    void setMultiSelect(bool ms) { multiSelect_ = ms; }
+    /// @brief Check if multi-select is enabled.
+    bool multiSelect() const     { return multiSelect_; }
 
-    // ── Bookmarks ────────────────────────────────────────────────────────
+    /// @brief Add a sidebar bookmark entry.
     void addBookmark(const std::string& name, const std::string& path);
-    void clearBookmarks();
 
-    // ── Recent files ─────────────────────────────────────────────────────
-    void addRecent(const std::string& path);
-    void clearRecent();
+    /// @brief Get the selected file/folder path.
+    const std::string& selectedPath() const { return selectedPath_; }
 
-    // ── Result ───────────────────────────────────────────────────────────
-    std::string selectedPath() const { return selectedPath_; }
-    std::vector<std::string> selectedPaths() const;
+    /// @brief Emitted when a file is accepted.
+    Signal<std::string> accepted;
+    /// @brief Emitted when the dialog is cancelled.
+    Signal<>            cancelled;
 
-    // ── Signals ──────────────────────────────────────────────────────────
-    Signal<std::string>              accepted;       // single path chosen
-    Signal<std::vector<std::string>> acceptedMulti;  // multiple paths chosen
-    Signal<>                         cancelled;
+    // ── Widget overrides ─────────────────────────────────────────────────
+    void layout() override;
+    void paint(PaintContext& ctx) override;
+    void onMousePress(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onMouseRelease(MouseEvent& e) override;
+    void onMouseScroll(MouseEvent& e) override;
+    void onKeyPress(KeyEvent& e) override;
 
 private:
-    Mode mode_ = Mode::Open;
+    Mode     mode_     = Mode::Open;
     ViewMode viewMode_ = ViewMode::Detail;
+
     std::string currentPath_;
     std::string selectedPath_;
     std::string filter_;
-    bool showHidden_ = false;
+    bool showHidden_  = false;
     bool multiSelect_ = false;
 
     // Bookmarks
     struct Bookmark { std::string name; std::string path; };
     std::vector<Bookmark> bookmarks_;
 
-    // Recent files
-    std::vector<std::string> recentFiles_;
-    static constexpr int kMaxRecent = 20;
-
     // Sort
     enum class SortField { Name, Size, Date };
-    SortField sortField_ = SortField::Name;
-    bool sortAscending_ = true;
+    SortField sortField_    = SortField::Name;
+    bool      sortAscending_ = true;
 
-    // Parsed filter extensions
+    // Filter
     std::vector<std::string> filterExts_;
     void parseFilter();
     bool matchesFilter(const std::string& name) const;
-    static bool isImageExtension(const std::string& ext);
+    static bool isImageExt(const std::string& ext);
 
-    // Directory contents (cached)
+    // Directory listing (flat, sorted, filtered)
     struct FileEntry {
         std::string name;
         std::string path;
-        bool isDir = false;
-        uint64_t size = 0;
-        time_t mtime = 0;
-        bool hidden = false;
-        IconId icon = IconId::None;
-        bool selected = false;   // for multi-select
+        uint64_t    size  = 0;
+        time_t      mtime = 0;
+        IconId      icon  = IconId::None;
+        bool        isDir = false;
     };
     std::vector<FileEntry> entries_;
+    DirCache dirCache_;
+
     void refreshDir();
     void sortEntries();
     void navigateTo(const std::string& path);
 
-    // Multi-select helpers
-    std::set<int> selectedIndices_;
-    bool isSelected(int idx) const;
-    void toggleSelect(int idx);
-    void selectRange(int from, int to);
-    int  lastClickedIndex_ = -1;  // for shift-click range
+    // Selection
+    int  selectedIndex_ = -1;
+    int  hoveredIndex_  = -1;
+    std::vector<bool> multiSel_;   // parallel to entries_
+    int  lastClickIdx_  = -1;
 
-    // Preview (for image modes)
-    Texture* previewTex_ = nullptr;
-    std::string previewPath_;
+    // Preview (image mode)
+    BuGUI::TextureHandle previewTex_ = {0};
+    int                  previewW_   = 0;
+    int                  previewH_   = 0;
+    std::string          previewPath_;
     void loadPreview(const std::string& path);
     void clearPreview();
 
-    // ── Child widget pointers (not owned, children_ owns them) ───────
-    BoxLayout*  mainLayout_     = nullptr;
-    BoxLayout*  toolBar_        = nullptr;   // breadcrumbs + view mode buttons
-    BoxLayout*  breadcrumbBar_  = nullptr;
-    BoxLayout*  bodyLayout_     = nullptr;
-    BoxLayout*  sidebarLayout_  = nullptr;
-    BoxLayout*  fileListLayout_ = nullptr;
-    Widget*     previewLayout_  = nullptr;   // image preview panel (plain Widget for sizeHint)
-    BoxLayout*  bottomBar_      = nullptr;
-    TextInput*  fileNameInput_  = nullptr;
-    Label*      fileLabel_      = nullptr;
-    Button*      okButton_       = nullptr;
-    Button*      cancelButton_   = nullptr;
-    Button*      hiddenToggle_   = nullptr;
-    ImageButton* viewDetailBtn_  = nullptr;
-    ImageButton* viewListBtn_    = nullptr;
-    ImageButton* viewIconBtn_    = nullptr;
-    Label*      statusLabel_    = nullptr;
-    Widget*     bottomSpacer_   = nullptr;  // stretch spacer for SelectFolder mode
+    // ── UI child widgets (not owned — children_ owns them) ──────────────
+    BoxLayout* mainLayout_      = nullptr;
+    BoxLayout* toolBar_         = nullptr;
+    BoxLayout* breadcrumbBar_   = nullptr;
+    BoxLayout* bodyLayout_      = nullptr;
+    BoxLayout* sidebarLayout_   = nullptr;
+    BoxLayout* fileListLayout_  = nullptr;
+    Widget*    previewPanel_    = nullptr;
+    BoxLayout* bottomBar_       = nullptr;
+    TextInput* fileNameInput_   = nullptr;
+    Label*     statusLabel_     = nullptr;
+    Button*    okButton_        = nullptr;
+    Button*    cancelButton_    = nullptr;
+
+    // Toolbar icon buttons (lazily bound to atlas in paint)
+    ImageButton* btnViewDetail_ = nullptr;
+    ImageButton* btnViewList_   = nullptr;
+    ImageButton* btnViewGrid_   = nullptr;
+    ImageButton* btnHidden_     = nullptr;
+    bool         iconsBound_    = false;
+    void         bindToolbarIcons(IconAtlas* atlas);
+    void         updateViewModeButtons();
 
     // File list state
-    int  selectedIndex_ = -1;
-    int  hoveredIndex_  = -1;
-    float scrollY_      = 0.0f;
-    float rowHeight_    = 22.0f;
-    float iconCellSize_ = 80.0f;  // for icon view
+    float scrollY_      = 0.f;
+    float rowHeight_    = 22.f;
+    float iconCellSize_ = 80.f;
 
-    // Deferred navigation (avoid destroying widgets mid-signal)
+    // Deferred nav
     std::string pendingNav_;
 
-    // File list header sort
-    struct ListColumn { std::string name; float width; SortField field; };
-    std::vector<ListColumn> listColumns_;
+    // Column widths (detail view)
+    struct Column { const char* name; float width; SortField field; };
+    static constexpr int kColCount = 3;
+    Column columns_[kColCount] = {
+        {"Name", 300, SortField::Name},
+        {"Size",  90, SortField::Size},
+        {"Date", 150, SortField::Date},
+    };
 
-    // Build UI tree
+    // Build
     void buildUI();
     void buildBreadcrumbs();
     void buildSidebar();
-    void updateViewButtons();
 
     // Paint helpers
-    void paintFileList(PaintContext& ctx, const Rect& area);
-    void paintFileListHeader(PaintContext& ctx, const Rect& area);
-    void paintFileListDetail(PaintContext& ctx, const Rect& area);
-    void paintFileListCompact(PaintContext& ctx, const Rect& area);
-    void paintFileListIcons(PaintContext& ctx, const Rect& area);
+    void paintFileArea(PaintContext& ctx, const Rect& area);
+    void paintHeader(PaintContext& ctx, const Rect& area);
+    void paintDetail(PaintContext& ctx, const Rect& area);
+    void paintCompact(PaintContext& ctx, const Rect& area);
+    void paintIcons(PaintContext& ctx, const Rect& area);
     void paintPreview(PaintContext& ctx, const Rect& area);
 
-    // Events for file list area
-    void fileListMousePress(float localX, float localY, bool dblClick, bool ctrl, bool shift);
-    void fileListMouseMove(float localX, float localY);
-    void fileListScroll(float dy);
+    // Hit test
+    int hitIndex(float mx, float my, const Rect& area) const;
 
     // Actions
     void onOk();
     void onCancel();
-    void onBookmarkClick(int idx);
-    void onRecentClick(int idx);
 
-    // Overrides
-    void layout() override;
-    void paint(PaintContext& ctx) override;
-    void onMousePress(MouseEvent& e) override;
-    void onMouseRelease(MouseEvent& e) override;
-    void onMouseMove(MouseEvent& e) override;
-    void onMouseScroll(MouseEvent& e) override;
-    void onKeyPress(KeyEvent& e) override;
+    // Icon mapping
+    static IconId iconForExt(const std::string& ext);
 };
-
