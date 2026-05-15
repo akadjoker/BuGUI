@@ -11,33 +11,11 @@
 #include <unordered_map>
 #include <any>
 
-class Menu;
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  Rect - axis-aligned rectangle (float)
-// ═════════════════════════════════════════════════════════════════════════════
-
-struct Rect
+namespace BuGUI
 {
-    float x = 0, y = 0, w = 0, h = 0;
 
-    /// @brief Get the right edge (x + w).
-    float right()  const { return x + w; }
-    /// @brief Get the bottom edge (y + h).
-    float bottom() const { return y + h; }
-
-    /// @brief Test if point (px, py) lies inside the rectangle.
-    bool contains(float px, float py) const
-    {
-        return px >= x && px < x + w && py >= y && py < y + h;
-    }
-
-    /// @brief Return a rect inset by pad pixels on each side.
-    Rect shrunk(float pad) const
-    {
-        return {x + pad, y + pad, w - pad * 2, h - pad * 2};
-    }
-};
+class Menu;
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  PaintContext
@@ -413,6 +391,8 @@ public:
     virtual void onKeyPress(KeyEvent& e)       { (void)e; }
     virtual void onKeyRelease(KeyEvent& e)     { (void)e; }
     virtual void onTextInput(KeyEvent& e)      { (void)e; }
+    virtual void onFocusGained()               {}
+    virtual void onFocusLost()                 {}
 
     // ── Drag & Drop (override in subclasses) ──────────────────────────────
     // Widget-to-widget DnD: source returns a payload; target accepts or rejects.
@@ -624,3 +604,5 @@ private:
 
 using VBoxLayout = BoxLayout;   // construct with LayoutDir::Vertical
 using HBoxLayout = BoxLayout;   // construct with LayoutDir::Horizontal
+
+} // namespace BuGUI

@@ -5,6 +5,8 @@
 #include <string>
 #include <functional>
 
+namespace BuGUI
+{
 class RadioButton;
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -428,3 +430,5 @@ private:
     Color bgColor_ = Color(0, 0, 0, 0);  // 0 alpha = use theme panelColor
 };
 
+
+} // namespace BuGUI

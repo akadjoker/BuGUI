@@ -15,9 +15,12 @@
 //  - Toolbar to switch languages and toggle features
 // ─────────────────────────────────────────────────────────────────────────────
 
+using namespace BuGUI;
+
 static const char* sampleCpp = R"(#include <iostream>
 #include <vector>
 #include <string>
+using namespace BuGUI;
 
 // A simple class to demonstrate syntax highlighting
 class Widget {
@@ -209,121 +212,171 @@ void registerCodeEditorStage(WidgetApp& app)
             app.setStage("menu", TransitionType::CoverRight);
         });
         header->createChild<Line>();
-        auto* titleLabel = header->createChild<Label>("CodeEditor — ");
-        (void)titleLabel;
+        header->createChild<Label>("CodeEditor —");
         auto* langLabel = header->createChild<Label>("C++");
         langLabel->setId("langLabel");
         header->createChild<Spacer>(0.f)->setStretch(1);
     }
 
+    // ── Toolbar row 1: language + fold + zoom ────────────────────────────
+    auto* bar1 = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
+    bar1->setSize(0, 30);
+    bar1->setPadding(Edges(2, 8, 2, 8));
+    bar1->setSpacing(4);
+
+    auto* btnCpp = bar1->createChild<Button>("C++");       btnCpp->setSize(50, 24);
+    auto* btnPy  = bar1->createChild<Button>("Python");    btnPy->setSize(66, 24);
+    auto* btnJs  = bar1->createChild<Button>("JS");        btnJs->setSize(44, 24);
+    bar1->createChild<Line>();
+    auto* btnFold   = bar1->createChild<Button>("Fold All");   btnFold->setSize(68, 24);
+    auto* btnUnfold = bar1->createChild<Button>("Unfold All"); btnUnfold->setSize(78, 24);
+    bar1->createChild<Line>();
+    auto* btnZoomIn  = bar1->createChild<Button>("+");    btnZoomIn->setSize(26, 24);
+    auto* btnZoomOut = bar1->createChild<Button>("-");    btnZoomOut->setSize(26, 24);
+    auto* btnZoomRst = bar1->createChild<Button>("100%"); btnZoomRst->setSize(48, 24);
+    bar1->createChild<Spacer>(0.f)->setStretch(1);
+
+    // ── Toolbar row 2: edit + toggles ────────────────────────────────────
+    auto* bar2 = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
+    bar2->setSize(0, 30);
+    bar2->setPadding(Edges(2, 8, 2, 8));
+    bar2->setSpacing(4);
+
+    auto* btnUndo = bar2->createChild<Button>("Undo"); btnUndo->setSize(54, 24);
+    auto* btnRedo = bar2->createChild<Button>("Redo"); btnRedo->setSize(54, 24);
+    bar2->createChild<Line>();
+    auto* btnSelAll = bar2->createChild<Button>("Select All"); btnSelAll->setSize(78, 24);
+    auto* btnSelOcc = bar2->createChild<Button>("Sel Occurrences"); btnSelOcc->setSize(112, 24);
+    bar2->createChild<Line>();
+    auto* chkReadOnly  = bar2->createChild<CheckBox>("Read Only");
+    auto* chkWordWrap  = bar2->createChild<CheckBox>("Word Wrap");
+    auto* chkMinimap   = bar2->createChild<CheckBox>("Minimap");
+    auto* chkWhitespace= bar2->createChild<CheckBox>("Whitespace");
+    chkMinimap->setChecked(true);
+    chkWhitespace->setChecked(true);
+    bar2->createChild<Spacer>(0.f)->setStretch(1);
+
+    // ── Editor ───────────────────────────────────────────────────────────
+    auto* editor = outer->createChild<CodeEditor>();
+    editor->setStretch(1);
+    editor->setHighlighter<CppHighlighter>();
+    editor->setText(sampleCpp);
+    editor->setShowFolding(true);
+    editor->setShowBracketMatch(true);
+    editor->setHighlightCurrentLine(true);
+    editor->setShowIndentGuides(true);
+    editor->setShowWhitespace(true);
+    editor->setShowScopeLines(true);
+    editor->setTabSize(4);
+    editor->setShowMinimap(true);
+
+    // ── Status bar ───────────────────────────────────────────────────────
+    auto* statusBar = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
+    statusBar->setSize(0, 22);
+    statusBar->setPadding(Edges(2, 8, 2, 8));
+    statusBar->setSpacing(12);
+    auto* lblCursorPos = statusBar->createChild<Label>("Ln 1, Col 1");
+    auto* lblLines     = statusBar->createChild<Label>("Lines: 0");
+    auto* lblMode      = statusBar->createChild<Label>("");
+    statusBar->createChild<Spacer>(0.f)->setStretch(1);
+
+    // ── Console ──────────────────────────────────────────────────────────
+    auto* console = outer->createChild<ConsoleWidget>();
+    console->setSize(0, 100);
+    console->log(LogLevel::Info, "CodeEditor ready. Edit, Ctrl+F to search, Ctrl+Z/Y undo/redo.");
+
+    // ── Initial status ───────────────────────────────────────────────────
+    auto updateStatus = [editor, lblLines, lblCursorPos]() {
+        char buf[64];
+        auto cp = editor->cursorPos();
+        std::snprintf(buf, sizeof(buf), "Ln %d, Col %d", cp.line + 1, cp.col + 1);
+        lblCursorPos->setText(buf);
+        std::snprintf(buf, sizeof(buf), "Lines: %d", editor->lineCount());
+        lblLines->setText(buf);
+    };
+    updateStatus();
+
+    editor->cursorMoved.connect([updateStatus](TextEdit::TextPos) { updateStatus(); });
+    editor->textChanged.connect([updateStatus]() { updateStatus(); });
+
     // ── Language buttons ─────────────────────────────────────────────────
-    auto* langBar = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
-    langBar->setSize(0, 30);
-    langBar->setPadding(Edges(2, 8, 2, 8));
-    langBar->setSpacing(4);
-    {
-        langBar->createChild<Label>("Language:");
+    auto* langLabel = root->findById<Label>("langLabel");
 
-        auto* btnCpp = langBar->createChild<Button>("C++");
-        btnCpp->setSize(60, 24);
-        auto* btnPy = langBar->createChild<Button>("Python");
-        btnPy->setSize(70, 24);
-        auto* btnJs = langBar->createChild<Button>("JavaScript");
-        btnJs->setSize(90, 24);
-
-        langBar->createChild<Line>();
-
-        auto* btnFold   = langBar->createChild<Button>("Fold All");
-        btnFold->setSize(70, 24);
-        auto* btnUnfold = langBar->createChild<Button>("Unfold All");
-        btnUnfold->setSize(80, 24);
-
-        langBar->createChild<Line>();
-
-        auto* btnUndo = langBar->createChild<Button>("Undo");
-        btnUndo->setSize(60, 24);
-        auto* btnRedo = langBar->createChild<Button>("Redo");
-        btnRedo->setSize(60, 24);
-
-        langBar->createChild<Line>();
-
-        auto* btnZoomIn  = langBar->createChild<Button>("+");
-        btnZoomIn->setSize(28, 24);
-        auto* btnZoomOut = langBar->createChild<Button>("-");
-        btnZoomOut->setSize(28, 24);
-        auto* btnZoomRst = langBar->createChild<Button>("100%");
-        btnZoomRst->setSize(50, 24);
-
-        langBar->createChild<Spacer>(0.f)->setStretch(1);
-
-        // ── Editor ───────────────────────────────────────────────────────
-        auto* editor = outer->createChild<CodeEditor>();
-        editor->setStretch(1);
+    btnCpp->clicked.connect([editor, console, langLabel]() {
         editor->setHighlighter<CppHighlighter>();
         editor->setText(sampleCpp);
-        editor->setShowFolding(true);
-        editor->setShowBracketMatch(true);
-        editor->setHighlightCurrentLine(true);
-        editor->setShowIndentGuides(true);
-        editor->setShowWhitespace(true);
-        editor->setShowScopeLines(true);
-        editor->setTabSize(4);
-        editor->setShowMinimap(true);
+        if (langLabel) langLabel->setText("C++");
+        console->log(LogLevel::Info, "Switched to C++");
+    });
+    btnPy->clicked.connect([editor, console, langLabel]() {
+        editor->setHighlighter<PythonHighlighter>();
+        editor->setText(samplePython);
+        if (langLabel) langLabel->setText("Python");
+        console->log(LogLevel::Info, "Switched to Python");
+    });
+    btnJs->clicked.connect([editor, console, langLabel]() {
+        editor->setHighlighter<JsHighlighter>();
+        editor->setText(sampleJs);
+        if (langLabel) langLabel->setText("JS");
+        console->log(LogLevel::Info, "Switched to JavaScript");
+    });
 
-        // ── Console ──────────────────────────────────────────────────────
-        auto* console = outer->createChild<ConsoleWidget>();
-        console->setSize(0, 100);
-        console->log(LogLevel::Info, "CodeEditor demo loaded. Switch languages, fold code, search (Ctrl+F).");
+    // ── Fold ─────────────────────────────────────────────────────────────
+    btnFold->clicked.connect([editor, console]() {
+        editor->foldAll();
+        console->log(LogLevel::Info, "Folded all regions");
+    });
+    btnUnfold->clicked.connect([editor, console]() {
+        editor->unfoldAll();
+        console->log(LogLevel::Info, "Unfolded all regions");
+    });
+    editor->foldToggled.connect([console](int line, bool folded) {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "Line %d %s", line + 1, folded ? "folded" : "unfolded");
+        console->log(LogLevel::Info, buf);
+    });
 
-        auto* langLabel = root->findById<Label>("langLabel");
+    // ── Zoom ─────────────────────────────────────────────────────────────
+    btnZoomIn->clicked.connect( [editor]() { editor->zoomIn();    });
+    btnZoomOut->clicked.connect([editor]() { editor->zoomOut();   });
+    btnZoomRst->clicked.connect([editor]() { editor->zoomReset(); });
 
-        // Wire up language buttons
-        btnCpp->clicked.connect([editor, console, langLabel]() {
-            editor->setHighlighter<CppHighlighter>();
-            editor->setText(sampleCpp);
-            if (langLabel) langLabel->setText("C++");
-            console->log(LogLevel::Info, "Switched to C++ highlighter");
-        });
-        btnPy->clicked.connect([editor, console, langLabel]() {
-            editor->setHighlighter<PythonHighlighter>();
-            editor->setText(samplePython);
-            if (langLabel) langLabel->setText("Python");
-            console->log(LogLevel::Info, "Switched to Python highlighter");
-        });
-        btnJs->clicked.connect([editor, console, langLabel]() {
-            editor->setHighlighter<JsHighlighter>();
-            editor->setText(sampleJs);
-            if (langLabel) langLabel->setText("JavaScript");
-            console->log(LogLevel::Info, "Switched to JavaScript highlighter");
-        });
+    // ── Undo / Redo — disabled when no history ───────────────────────────
+    btnUndo->setEnabled(false);
+    btnRedo->setEnabled(false);
 
-        // Wire up fold buttons
-        btnFold->clicked.connect([editor, console]() {
-            editor->foldAll();
-            console->log(LogLevel::Info, "Folded all regions");
-        });
-        btnUnfold->clicked.connect([editor, console]() {
-            editor->unfoldAll();
-            console->log(LogLevel::Info, "Unfolded all regions");
-        });
+    editor->undoRedoChanged.connect([btnUndo, btnRedo](bool canUndo, bool canRedo) {
+        btnUndo->setEnabled(canUndo);
+        btnRedo->setEnabled(canRedo);
+    });
+    btnUndo->clicked.connect([editor, console]() {
+        editor->undo();
+        console->log(LogLevel::Info, "Undo");
+    });
+    btnRedo->clicked.connect([editor, console]() {
+        editor->redo();
+        console->log(LogLevel::Info, "Redo");
+    });
 
-        // Wire up zoom
-        btnZoomIn->clicked.connect([editor]() { editor->zoomIn(); });
-        btnZoomOut->clicked.connect([editor]() { editor->zoomOut(); });
-        btnZoomRst->clicked.connect([editor]() { editor->zoomReset(); });
+    // ── Select All / Select All Occurrences ──────────────────────────────
+    btnSelAll->clicked.connect([editor]() { editor->selectAll(); });
+    btnSelOcc->clicked.connect([editor, console]() {
+        editor->selectAllOccurrences();
+        console->log(LogLevel::Info, "Selected all occurrences of word under cursor");
+    });
 
-        // Wire up undo/redo
-        btnUndo->clicked.connect([editor, console]() {
-            if (editor->canUndo()) {
-                editor->undo();
-                console->log(LogLevel::Info, "Undo");
-            }
-        });
-        btnRedo->clicked.connect([editor, console]() {
-            if (editor->canRedo()) {
-                editor->redo();
-                console->log(LogLevel::Info, "Redo");
-            }
-        });
-    }
+    // ── Toggles ──────────────────────────────────────────────────────────
+    chkReadOnly->toggled.connect([editor, lblMode](bool on) {
+        editor->setReadOnly(on);
+        lblMode->setText(on ? "[READ ONLY]" : "");
+    });
+    chkWordWrap->toggled.connect([editor](bool on) {
+        editor->setWordWrap(on);
+    });
+    chkMinimap->toggled.connect([editor](bool on) {
+        editor->setShowMinimap(on);
+    });
+    chkWhitespace->toggled.connect([editor](bool on) {
+        editor->setShowWhitespace(on);
+    });
 }

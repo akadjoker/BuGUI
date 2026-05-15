@@ -36,26 +36,39 @@ Your App / Engine
 ## Requirements
 
 - **C++17** compiler (Clang, GCC, MSVC)
-- **CMake 3.10+**
-- **SDL2** (for the included demo/test backends)
-- **OpenGL 3.3** (for the included render backend)
+- **CMake 3.14+**
+- **SDL2** (for the SDL demo/test backends)
+- **raylib 5.5** (for the raylib backend — fetched automatically via CMake FetchContent)
+- **OpenGL 3.3 Core** (for the included render backends)
 
 ## Build
 
 ```bash
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build .
 ```
 
-Executables go to `bin/`. The default build produces `bugui_demo` (backend IO test) and `bugui_demos` (widget showcase with 30+ stages).
+Executables go to `bin/`. The default build produces:
+- `bugui_demo` — minimal SDL2+OpenGL backend test
+- `bugui_demos` — full widget showcase (SDL2+OpenGL, 30+ stages)
+- `bugui_demo_raylib` — same showcase with raylib backend
+
+### Install
+
+```bash
+cmake --install <build_dir> [--prefix /usr/local]
+```
+
+Installs `libbugui_widgets.a` (or `.so`) to `lib/` and all public headers to `include/BuGUI/`.
 
 ### CMake options
 
 | Option | Default | Description |
 |---|---|---|
+| `BUGUI_BUILD_SHARED` | OFF | Build as shared library instead of static |
 | `BUGUI_BUILD_APP` | ON | Main application |
-| `BUGUI_BUILD_DEMO` | ON | Backend IO/events demo |
+| `BUGUI_BUILD_DEMO` | ON | SDL2 backend IO/events demo |
 | `BUGUI_BUILD_EDITOR` | ON | Editor executable |
 | `BUGUI_BUILD_TUTORIALS` | OFF | Tutorial examples |
 
@@ -64,13 +77,16 @@ Executables go to `bin/`. The default build produces `bugui_demo` (backend IO te
 ```
 widgets/            Core library (zero platform deps)
   include/          Public headers
+    BuGUI_light.hpp Minimal include for simple apps (no NodeEditor/Charts/…)
+    Widgets.hpp     Full umbrella include
   src/              Implementation
 vendor/             Third-party (poly2tri, stb, glad, nlohmann)
-demo/               Minimal backend demo (SDL2 + OpenGL)
-test1/              Widget showcase app
-  main.cpp          App entry, stage registration
-  backends/         SdlOpenGLBackend (reference implementation)
+cmake/              CMake package config templates
+demo/               Minimal SDL2+OpenGL backend demo
+demos/              Full widget showcase (SDL2+OpenGL backend)
+  backends/         SdlOpenGLBackend + RaylibBackend reference implementations
   stages/           One file per demo stage (~30 stages)
+demo_raylib/        Raylib backend showcase (same stages, different backend)
 ```
 
 ## Architecture
@@ -122,7 +138,8 @@ while (backend.beginFrame()) {
 
 ### IO Struct
 
-The backend fills this every frame before `app.update()`:
+The backend fills this every frame before `app.update()`. Clipboard and file I/O
+callbacks are **captureless lambdas or plain function pointers** (no `std::function`):
 
 ```cpp
 BuGUI::IO& io = BuGUI::GetIO();
@@ -137,8 +154,14 @@ io.keyCtrl         = ctrlHeld;
 io.keyShift        = shiftHeld;
 io.keyAlt          = altHeld;
 io.addInputCharacter(codepoint);
-io.setClipboardText = [](const char* t) { /* OS clipboard */ };
-io.getClipboardText = []() -> std::string { /* OS clipboard */ };
+
+// Captureless lambdas convert implicitly to raw function pointers:
+io.setClipboardText = [](const char* t) { SDL_SetClipboardText(t); };
+io.getClipboardText = []() -> std::string {
+    char* s = SDL_GetClipboardText(); std::string r(s); SDL_free(s); return r;
+};
+io.readFile  = [](const std::string& p) -> std::string { /* read p */ return {}; };
+io.writeFile = [](const std::string& p, const std::string& d) -> bool { /* write */ return true; };
 ```
 
 ### Key Constants
@@ -289,12 +312,14 @@ Widget::paint()  →  PaintContext  →  DrawList  →  DrawData
 
 ## Signals
 
-Type-safe observer pattern:
+Type-safe observer pattern. Implemented with Qt-style type erasure — **no `std::function`**,
+no `<functional>` header pulled into consumer TUs. Stores closures as heap-allocated
+callables + raw call/destroy pointers:
 
 ```cpp
 Signal<float> valueChanged;
 
-// Connect
+// Connect — any callable (lambda, functor, fn ptr)
 auto id = valueChanged.connect([](float v) {
     printf("New value: %f\n", v);
 });
@@ -346,6 +371,30 @@ model->appendRow({"Bob", "25", "Brazil"});
 auto* grid = parent->createChild<DataGrid>();
 grid->setModel(model);
 ```
+
+## Compile-time footprint
+
+The library is designed to be lightweight to include:
+
+| Header | Preprocessed lines |
+|---|---|
+| `BuGUI_base.hpp` | ~21 k |
+| `BuGUI.hpp` | ~48 k |
+| `Widget.hpp` | ~53 k |
+| `WidgetApp.hpp` | ~54 k |
+| `BuGUI_light.hpp` | ~57 k |
+
+For simple apps include only what you need:
+
+```cpp
+// Minimal — basic/layout/input/scroll/dialog only
+#include <BuGUI/BuGUI_light.hpp>
+
+// Full widget set
+#include <BuGUI/Widgets.hpp>
+```
+
+When linking as a CMake target the library propagates a PCH for `WidgetApp.hpp` and `BuGUI_light.hpp` automatically via `target_precompile_headers(INTERFACE ...)`, so consumer TUs see near-zero parse overhead.
 
 ## License
 

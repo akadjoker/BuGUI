@@ -16,6 +16,10 @@
     #include <pwd.h>
 #endif
 
+
+namespace BuGUI
+{
+
 namespace FileSystem {
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -355,3 +359,5 @@ bool removeFile(const std::string& path)
 #endif // _WIN32
 
 } // namespace FileSystem
+
+} // namespace BuGUI

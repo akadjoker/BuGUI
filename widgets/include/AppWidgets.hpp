@@ -17,6 +17,8 @@
 //      bc->itemClicked.connect([](int index) { /* navigate */ });
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 class Breadcrumbs : public Widget
 {
 public:
@@ -380,3 +382,5 @@ private:
 
     int lastW_ = 0, lastH_ = 0; // for resize detection
 };
+
+} // namespace BuGUI

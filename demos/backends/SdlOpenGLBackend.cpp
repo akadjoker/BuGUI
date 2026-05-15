@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+using namespace BuGUI;
 
 namespace {
 

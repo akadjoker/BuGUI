@@ -2,6 +2,9 @@
 
 #include "BuGUI_base.hpp"
 
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  Theme - centralized colors/sizes for all widgets
 // ═════════════════════════════════════════════════════════════════════════════
@@ -245,3 +248,5 @@ struct Theme
         return theme;
     }
 };
+
+} // namespace BuGUI

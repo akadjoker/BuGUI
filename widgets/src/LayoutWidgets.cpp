@@ -774,7 +774,7 @@ void Overlay::paint(PaintContext& ctx)
 
 Splitter::Splitter(LayoutDir dir) : dir_(dir)
 {
-    cursor_ = (dir == LayoutDir::Horizontal) ? CursorType::SizeH : CursorType::SizeV;
+    // cursor_ stays Arrow; set to SizeH/SizeV only when hovering the handle
 }
 
 void Splitter::setRatio(float r)
@@ -931,6 +931,7 @@ void Splitter::onMousePress(MouseEvent& e)
         if (localX >= handleX && localX <= handleX + handleSize_)
         {
             dragging_ = true;
+            cursor_   = CursorType::SizeH;
             e.consumed = true;
         }
     }
@@ -941,6 +942,7 @@ void Splitter::onMousePress(MouseEvent& e)
         if (localY >= handleY && localY <= handleY + handleSize_)
         {
             dragging_ = true;
+            cursor_   = CursorType::SizeV;
             e.consumed = true;
         }
     }
@@ -951,6 +953,7 @@ void Splitter::onMouseRelease(MouseEvent& e)
     if (dragging_)
     {
         dragging_ = false;
+        cursor_   = CursorType::Arrow;
         e.consumed = true;
         markDirty();
         return;  // don't fire clicked after drag
@@ -976,7 +979,14 @@ void Splitter::onMouseMove(MouseEvent& e)
         float hy = abs.y + total * ratio_;
         onHandle = (e.y >= hy && e.y <= hy + handleSize_);
     }
-    if (onHandle != handleHovered_) { handleHovered_ = onHandle; markDirty(); }
+    if (onHandle != handleHovered_)
+    {
+        handleHovered_ = onHandle;
+        cursor_ = onHandle
+            ? (dir_ == LayoutDir::Horizontal ? CursorType::SizeH : CursorType::SizeV)
+            : CursorType::Arrow;
+        markDirty();
+    }
 
     if (!dragging_) return;
 
@@ -998,6 +1008,7 @@ void Splitter::onMouseMove(MouseEvent& e)
 void Splitter::onMouseLeave()
 {
     if (handleHovered_) { handleHovered_ = false; markDirty(); }
+    cursor_ = CursorType::Arrow;
     Widget::onMouseLeave();
 }
 

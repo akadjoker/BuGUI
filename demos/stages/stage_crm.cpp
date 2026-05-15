@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage — CRM (Client Relationship Manager)

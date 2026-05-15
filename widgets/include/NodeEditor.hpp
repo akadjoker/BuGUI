@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  NodeEditor — Visual node graph (shaders, AI, scripting)
 //
@@ -154,3 +156,5 @@ private:
     void paintNodes(PaintContext& ctx);
     void paintDragLink(PaintContext& ctx);
 };
+
+} // namespace BuGUI

@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "ChartWidgets.hpp"
 #include <cmath>
+using namespace BuGUI;
 
 void registerChartsStage(WidgetApp& app)
 {

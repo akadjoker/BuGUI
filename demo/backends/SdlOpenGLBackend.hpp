@@ -3,6 +3,8 @@
 #include "BuGUI.hpp"
 #include <cstdint>
 
+using namespace BuGUI;
+
 class SdlOpenGLBackend
 {
 public:

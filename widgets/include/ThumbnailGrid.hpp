@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  ThumbnailGrid — Grid of thumbnail cards with label + selection
 //
@@ -20,9 +23,10 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 struct ThumbnailItem {
-    std::string label;
-    Color       color = Color(80, 90, 110, 255);
-    bool        selected = false;
+    std::string          label;
+    Color                color = Color(80, 90, 110, 255);
+    BuGUI::TextureHandle tex   = {};
+    bool                 selected = false;
 };
 
 class ThumbnailGrid : public Widget
@@ -36,6 +40,9 @@ public:
     void removeItem(int idx);
     /// @brief Remove all thumbnails.
     void clearItems();
+
+    /// @brief Set the texture for an existing item.
+    void setItemTexture(int idx, BuGUI::TextureHandle tex);
 
     /// @brief Get the number of items.
     int  itemCount() const { return static_cast<int>(items_.size()); }
@@ -76,3 +83,5 @@ private:
 
     int hitTest(float mx, float my) const;
 };
+
+} // namespace BuGUI

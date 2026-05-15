@@ -512,6 +512,7 @@ void DataGrid::paint(PaintContext& ctx)
 
     ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
     ctx.lineRect(abs.x, abs.y, abs.w, abs.h);
+    if (overrideFont_) ctx.popFont();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -527,6 +528,36 @@ void DataGrid::onMousePress(MouseEvent& e)
     e.consumed = true;
     float localX = e.x - abs.x;
     float localY = e.y - abs.y;
+
+    // ── Horizontal scrollbar drag ─────────────────────────────────────────
+    float contentW = totalColumnsWidth();
+    if (contentW > abs.w)
+    {
+        float sbH    = 8.0f;
+        float sbY    = abs.y + abs.h - sbH;
+        float trackW = abs.w;
+        float thumbW = std::max(20.0f, (abs.w / contentW) * trackW);
+        float maxSX  = contentW - abs.w;
+        float thumbX = (maxSX > 0.f ? (scrollX_ / maxSX) * (trackW - thumbW) : 0.f);
+        if (e.y >= sbY && e.y <= sbY + sbH)
+        {
+            // Click on thumb → start drag; click on track → jump
+            if (e.x >= abs.x + thumbX && e.x <= abs.x + thumbX + thumbW)
+            {
+                hScrollDrag_      = true;
+                hScrollDragStartX_  = e.x;
+                hScrollDragStartSX_ = scrollX_;
+            }
+            else
+            {
+                // Jump to clicked position
+                float clickRatio = (localX - thumbW * 0.5f) / (trackW - thumbW);
+                scrollX_ = std::max(0.f, std::min(maxSX, clickRatio * maxSX));
+                markDirty();
+            }
+            return;
+        }
+    }
 
     if (localY < headerHeight_) {
         int resEdge = hitResizeEdge(localX);
@@ -624,6 +655,7 @@ void DataGrid::onMousePress(MouseEvent& e)
 
 void DataGrid::onMouseRelease(MouseEvent& e)
 {
+    if (hScrollDrag_) { hScrollDrag_ = false; }
     if (resizeCol_ >= 0) resizeCol_ = -1;
     (void)e;
 }
@@ -632,6 +664,20 @@ void DataGrid::onMouseMove(MouseEvent& e)
 {
     if (!visible_ || !enabled_) return;
     Rect abs = absoluteRect();
+
+    if (hScrollDrag_)
+    {
+        e.consumed = true;
+        float contentW = totalColumnsWidth();
+        float trackW   = abs.w;
+        float thumbW   = std::max(20.0f, (abs.w / contentW) * trackW);
+        float maxSX    = contentW - abs.w;
+        float dx       = e.x - hScrollDragStartX_;
+        float ratio    = maxSX > 0.f ? maxSX / (trackW - thumbW) : 0.f;
+        scrollX_ = std::max(0.f, std::min(maxSX, hScrollDragStartSX_ + dx * ratio));
+        markDirty();
+        return;
+    }
 
     if (resizeCol_ >= 0) {
         float dx = e.x - resizeStartX_;

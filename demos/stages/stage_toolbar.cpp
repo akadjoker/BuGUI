@@ -6,6 +6,7 @@
 #include "IconAtlas.hpp"
 #include "BuImage.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage — ToolBar demo

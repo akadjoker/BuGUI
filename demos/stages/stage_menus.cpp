@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "MenuWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 07 — Menus & Context

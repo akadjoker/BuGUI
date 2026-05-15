@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "DataWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 10 — DataGrid + TreeGrid

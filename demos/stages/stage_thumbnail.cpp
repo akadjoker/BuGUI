@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "ThumbnailGrid.hpp"
 #include <cstdlib>
+using namespace BuGUI;
 
 void registerThumbnailStage(WidgetApp& app)
 {

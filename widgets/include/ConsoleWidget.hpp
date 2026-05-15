@@ -24,6 +24,8 @@
 //    - Scrollbar
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 enum class LogLevel { Trace, Info, Warn, Error };
 
 struct LogEntry {
@@ -154,3 +156,5 @@ private:
     void historyUp();
     void historyDown();
 };
+
+} // namespace BuGUI

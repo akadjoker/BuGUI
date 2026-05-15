@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "InputWidgets.hpp"
 #include "AutomotiveWidgets.hpp"
+using namespace BuGUI;
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  BMW-style Instrument Cluster Demo

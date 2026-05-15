@@ -974,8 +974,14 @@ void PropertyGrid::onMousePress(MouseEvent& e)
         auto& d=std::get<PropCombo>(row.data);
         auto vis=visibleRows(); float rowY=abs.y;
         for (int vi=0;vi<(int)vis.size();++vi) { if (vis[vi]==idx) { rowY=abs.y+vi*rowHeight_-scrollOffset_; break; } }
+        const auto& io2=BuGUI::GetIO();
         int n=(int)d.options.size(); float itemH=22.f, popH=n*itemH+2, popW=abs.w-abs.w*labelRatio_;
-        float popX=abs.x+abs.w*labelRatio_, popY=rowY+rowHeight_;
+        float popX=abs.x+abs.w*labelRatio_;
+        float popY=rowY+rowHeight_;
+        if (popX+popW > io2.displayWidth)  popX = io2.displayWidth  - popW;
+        if (popX < 0.f) popX = 0.f;
+        if (popY+popH > io2.displayHeight) popY = (rowY-popH >= 0.f) ? rowY-popH : io2.displayHeight-popH;
+        if (popY < 0.f) popY = 0.f;
         auto* popup=new PropComboPopup_(this,idx); popup->setRect({popX,popY,popW,popH});
         WidgetApp::instance().showPopup(popup,nullptr); e.consumed=true; markDirty(); break;
     }
@@ -997,7 +1003,14 @@ void PropertyGrid::onMousePress(MouseEvent& e)
     case PropType::Color: {
         auto vis=visibleRows(); float rowY=abs.y;
         for (int vi=0;vi<(int)vis.size();++vi) { if (vis[vi]==idx) { rowY=abs.y+vi*rowHeight_-scrollOffset_; break; } }
-        float popW=230.f, popH=270.f, popX=abs.x+abs.w*labelRatio_, popY=rowY+rowHeight_;
+        const auto& io=BuGUI::GetIO();
+        float popW=230.f, popH=270.f;
+        float popX=abs.x+abs.w*labelRatio_;
+        float popY=rowY+rowHeight_;
+        if (popX+popW > io.displayWidth)  popX = io.displayWidth  - popW;
+        if (popX < 0.f) popX = 0.f;
+        if (popY+popH > io.displayHeight) popY = (rowY-popH >= 0.f) ? rowY-popH : io.displayHeight-popH;
+        if (popY < 0.f) popY = 0.f;
         auto* popup=new ColorPickerPopup_(this,idx); popup->setRect({popX,popY,popW,popH});
         WidgetApp::instance().showPopup(popup,nullptr); e.consumed=true; break;
     }

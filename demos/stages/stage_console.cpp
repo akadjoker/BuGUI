@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "ConsoleWidget.hpp"
+using namespace BuGUI;
 
 void registerConsoleStage(WidgetApp& app)
 {

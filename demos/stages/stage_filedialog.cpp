@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "FileDialog.hpp"
+using namespace BuGUI;
 
 void registerFileDialogStage(WidgetApp& app)
 {

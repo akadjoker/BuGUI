@@ -9,6 +9,11 @@
 #include <string>
 #include <unordered_map>
 
+
+
+namespace BuGUI
+{
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  Easing functions for transitions
 // ═════════════════════════════════════════════════════════════════════════════
@@ -380,8 +385,8 @@ private:
     int      lastClickBtn_ = -1;
     int      clickSeq_     = 0;   // 0→1→2→3 then resets
 
-    std::function<void(const char*)> clipSet_;
-    std::function<std::string()>     clipGet_;
+    void        (*clipSet_)(const char*) = nullptr;
+    std::string (*clipGet_)()            = nullptr;
 
     // Subsystems
     IconAtlas* iconAtlas_ = nullptr;
@@ -465,3 +470,5 @@ private:
     void dispatchDropEvents(const std::vector<BuGUI::IO::DropEvent>& drops);
     void cancelDrag();
 };
+
+} // namespace BuGUI

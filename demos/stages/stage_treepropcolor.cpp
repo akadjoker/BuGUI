@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "TreePropertyColorWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 09 — TreeView + PropertyGrid + ColorPicker

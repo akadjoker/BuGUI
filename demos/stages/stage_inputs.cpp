@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "InputWidgets.hpp"
+using namespace BuGUI;
 
 void registerInputsStage(WidgetApp& app)
 {

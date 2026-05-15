@@ -269,6 +269,7 @@ void ProgressBar::paint(PaintContext& ctx)
     // Status text (horizontal only)
     if (!text_.empty() && !vert)
     {
+        if (overrideFont_) ctx.pushFont(overrideFont_);
         float textH = ctx.font.GetFontSize();
         float textW = ctx.font.GetTextWidth(text_.c_str());
         float tx, ty = abs.y + (abs.h + ctx.font.GetAscender()) * 0.5f;
@@ -291,6 +292,7 @@ void ProgressBar::paint(PaintContext& ctx)
         Rect textRect = {tx, ty - textH, textW, textH};
         if (!ctx.isClipped(textRect))
             ctx.font.Print(text_.c_str(), tx, ty);
+        if (overrideFont_) ctx.popFont();
     }
 
     Widget::paint(ctx);
@@ -393,6 +395,7 @@ void SpinBox::paint(PaintContext& ctx)
     ctx.line.Line2D(pcx, pcy - 4, pcx, pcy + 4);
 
     // Value text
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetBatch(&ctx.text);
     std::string txt = formatValue();
@@ -402,6 +405,7 @@ void SpinBox::paint(PaintContext& ctx)
     float ty = abs.y + (abs.h + asc) * 0.5f;
     ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
     ctx.font.Print(txt.c_str(), tx, ty);
+    if (overrideFont_) ctx.popFont();
 
     // Border
     Color bc = isFocused() ? t.focusColor : (isHovered() ? t.inputBorderHover : t.inputBorder);
@@ -902,7 +906,14 @@ void DatePicker::openCalendar()
     float popH = 8 * 22.0f + 40;  // header + dow + 6 rows + padding
 
     auto* popup = new CalendarPopup_(this, date_);
-    popup->setRect({abs.x, abs.y + abs.h + 2, popW, popH});
+    const auto& io = BuGUI::GetIO();
+    float popX = abs.x;
+    float popY = abs.y + abs.h + 2;
+    if (popX + popW > io.displayWidth)  popX = io.displayWidth  - popW;
+    if (popX < 0.f) popX = 0.f;
+    if (popY + popH > io.displayHeight) popY = (abs.y - popH >= 0.f) ? abs.y - popH : io.displayHeight - popH;
+    if (popY < 0.f) popY = 0.f;
+    popup->setRect({popX, popY, popW, popH});
     WidgetApp::instance().showPopup(popup, this);
     markDirty();
 }

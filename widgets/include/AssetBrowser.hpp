@@ -3,6 +3,8 @@
 #include "Widget.hpp"
 #include "IconAtlas.hpp"
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  AssetBrowser — thumbnail grid (or list) file/asset browser
 //
@@ -52,7 +54,7 @@ public:
     ViewMode viewMode() const        { return viewMode_; }
 
     /// @brief Set the thumbnail cell size.
-    void  setThumbSize(float s)  { thumbSize_ = std::max(24.f, s); markDirty(); }
+    void  setThumbSize(float s)  { thumbSize_ = max2(24.f, s); markDirty(); }
     /// @brief Get the thumbnail cell size.
     float thumbSize() const      { return thumbSize_; }
 
@@ -88,3 +90,5 @@ private:
     };
     GridLayout computeGrid(const Rect& b) const;
 };
+
+} // namespace BuGUI

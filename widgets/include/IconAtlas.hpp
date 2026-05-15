@@ -12,59 +12,9 @@
 #include "BuImage.hpp"   // BuGUI::BuImage
 #include <vector>
 
-// IconAtlas holds a TextureHandle (opaque uintptr_t) filled in by the backend.
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  Icon identifiers
-// ═════════════════════════════════════════════════════════════════════════════
-
-/// @brief Identifiers for built-in pixel icons in the atlas.
-enum class IconId
+namespace BuGUI
 {
-    None = 0,
-    Folder,
-    FolderOpen,
-    File,
-    FileCode,
-    Book,
-    Gear,
-    Star,
-    Heart,
-    Search,
-    Plus,
-    Minus,
-    Check,
-    Cross,
-    ArrowRight,
-    ArrowDown,
-    ArrowUp,
-    ArrowLeft,
-    Eye,
-    EyeOff,
-    Lock,
-    Unlock,
-    Refresh,
-    Trash,
-    Edit,
-    Home,
-    User,
-    Warning,
-    Info,
-    Error,
-    FileImage,
-    FileArchive,
-    ViewDetail,
-    ViewList,
-    ViewGrid,
-    // Transport / media controls
-    Play,
-    Pause,
-    Stop,
-    StepForward,
-    StepBack,
-    Record,
-    COUNT  // must be last
-};
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  IconAtlas - renders all icons into a single RGBA BuImage at startup,
@@ -160,3 +110,5 @@ private:
     int cellSize_  = 24;
     int cols_      = 0;
 };
+
+} // namespace BuGUI

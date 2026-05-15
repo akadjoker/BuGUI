@@ -1,6 +1,7 @@
 #include "WidgetApp.hpp"
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
+using namespace BuGUI;
 
 void registerLayoutsStage(WidgetApp& app)
 {

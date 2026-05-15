@@ -5,6 +5,8 @@
 #include "Signal.hpp"
 #include "IconAtlas.hpp"
 
+namespace BuGUI
+{
 class BoxLayout;
 class Label;
 class TextInput;
@@ -208,3 +210,5 @@ private:
     // Icon mapping
     static IconId iconForExt(const std::string& ext);
 };
+
+} // namespace BuGUI

@@ -4,6 +4,7 @@
 #include "ScrollWidgets.hpp"
 #include "AppWidgets.hpp"
 #include "TreePropertyColorWidgets.hpp"
+using namespace BuGUI;
 
 void registerAppWidgetsStage(WidgetApp& app)
 {

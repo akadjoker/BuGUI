@@ -5,6 +5,7 @@
 #include "TreePropertyColorWidgets.hpp"
 #include "TextInputWidgets.hpp"
 #include "ConsoleWidget.hpp"
+using namespace BuGUI;
 
 void registerDockStage(WidgetApp& app)
 {

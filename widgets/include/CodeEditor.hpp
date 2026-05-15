@@ -6,6 +6,8 @@
 #include <unordered_set>
 #include <functional>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  SyntaxHighlighter — abstract base for language-specific highlighting
 //
@@ -587,3 +589,5 @@ private:
     bool isWordChar(char c) const;
     std::string commentPrefix() const;
 };
+
+} // namespace BuGUI

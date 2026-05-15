@@ -15,6 +15,8 @@
 //  Emits scrolled(value) when the user drags or clicks in the track.
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 enum class ScrollBarOrientation { Horizontal, Vertical };
 
 class ScrollBar : public Widget
@@ -31,7 +33,7 @@ public:
     /// @brief Get the current scroll position.
     float value() const            { return scrollValue_; }
     /// @brief Get the maximum scroll value.
-    float maxValue() const         { return std::max(0.0f, contentSize_ - viewSize_); }
+    float maxValue() const         { return max2(0.0f, contentSize_ - viewSize_); }
     /// @brief Check if scrolling is needed (content > view).
     bool  needed() const           { return contentSize_ > viewSize_ + 0.5f; }
 
@@ -225,3 +227,5 @@ private:
 
     static constexpr float kRowPad = 4.0f;
 };
+
+} // namespace BuGUI

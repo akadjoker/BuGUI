@@ -4,6 +4,7 @@
 #include "AudioWidgets.hpp"
 #include <cmath>
 #include <cstdlib>
+using namespace BuGUI;
 
 void registerAudioStage(WidgetApp& app)
 {

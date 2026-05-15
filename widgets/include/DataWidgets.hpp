@@ -8,6 +8,8 @@
 #include <numeric>
 #include <unordered_set>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  DataGrid — spreadsheet table with sortable columns, inline edit,
 //             checkboxes, multi-select, zebra stripes
@@ -145,6 +147,10 @@ private:
     int   resizeCol_    = -1;
     float resizeStartX_ = 0.f;
     float resizeStartW_ = 0.f;
+
+    bool  hScrollDrag_        = false;
+    float hScrollDragStartX_  = 0.f;
+    float hScrollDragStartSX_ = 0.f;
 
     // Double-click detection (per-instance)
     uint32_t lastClickTime_ = 0;
@@ -300,3 +306,5 @@ private:
     float resizeStartX_ = 0.f;
     float resizeStartW_ = 0.f;
 };
+
+} // namespace BuGUI

@@ -400,6 +400,7 @@ void ListBox::paint(PaintContext& ctx)
     int last  = static_cast<int>((scrollOffset_ + abs.h) / ih) + 1;
     last = std::min(last, static_cast<int>(items_.size()));
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetBatch(&ctx.text);
 
@@ -426,6 +427,7 @@ void ListBox::paint(PaintContext& ctx)
         ctx.font.Print(items_[static_cast<size_t>(i)].c_str(), tx, ty);
     }
 
+    if (overrideFont_) ctx.popFont();
     ctx.popClip();
 }
 

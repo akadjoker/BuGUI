@@ -380,7 +380,7 @@ namespace BuGUI
         uint32_t base   = static_cast<uint32_t>(vertices_.size());
 
         for (const auto &p : path_)
-            vertices_.push_back({p.x, p.y, 0.0f, 0.0f, color});
+            vertices_.push_back({p.x, p.y, whiteUV_.x, whiteUV_.y, color});
 
         for (uint32_t i = 2; i < static_cast<uint32_t>(n); ++i)
         {
@@ -439,9 +439,9 @@ namespace BuGUI
             my *= inv2 * thickness;
 
             vL[i] = static_cast<uint32_t>(vertices_.size());
-            vertices_.push_back({p.x + mx, p.y + my, 0.0f, 0.0f, color});
+            vertices_.push_back({p.x + mx, p.y + my, whiteUV_.x, whiteUV_.y, color});
             vR[i] = static_cast<uint32_t>(vertices_.size());
-            vertices_.push_back({p.x - mx, p.y - my, 0.0f, 0.0f, color});
+            vertices_.push_back({p.x - mx, p.y - my, whiteUV_.x, whiteUV_.y, color});
         }
 
         for (int i = 0; i < segs; ++i)
@@ -882,11 +882,6 @@ namespace BuGUI
     void NewFrame()
     {
         auto &ctx = current();
-        ctx.io.inputChars.clear();
-        ctx.io.keyEvents.clear();
-        ctx.io.dropEvents.clear();
-        ctx.io.mouseWheelX = 0.0f;
-        ctx.io.mouseWheelY = 0.0f;
         ctx.drawList.clear();
         ctx.transDrawList.clear();
         ctx.overlayList.clear();
@@ -896,6 +891,11 @@ namespace BuGUI
     void Render()
     {
         auto &ctx = current();
+        ctx.io.mouseWheelX = 0.0f;
+        ctx.io.mouseWheelY = 0.0f;
+        ctx.io.inputChars.clear();
+        ctx.io.keyEvents.clear();
+        ctx.io.dropEvents.clear();
         // passes are already populated by WidgetApp::paint();
         // append the overlay as the last pass (identity camera, always on top).
         if (!ctx.overlayList.commands().empty())

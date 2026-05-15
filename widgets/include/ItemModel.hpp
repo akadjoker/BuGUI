@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <any>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  Model/View Architecture  (Qt-inspired)
 //
@@ -433,3 +435,5 @@ private:
     mutable bool          dirty_          = true;
     mutable std::vector<int> mapping_;  // proxy row → source row
 };
+
+} // namespace BuGUI

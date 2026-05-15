@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "InputWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // Stage 14 - Carousel (matches tmp/app/StageAnchor.hpp carousel)
 

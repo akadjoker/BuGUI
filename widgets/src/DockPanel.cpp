@@ -555,14 +555,8 @@ void DockPanel::onMousePress(MouseEvent& e)
     if (!leaf) return;
     int tabIdx = hitTab(leaf, ox, oy, e.x, e.y);
     if (tabIdx >= 0) {
-        // Single-tab leaf: nothing to switch or drag
-        if (leaf->tabs.size() <= 1) {
-            e.consumed = true;
-            return;
-        }
-
         // Switch tab (skip if already active)
-        if (tabIdx != leaf->currentTab) {
+        if (tabIdx != leaf->currentTab && leaf->tabs.size() > 1) {
             for (auto& t : leaf->tabs) t.content->setVisible(false);
             leaf->currentTab = tabIdx;
             leaf->tabs[tabIdx].content->setVisible(true);

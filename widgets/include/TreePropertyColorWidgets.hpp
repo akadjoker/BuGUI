@@ -7,6 +7,9 @@
 #include <variant>
 #include <vector>
 
+
+namespace BuGUI
+{
 // ─────────────────────────────────────────────────────────────────────────────
 //  Forward declarations
 // ─────────────────────────────────────────────────────────────────────────────
@@ -333,3 +336,5 @@ private:
     bool       showAlpha_  = false;
     DragTarget dragTarget_ = DragNone;
 };
+
+} // namespace BuGUI

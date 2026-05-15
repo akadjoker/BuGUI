@@ -27,6 +27,8 @@
 //  (requires a valid GL context at that point).
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 class ToolBar : public Widget
 {
 public:
@@ -185,3 +187,5 @@ private:
 
     int hitItem(float absX, float absY) const;  // returns item id or -1
 };
+
+} // namespace BuGUI

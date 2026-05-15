@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "DialogWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 08 — Dialogs & Notifications

@@ -10,6 +10,10 @@
 #include <memory>
 #include <unordered_map>
 
+
+namespace BuGUI
+{
+    
 class Widget;
 
 // Forward — EaseType & applyEasing live in WidgetApp.hpp
@@ -219,3 +223,5 @@ private:
     std::vector<Animation*>      pendingAnims_;
     std::vector<AnimationGroup*> pendingGroups_;
 };
+
+} // namespace BuGUI

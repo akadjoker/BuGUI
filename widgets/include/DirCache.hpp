@@ -19,6 +19,8 @@
 //    cache.invalidate("/home/user/project/textures");
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 class DirCache
 {
 public:
@@ -134,3 +136,5 @@ private:
 
     void freeArena();
 };
+
+} // namespace BuGUI

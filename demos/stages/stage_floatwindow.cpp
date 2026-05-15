@@ -4,6 +4,7 @@
 #include "InputWidgets.hpp"
 #include "ViewWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 11 — FloatWindow (draggable / resizable / closable floating panels)

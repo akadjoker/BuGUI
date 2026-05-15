@@ -6,6 +6,8 @@
 #include <string>
 #include <cmath>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  Knob — Rotary knob control (270° arc style)
 //
@@ -140,13 +142,13 @@ public:
     ADSRWidget();
 
     /// @brief Set the attack time in seconds.
-    void setAttack(float s)  { a_ = std::max(0.001f, s); markDirty(); }
+    void setAttack(float s)  { a_ = max2(0.001f, s); markDirty(); }
     /// @brief Set the decay time in seconds.
-    void setDecay(float s)   { d_ = std::max(0.001f, s); markDirty(); }
+    void setDecay(float s)   { d_ = max2(0.001f, s); markDirty(); }
     /// @brief Set the sustain level (0..1).
-    void setSustain(float v) { s_ = std::clamp(v, 0.0f, 1.0f); markDirty(); }
+    void setSustain(float v) { s_ = clamp(v, 0.0f, 1.0f); markDirty(); }
     /// @brief Set the release time in seconds.
-    void setRelease(float s) { r_ = std::max(0.001f, s); markDirty(); }
+    void setRelease(float s) { r_ = max2(0.001f, s); markDirty(); }
     /// @brief Set all ADSR envelope parameters at once.
     void setADSR(float a, float d, float s, float r);
 
@@ -477,3 +479,5 @@ private:
     int   newNotePitch_ = -1;
     float newNoteStart_ = 0.f;
 };
+
+} // namespace BuGUI

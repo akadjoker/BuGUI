@@ -4,6 +4,8 @@
 #include "Animation.hpp"     // Animator
 #include "MenuWidgets.hpp"   // Menu::exec (for context menu)
 
+namespace BuGUI {
+
 struct ContextMenu {
     static void show(Menu* menu, float x, float y, Widget* /*owner*/) {
         if (menu) menu->exec(x, y);
@@ -921,11 +923,15 @@ void WidgetApp::updateHover(Widget* newLeaf)
 
 void WidgetApp::setFocused(Widget* w)
 {
-    if (focused_)
+    if (focused_) {
         focused_->setFocused(false);
+        focused_->onFocusLost();
+    }
     focused_ = w;
-    if (focused_)
+    if (focused_) {
         focused_->setFocused(true);
+        focused_->onFocusGained();
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1445,3 +1451,5 @@ void WidgetApp::dispatchDropEvents(const std::vector<BuGUI::IO::DropEvent>& drop
         }
     }
 }
+
+} // namespace BuGUI

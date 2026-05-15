@@ -1,6 +1,7 @@
 #include "SdlOpenGLBackend.hpp"
 #include "BuGUI.hpp"
 #include <cstdio>
+using namespace BuGUI;
 #include <string>
 #include <vector>
 #include <cstring>

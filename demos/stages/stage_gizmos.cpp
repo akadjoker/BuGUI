@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage 12 — Gizmo2D + Gizmo3D

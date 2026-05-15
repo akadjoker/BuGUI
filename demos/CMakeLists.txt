@@ -37,6 +37,7 @@ add_executable(bugui_demos
     stages/stage_toolbar.cpp
     stages/stage_codeeditor.cpp
     stages/stage_appwidgets.cpp
+    stages/stage_focus.cpp
     backends/SdlOpenGLBackend.cpp
 )
 

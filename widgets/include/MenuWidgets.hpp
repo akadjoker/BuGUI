@@ -6,6 +6,9 @@
 #include <vector>
 #include <functional>
 
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  MenuAction — a single item in a Menu
 //    auto* act = menu->addAction("Open");
@@ -176,3 +179,5 @@ private:
     void closeMenu_();
     void computeEntryWidths_();
 };
+
+} // namespace BuGUI

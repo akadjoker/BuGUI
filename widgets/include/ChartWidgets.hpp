@@ -6,6 +6,8 @@
 #include <string>
 #include <functional>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  GradientEditor - horizontal color gradient with draggable stops
 // ═════════════════════════════════════════════════════════════════════════════
@@ -392,3 +394,5 @@ private:
     void paintKeys(PaintContext& ctx, const Rect& b);
     void paintPlayhead(PaintContext& ctx, const Rect& b);
 };
+
+} // namespace BuGUI

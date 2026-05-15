@@ -72,7 +72,11 @@ set(SOURCES
     # src/UIApp.cpp
 )
 
-add_library(bugui_widgets STATIC ${SOURCES})
+add_library(bugui_widgets ${BUGUI_LIB_TYPE} ${SOURCES})
+
+set_target_properties(bugui_widgets PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 
 target_include_directories(bugui_widgets PUBLIC
     include
@@ -83,3 +87,12 @@ target_include_directories(bugui_widgets PUBLIC
 target_link_libraries(bugui_widgets PRIVATE bugui_stb)
 
 target_precompile_headers(bugui_widgets PRIVATE src/pch.hpp)
+
+# Consumers that call target_link_libraries(... bugui_widgets) automatically
+# inherit this PCH, avoiding repeated parsing of the heavy widget headers.
+# Override with target_precompile_headers(myapp REUSE_FROM bugui_widgets) for
+# maximum sharing when compile flags match.
+target_precompile_headers(bugui_widgets INTERFACE
+    include/WidgetApp.hpp
+    include/BuGUI_light.hpp
+)

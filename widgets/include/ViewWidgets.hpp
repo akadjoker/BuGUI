@@ -19,6 +19,8 @@
 //  The FloatWindow lives in WidgetApp's float layer (above stages, below popups).
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 class FloatWindow : public Widget
 {
 public:
@@ -242,3 +244,5 @@ private:
     float transDuration_ = 0.25f;
     Transition transType_ = None;
 };
+
+} // namespace BuGUI

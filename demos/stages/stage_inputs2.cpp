@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp"
 #include "TextInputWidgets.hpp"
 #include "ComboBox.hpp"
+using namespace BuGUI;
 
 void registerInputs2Stage(WidgetApp& app)
 {

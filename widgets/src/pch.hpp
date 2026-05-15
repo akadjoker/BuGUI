@@ -29,3 +29,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+// BuGUI internal code uses bare Color/Vec2f/etc. without BuGUI:: prefix.
+using namespace BuGUI;

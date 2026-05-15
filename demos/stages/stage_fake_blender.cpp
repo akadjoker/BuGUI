@@ -13,6 +13,7 @@
 #include "InputWidgets.hpp"
 #include "ScrollWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage — Fake Blender

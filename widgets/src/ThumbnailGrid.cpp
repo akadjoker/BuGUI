@@ -17,9 +17,16 @@ ThumbnailGrid::ThumbnailGrid() {}
 
 int ThumbnailGrid::addItem(const std::string& label, const Color& color)
 {
-    items_.push_back({label, color, false});
+    items_.push_back({label, color, {}, false});
     markDirty();
     return static_cast<int>(items_.size()) - 1;
+}
+
+void ThumbnailGrid::setItemTexture(int idx, BuGUI::TextureHandle tex)
+{
+    if (idx < 0 || idx >= static_cast<int>(items_.size())) return;
+    items_[idx].tex = tex;
+    markDirty();
 }
 
 void ThumbnailGrid::removeItem(int idx)
@@ -105,17 +112,23 @@ void ThumbnailGrid::paint(PaintContext& ctx)
             ctx.fillRect(x - 2, y - 2, thumbW_ + 4, thumbH_ + labelH + 4);
         }
 
-        // Thumbnail (colour placeholder — will use texture in future)
-        ctx.fill.SetColor(item.color.r, item.color.g, item.color.b, item.color.a);
-        ctx.fillRect(x, y, thumbW_, thumbH_);
+        // Thumbnail
+        if (item.tex) {
+            Rect dst = {x, y, thumbW_, thumbH_};
+            Rect uv  = {0.f, 0.f, 1.f, 1.f};
+            ctx.drawImage(item.tex, dst, uv);
+        } else {
+            ctx.fill.SetColor(item.color.r, item.color.g, item.color.b, item.color.a);
+            ctx.fillRect(x, y, thumbW_, thumbH_);
 
-        // Subtle gradient at bottom of thumb (darkening)
-        float gradH = thumbH_ * 0.3f;
-        for (int g = 0; g < static_cast<int>(gradH); ++g) {
-            float t = float(g) / gradH;
-            uint8_t a = static_cast<uint8_t>(t * 80.f);
-            ctx.fill.SetColor(0, 0, 0, a);
-            ctx.fillRect(x, y + thumbH_ - gradH + g, thumbW_, 1);
+            // Subtle gradient at bottom of thumb (darkening)
+            float gradH = thumbH_ * 0.3f;
+            for (int g = 0; g < static_cast<int>(gradH); ++g) {
+                float t2 = float(g) / gradH;
+                uint8_t a = static_cast<uint8_t>(t2 * 80.f);
+                ctx.fill.SetColor(0, 0, 0, a);
+                ctx.fillRect(x, y + thumbH_ - gradH + g, thumbW_, 1);
+            }
         }
 
         // Border

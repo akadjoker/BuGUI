@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <cmath>
-#include <algorithm>
 
 // ── Raw integer typedefs (global, used everywhere) ───────────────────────────
 typedef uint8_t   u8;
@@ -233,6 +232,45 @@ struct Color
     static const Color CYAN;
     static const Color MAGENTA;
     static const Color YELLOW;
+
+    // ── HSV conversion ───────────────────────────────────────────────────
+    /// h∈[0,360), s∈[0,1], v∈[0,1], a∈[0,1]
+    static Color FromHSV(float h, float s, float v, float a = 1.0f)
+    {
+        float r = v, g = v, b = v;
+        if (s > 0.0f) {
+            h = h / 60.0f;
+            int   i = static_cast<int>(h);
+            float f = h - static_cast<float>(i);
+            float p = v * (1.0f - s);
+            float q = v * (1.0f - s * f);
+            float t = v * (1.0f - s * (1.0f - f));
+            switch (i % 6) {
+            case 0: r=v; g=t; b=p; break;
+            case 1: r=q; g=v; b=p; break;
+            case 2: r=p; g=v; b=t; break;
+            case 3: r=p; g=q; b=v; break;
+            case 4: r=t; g=p; b=v; break;
+            default:r=v; g=p; b=q; break;
+            }
+        }
+        return FromFloat(r, g, b, a);
+    }
+
+    /// Returns h∈[0,360), s∈[0,1], v∈[0,1]. Alpha passed through.
+    void ToHSV(float& h, float& s, float& v) const
+    {
+        float rf = r / 255.f, gf = g / 255.f, bf = b / 255.f;
+        float mx = rf > gf ? (rf > bf ? rf : bf) : (gf > bf ? gf : bf);
+        float mn = rf < gf ? (rf < bf ? rf : bf) : (gf < bf ? gf : bf);
+        float d  = mx - mn;
+        v = mx;
+        s = (mx > 0.00001f) ? d / mx : 0.0f;
+        if (d < 0.00001f) { h = 0.0f; return; }
+        if      (mx == rf) h = 60.0f * (gf - bf) / d + (gf < bf ? 360.0f : 0.0f);
+        else if (mx == gf) h = 60.0f * (bf - rf) / d + 120.0f;
+        else               h = 60.0f * (rf - gf) / d + 240.0f;
+    }
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -289,12 +327,6 @@ using FloatRect = Rectangle<float>;
 } // namespace BuGUI
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Global aliases — existing code uses bare Color/IntRect/FloatRect/Vec2f ───
-using BuGUI::Color;
-using BuGUI::IntRect;
-using BuGUI::FloatRect;
-using BuGUI::Vec2f;
-using BuGUI::Vec3f;
-using BuGUI::Vec4f;
-using BuGUI::Mat4f;
+// All types (Color, Vec2f, IntRect, …) live in namespace BuGUI.
+// Consumer code: add  using namespace BuGUI;  or qualify with  BuGUI::
 

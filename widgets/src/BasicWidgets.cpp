@@ -28,6 +28,7 @@ void Label::paint(PaintContext& ctx)
     const auto& t = Theme::instance();
     const Color& c = enabled_ ? color_ : t.textDisabled;
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(c);
     ctx.font.SetBatch(&ctx.text);
@@ -46,8 +47,7 @@ void Label::paint(PaintContext& ctx)
     Rect textRect = {tx, ty - asc, textW, asc};
     if (!ctx.isClipped(textRect))
         ctx.font.Print(text_.c_str(), tx, ty);
-
-    Widget::paint(ctx);
+    if (overrideFont_) ctx.popFont();    Widget::paint(ctx);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -162,6 +162,7 @@ void Button::paint(PaintContext& ctx)
             t.borderRadius, 6, false);
     }
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
     ctx.font.SetBatch(&ctx.text);
@@ -193,6 +194,7 @@ void Button::paint(PaintContext& ctx)
     if (!ctx.isClipped(textRect))
         ctx.font.Print(text_.c_str(), tx, ty);
 
+    if (overrideFont_) ctx.popFont();
     // paint children (no clip needed — button children are rare)
     for (auto& c : children_)
         c->paint(ctx);
@@ -563,6 +565,7 @@ void CheckBox::paint(PaintContext& ctx)
         }
     }
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
     ctx.font.SetBatch(&ctx.text);
@@ -573,8 +576,7 @@ void CheckBox::paint(PaintContext& ctx)
     Rect textRect = {tx, ty - asc, abs.w, asc};
     if (!ctx.isClipped(textRect))
         ctx.font.Print(text_.c_str(), tx, ty);
-
-    Widget::paint(ctx);
+    if (overrideFont_) ctx.popFont();    Widget::paint(ctx);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -708,6 +710,7 @@ void RadioButton::paint(PaintContext& ctx)
         ctx.fillCircle(cx, cy, r * 0.45f);
     }
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetColor(enabled_ ? t.textColor : t.textDisabled);
     ctx.font.SetBatch(&ctx.text);
@@ -718,8 +721,7 @@ void RadioButton::paint(PaintContext& ctx)
     Rect trRect = {rtx, rty - asc2, abs.w, asc2};
     if (!ctx.isClipped(trRect))
         ctx.font.Print(text_.c_str(), rtx, rty);
-
-    Widget::paint(ctx);
+    if (overrideFont_) ctx.popFont();    Widget::paint(ctx);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -786,6 +788,7 @@ void Switch::paint(PaintContext& ctx)
     ctx.fill.SetColor(t.switchThumb.r, t.switchThumb.g, t.switchThumb.b, t.switchThumb.a);
     ctx.fillCircle(thumbX, thumbY, thumbR);
 
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     if (!text_.empty())
     {
         ctx.font.SetFontSize(t.fontSize);
@@ -799,8 +802,7 @@ void Switch::paint(PaintContext& ctx)
         if (!ctx.isClipped(textRect))
             ctx.font.Print(text_.c_str(), lx, ly);
     }
-
-    Widget::paint(ctx);
+    if (overrideFont_) ctx.popFont();    Widget::paint(ctx);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -6,6 +6,10 @@
 #include <string>
 #include <functional>
 
+
+namespace BuGUI
+{
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  GridLayout - uniform grid with N columns, rows auto-calculated
 //    Children flow left-to-right, top-to-bottom. Each child = 1 cell.
@@ -705,3 +709,5 @@ private:
     bool     showScrim_    = true;
 };
 
+
+} // namespace BuGUI

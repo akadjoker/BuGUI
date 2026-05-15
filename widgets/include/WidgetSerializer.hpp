@@ -5,6 +5,10 @@
 
 using json = nlohmann::json;
 
+
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  WidgetSerializer - save / load widget trees to/from JSON
 // ═════════════════════════════════════════════════════════════════════════════
@@ -37,3 +41,6 @@ private:
     static json serializeChildren(const Widget* w);
     static void deserializeChildren(const json& j, Widget* w);
 };
+
+
+} // namespace BuGUI

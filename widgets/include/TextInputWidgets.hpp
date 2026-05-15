@@ -7,6 +7,9 @@
 #include <functional>
 #include <vector>
 
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  TextInput - single-line text input field
 //  Modes: Normal, Password (•), NumberOnly (digits/-.+), ReadOnly
@@ -169,7 +172,7 @@ public:
     int  tabSize() const   { return tabSize_; }
 
     /// @brief Set font zoom scale (1.0 = 100%).
-    void setFontScale(float s) { fontScale_ = std::max(0.5f, std::min(3.0f, s)); markDirty(); }
+    void setFontScale(float s) { fontScale_ = max2(0.5f, min2(3.0f, s)); markDirty(); }
     /// @brief Get font zoom scale.
     float fontScale() const    { return fontScale_; }
 
@@ -296,3 +299,5 @@ private:
     int        totalVisualRows() const;
     VisualPos  visualToLogical(int visualRow) const;
 };
+
+} // namespace BuGUI

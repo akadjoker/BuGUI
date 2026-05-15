@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "InputWidgets.hpp"
 #include "LayoutWidgets.hpp"
+using namespace BuGUI;
 
 void registerSlidePanelStage(WidgetApp& app)
 {

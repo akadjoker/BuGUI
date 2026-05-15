@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "NodeEditor.hpp"
+using namespace BuGUI;
 
 void registerNodeEditorStage(WidgetApp& app)
 {

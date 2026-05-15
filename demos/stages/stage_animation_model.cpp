@@ -8,6 +8,7 @@
 #include "InputWidgets.hpp"
 #include "Animation.hpp"
 #include "ItemModel.hpp"
+using namespace BuGUI;
 
 static void backToMenu(WidgetApp& app)
 {

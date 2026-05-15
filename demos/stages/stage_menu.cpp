@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "ScrollWidgets.hpp"
+using namespace BuGUI;
 
 void registerMenuStage(WidgetApp& app)
 {
@@ -191,5 +192,10 @@ void registerMenuStage(WidgetApp& app)
     auto* btn34 = vbox->createChild<Button>("34 - App Widgets (Breadcrumbs / Search / Outliner / RichText / Viewport3D)");
     btn34->clicked.connect([&app]() {
         app.setStage("appwidgets", TransitionType::CoverLeft);
+    });
+
+    auto* btn35 = vbox->createChild<Button>("35 - Focus & Keyboard Navigation (Tab cycling / onFocusGained / Context Menu)");
+    btn35->clicked.connect([&app]() {
+        app.setStage("focus", TransitionType::CoverLeft);
     });
 }

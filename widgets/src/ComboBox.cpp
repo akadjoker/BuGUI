@@ -24,18 +24,16 @@ public:
         Rect abs = absoluteRect();
         const auto& t = Theme::instance();
 
-        // Background + border
-        Rect clipped;
-        if (ctx.clipRectIntersect(abs, clipped))
-        {
-            ctx.fill.SetColor(t.panelColor.r, t.panelColor.g, t.panelColor.b, 255);
-            ctx.fill.RoundedRectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                                       static_cast<int>(clipped.w), static_cast<int>(clipped.h),
-                                       t.borderRadius, 6, true);
-            ctx.line.SetColor(t.inputBorderHover.r, t.inputBorderHover.g, t.inputBorderHover.b, 255);
-            ctx.line.Rectangle(static_cast<int>(clipped.x), static_cast<int>(clipped.y),
-                               static_cast<int>(clipped.w), static_cast<int>(clipped.h), false);
-        }
+        // Background + border — draw over the full popup rect, ignoring the
+        // inherited clip so the solid background covers whatever is underneath
+        // (important when the popup opens upward over other widgets).
+        ctx.fill.SetColor(t.panelColor.r, t.panelColor.g, t.panelColor.b, 255);
+        ctx.fill.RoundedRectangle(static_cast<int>(abs.x), static_cast<int>(abs.y),
+                                   static_cast<int>(abs.w), static_cast<int>(abs.h),
+                                   t.borderRadius, 6, true);
+        ctx.line.SetColor(t.inputBorderHover.r, t.inputBorderHover.g, t.inputBorderHover.b, 255);
+        ctx.line.Rectangle(static_cast<int>(abs.x), static_cast<int>(abs.y),
+                           static_cast<int>(abs.w), static_cast<int>(abs.h), false);
 
         ctx.pushClip(abs);
         int n     = static_cast<int>(items_.size());
@@ -214,6 +212,7 @@ void ComboBox::paint(PaintContext& ctx)
     }
 
     // Selected text
+    if (overrideFont_) ctx.pushFont(overrideFont_);
     ctx.font.SetFontSize(t.fontSize);
     ctx.font.SetBatch(&ctx.text);
     float asc = ctx.font.GetAscender();
@@ -246,6 +245,7 @@ void ComboBox::paint(PaintContext& ctx)
                     static_cast<int>(ax + arrowSz),      static_cast<int>(ay + arrowSz));
     ctx.line.Line2D(static_cast<int>(ax + arrowSz),     static_cast<int>(ay + arrowSz),
                     static_cast<int>(ax + arrowSz * 2),  static_cast<int>(ay));
+    if (overrideFont_) ctx.popFont();
 }
 
 void ComboBox::onMousePress(MouseEvent& e)
@@ -266,7 +266,18 @@ void ComboBox::openDropdown()
     float popH = vis * rowH + 2;
 
     auto* popup = new ComboPopup_(this, items_, selectedIndex_, maxVisible_, rowH);
-    popup->setRect({abs.x, abs.y + abs.h, abs.w, popH});
+
+    // Open upward if there is not enough space below. Clamp horizontally too.
+    const auto& io = BuGUI::GetIO();
+    float popX = abs.x;
+    float popY = (abs.y + abs.h + popH > io.displayHeight && abs.y - popH >= 0.0f)
+                 ? abs.y - popH
+                 : abs.y + abs.h;
+    if (popY + popH > io.displayHeight) popY = io.displayHeight - popH;
+    if (popY < 0.f) popY = 0.f;
+    if (popX + abs.w > io.displayWidth)  popX = io.displayWidth  - abs.w;
+    if (popX < 0.f) popX = 0.f;
+    popup->setRect({popX, popY, abs.w, popH});
     WidgetApp::instance().showPopup(popup, this);
     markDirty();
 }

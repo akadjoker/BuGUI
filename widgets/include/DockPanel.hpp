@@ -2,6 +2,9 @@
 
 #include "Widget.hpp"
 
+
+namespace BuGUI
+{
 // ─────────────────────────────────────────────────────────────────────────────
 //  DockSide - where to dock relative to a panel
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,3 +166,5 @@ private:
     void       performDrop();
     void       pruneNode (DockNode*& slot);
 };
+
+} // namespace BuGUI

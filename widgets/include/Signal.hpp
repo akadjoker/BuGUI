@@ -1,11 +1,13 @@
 #pragma once
 #include <cstdint>
-#include <functional>
 #include <vector>
-#include <algorithm>
+#include <type_traits>  // ~6k lines — replaces <functional> (~28k) + <algorithm> (~17k)
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Signal<Args...>  - lightweight signal/slot (like Qt, but std::function)
+//  Signal<Args...>  — lightweight signal/slot, Qt-style type erasure.
+//
+//  No std::function: stores callable as heap-allocated closure + raw fn ptr,
+//  same technique Qt's moc generates but in pure C++17, header-only.
 //
 //  Usage:
 //      Signal<int> onValueChanged;
@@ -14,50 +16,76 @@
 //      onValueChanged.disconnect(id);
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
+
 template <typename... Args>
 class Signal
 {
 public:
-    using SlotFunc = std::function<void(Args...)>;
-    using SlotId   = uint32_t;
+    using SlotId = uint32_t;
 
-    /// @brief Connect a slot function, returns a unique ID.
-    SlotId connect(SlotFunc fn)
+    /// Connect any callable (lambda, function pointer, functor).
+    /// Returns a unique ID for later disconnection.
+    template <typename F>
+    SlotId connect(F&& fn)
     {
-        SlotId id = nextId_++;
-        slots_.push_back({id, std::move(fn)});
-        return id;
+        using FD = typename std::decay<F>::type;
+        auto* copy = new FD(static_cast<F&&>(fn));
+        // Captureless lambdas: FD is baked in at instantiation → valid fn ptr.
+        slots_.push_back({
+            nextId_++,
+            copy,
+            [](void* ctx, Args... args) { (*static_cast<FD*>(ctx))(static_cast<Args>(args)...); },
+            [](void* ctx)               { delete static_cast<FD*>(ctx); }
+        });
+        return slots_.back().id;
     }
 
-    /// @brief Disconnect a slot by its ID.
     void disconnect(SlotId id)
     {
-        slots_.erase(
-            std::remove_if(slots_.begin(), slots_.end(),
-                           [id](const Slot& s) { return s.id == id; }),
-            slots_.end());
+        for (auto it = slots_.begin(); it != slots_.end(); ++it) {
+            if (it->id == id) {
+                it->destroy(it->ctx);
+                slots_.erase(it);
+                return;
+            }
+        }
     }
 
-    /// @brief Disconnect all slots.
-    void disconnectAll() { slots_.clear(); }
+    void disconnectAll()
+    {
+        for (auto& s : slots_) s.destroy(s.ctx);
+        slots_.clear();
+    }
 
-    /// @brief Emit the signal, calling all connected slots.
     void emit(Args... args) const
     {
         for (const auto& s : slots_)
-            s.fn(args...);
+            s.call(s.ctx, static_cast<Args>(args)...);
     }
 
-    /// @brief Check if no slots are connected.
     bool empty() const { return slots_.empty(); }
 
+    ~Signal() { disconnectAll(); }
+
+    // Non-copyable (owns heap allocations)
+    Signal() = default;
+    Signal(const Signal&)            = delete;
+    Signal& operator=(const Signal&) = delete;
+    Signal(Signal&&)                 = default;
+    Signal& operator=(Signal&&)      = default;
+
 private:
-    struct Slot
-    {
-        SlotId   id;
-        SlotFunc fn;
+    struct Slot {
+        SlotId  id;
+        void*   ctx;
+        void  (*call)(void*, Args...);
+        void  (*destroy)(void*);
     };
 
     std::vector<Slot> slots_;
     SlotId nextId_ = 1;
 };
+
+} // namespace BuGUI

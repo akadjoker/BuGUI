@@ -5,7 +5,7 @@
 
 using BuGUI::clamp;
 // Screen-space 2D alias — avoids Widget::Vec2f ambiguity inside member methods
-using Pt2 = ::Vec2f;
+using Pt2 = BuGUI::Vec2f;
 
 static constexpr float kPi = 3.14159265f;
 
@@ -394,7 +394,7 @@ void Gizmo3D::setTarget(const float* pos3, const float* rotDeg3, const float* sc
 
 // ── Projection helpers ────────────────────────────────────────────────────────
 
-Vec2f Gizmo3D::project(const Vec3f& world) const
+BuGUI::Vec2f Gizmo3D::project(const Vec3f& world) const
 {
     Rect pAbs = parent_ ? parent_->absoluteRect() : Rect{0, 0, (float)vpW_, (float)vpH_};
 

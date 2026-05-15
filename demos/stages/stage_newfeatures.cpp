@@ -4,6 +4,7 @@
 #include "InputWidgets.hpp"
 #include "TextInputWidgets.hpp"
 #include "ScrollWidgets.hpp"
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Simple syntax callback for C-like code (keywords, strings, comments)

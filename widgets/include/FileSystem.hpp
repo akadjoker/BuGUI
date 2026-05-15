@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <ctime>
 
+
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  FileSystem — cross-platform file/directory operations
 //
@@ -70,3 +73,5 @@ std::string humanSize(uint64_t bytes);  // "3.2 KB", "1.5 MB", etc.
 std::string humanDate(time_t t);  // "2025-01-15 14:30"
 
 } // namespace FileSystem
+
+} // namespace BuGUI

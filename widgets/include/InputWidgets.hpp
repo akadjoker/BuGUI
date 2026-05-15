@@ -4,6 +4,8 @@
 #include "Theme.hpp"
 #include <string>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  Slider — draggable value control (horizontal or vertical)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -278,3 +280,5 @@ private:
     void  adjustField(Field f, int delta);
     std::string formatTime() const;
 };
+
+} // namespace BuGUI

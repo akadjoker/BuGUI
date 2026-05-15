@@ -124,7 +124,9 @@ public:
     int height;
 }; // class BuImage
 
-} // namespace BuGUI
 
 // Global alias so existing code compiles without changes
 using BuGUI::BuImage;
+
+} // namespace BuGUI
+ 

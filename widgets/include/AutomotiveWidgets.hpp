@@ -17,6 +17,9 @@
 //    and a large center readout
 // ─────────────────────────────────────────────────────────────────────────────
 
+namespace BuGUI
+{
+
 class RadialGauge : public Widget
 {
 public:
@@ -299,3 +302,5 @@ private:
     float percent_;
     bool  charging_ = false;
 };
+
+} // namespace BuGUI

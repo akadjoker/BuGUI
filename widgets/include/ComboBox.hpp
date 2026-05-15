@@ -12,6 +12,8 @@
 //    cb->selectionChanged.connect([](int idx) { ... });
 // ═════════════════════════════════════════════════════════════════════════════
 
+namespace BuGUI
+{
 class ComboBox : public Widget
 {
 public:
@@ -68,3 +70,5 @@ private:
 
     friend class ComboPopup_;
 };
+
+} // namespace BuGUI

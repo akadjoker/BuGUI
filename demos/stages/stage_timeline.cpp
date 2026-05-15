@@ -2,6 +2,7 @@
 #include "BasicWidgets.hpp"
 #include "LayoutWidgets.hpp"
 #include "Timeline.hpp"
+using namespace BuGUI;
 
 void registerTimelineStage(WidgetApp& app)
 {

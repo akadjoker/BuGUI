@@ -14,6 +14,7 @@
 #include "Timeline.hpp"
 #include "GizmoWidgets.hpp"
 #include <cstdio>
+using namespace BuGUI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Stage — Fake Unity 3D

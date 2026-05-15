@@ -4,6 +4,7 @@
 #include "ScrollWidgets.hpp"
 
 #include <string>
+using namespace BuGUI;
 
 void registerScrollStage(WidgetApp& app)
 {

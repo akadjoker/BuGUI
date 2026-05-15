@@ -7,6 +7,8 @@
 #include <functional>
 #include <vector>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  Dialog — modal overlay with scrim, title, message, action buttons
 //
@@ -229,3 +231,5 @@ private:
     void onCancel();
     void onKeyPress(KeyEvent& e) override;
 };
+
+} // namespace BuGUI

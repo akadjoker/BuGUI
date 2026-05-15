@@ -2,6 +2,7 @@
 #include "BuGUI.hpp"
 #include "WidgetApp.hpp"
 #include "IconAtlas.hpp"
+using namespace BuGUI;
 
 extern "C" const char *__lsan_default_suppressions()
 {
@@ -46,6 +47,7 @@ void registerFakeUnityStage(WidgetApp& app);
 void registerToolBarStage(WidgetApp& app);
 void registerCodeEditorStage(WidgetApp& app);
 void registerAppWidgetsStage(WidgetApp& app);
+void registerFocusStage(WidgetApp& app);
 
 int main()
 {
@@ -124,6 +126,7 @@ int main()
     registerToolBarStage(app);
     registerCodeEditorStage(app);
     registerAppWidgetsStage(app);
+    registerFocusStage(app);
     app.setStage("menu");
 
     // ── Loop ─────────────────────────────────────────────────────────────────

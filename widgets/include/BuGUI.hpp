@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <string>
 #include <vector>
-#include <functional>
 #include <unordered_map>
 
 namespace BuGUI
@@ -67,6 +66,19 @@ namespace BuGUI
         float y = 0.0f;
         float w = 0.0f;
         float h = 0.0f;
+
+        float right()  const { return x + w; }
+        float bottom() const { return y + h; }
+
+        bool contains(float px, float py) const
+        {
+            return px >= x && px < x + w && py >= y && py < y + h;
+        }
+
+        Rect shrunk(float pad) const
+        {
+            return {x + pad, y + pad, w - pad * 2, h - pad * 2};
+        }
     };
 
     struct TextureHandle
@@ -115,14 +127,15 @@ namespace BuGUI
         int wantedCursor = 0;
 
         // ── Clipboard (set by backend) ───────────────────────────────────
-        std::function<void(const char*)>  setClipboardText;
-        std::function<std::string()>      getClipboardText;
+        // Assign captureless lambdas or plain function pointers.
+        void        (*setClipboardText)(const char*)        = nullptr;
+        std::string (*getClipboardText)()                   = nullptr;
 
         // ── File I/O (set by backend) ────────────────────────────────────
         // readFile:  path → file contents (empty string on failure)
         // writeFile: path, data → true on success
-        std::function<std::string(const std::string& path)>                   readFile;
-        std::function<bool(const std::string& path, const std::string& data)> writeFile;
+        std::string (*readFile )(const std::string& path)                          = nullptr;
+        bool        (*writeFile)(const std::string& path, const std::string& data) = nullptr;
 
         // ── OS-level file/text drop (set by backend) ─────────────────────
         // Backend pushes drop events each frame; WidgetApp consumes them.
@@ -166,13 +179,48 @@ namespace BuGUI
     enum class IconId
     {
         None = 0,
-        Check,
-        Cross,
+        Folder,
+        FolderOpen,
+        File,
+        FileCode,
+        Book,
+        Gear,
+        Star,
+        Heart,
+        Search,
         Plus,
         Minus,
+        Check,
+        Cross,
         ArrowRight,
         ArrowDown,
-        Search
+        ArrowUp,
+        ArrowLeft,
+        Eye,
+        EyeOff,
+        Lock,
+        Unlock,
+        Refresh,
+        Trash,
+        Edit,
+        Home,
+        User,
+        Warning,
+        Info,
+        Error,
+        FileImage,
+        FileArchive,
+        ViewDetail,
+        ViewList,
+        ViewGrid,
+        // Transport / media controls
+        Play,
+        Pause,
+        Stop,
+        StepForward,
+        StepBack,
+        Record,
+        COUNT  // must be last
     };
 
     struct FontGlyph
@@ -389,5 +437,6 @@ namespace BuGUI
     void NewFrame();
     void Render();
     DrawData *GetDrawData();
+
 
 } // namespace BuGUI
