@@ -39,13 +39,11 @@ add_executable(bugui_demo_raylib
     stage_dialogs.cpp
     stage_dock.cpp
     stage_properties.cpp
-    ${CMAKE_SOURCE_DIR}/demos/backends/RaylibBackend.cpp
+    RaylibBackend.cpp
 )
 
 target_include_directories(bugui_demo_raylib PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/demos/backends
-    ${CMAKE_SOURCE_DIR}/demos/stages
     ${CMAKE_SOURCE_DIR}/widgets/include
     # GLAD headers — used for type declarations only;
     # function pointer definitions come from raylib.a (loaded by InitWindow).

@@ -35,10 +35,6 @@ add_subdirectory(widgets)
 
 
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/demos/CMakeLists.txt")
-    add_subdirectory(demos)
-endif()
-
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/demo_raylib/CMakeLists.txt")
     add_subdirectory(demo_raylib)
