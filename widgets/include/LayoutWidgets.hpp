@@ -228,6 +228,12 @@ public:
     void setCurrentIndex(int idx);
     /// @brief Get the active child index.
     int  currentIndex() const { return currentIndex_; }
+    /// @brief Enable animated transitions between children.
+    void setAnimated(bool on) { animated_ = on; }
+    /// @brief Set transition duration in seconds.
+    void setAnimDuration(float seconds) { animDuration_ = seconds; }
+    /// @brief Set the easing function used by transitions.
+    void setEaseType(EaseType ease) { easeType_ = ease; }
 
     /// @brief Get the currently visible widget (nullptr if none).
     Widget* currentWidget() const;
@@ -241,6 +247,13 @@ public:
 
 private:
     int currentIndex_ = 0;
+    int previousIndex_ = -1;
+    int animDir_ = 1;
+    bool animated_ = false;
+    bool animating_ = false;
+    float animProgress_ = 1.0f;
+    float animDuration_ = 0.22f;
+    EaseType easeType_ = EaseType::OutCubic;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

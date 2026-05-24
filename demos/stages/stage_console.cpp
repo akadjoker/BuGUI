@@ -13,6 +13,14 @@ void registerConsoleStage(WidgetApp& app)
     vbox->setSpacing(8);
     vbox->setPadding(20);
 
+    auto* topBar = vbox->createChild<BoxLayout>(LayoutDir::Horizontal);
+    topBar->setSpacing(8);
+    auto* backBtn = topBar->createChild<Button>("\u2190 Menu");
+    backBtn->clicked.connect([&app]() {
+        app.setStage("menu", TransitionType::CoverRight);
+    });
+    topBar->createChild<Spacer>(1)->setStretch(1);
+
     vbox->createChild<Label>("ConsoleWidget Demo");
     vbox->createChild<Spacer>(6);
 

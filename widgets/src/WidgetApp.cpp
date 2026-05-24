@@ -3,6 +3,7 @@
 #include "LayoutWidgets.hpp" // StatusBar
 #include "Animation.hpp"     // Animator
 #include "MenuWidgets.hpp"   // Menu::exec (for context menu)
+#include "DialogWidgets.hpp" // Toast
 
 namespace BuGUI {
 
@@ -12,11 +13,6 @@ struct ContextMenu {
     }
 };
 
-struct Toast {
-    static void tick(float) {}
-    static bool hasActive() { return false; }
-    static void paint(PaintContext&, float, float) {}
-};
 #include <cstring>
 
 // ── helpers ───────────────────────────────────────────────────────────────

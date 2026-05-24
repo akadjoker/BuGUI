@@ -19,18 +19,26 @@ void registerAnimModelStage(WidgetApp& app)
 {
     Widget* root = app.addStage("animmodel");
 
+    auto* outer = root->createChild<BoxLayout>(LayoutDir::Vertical);
+    outer->setStretch(1);
+    outer->setSpacing(0);
+    outer->setPadding(0);
+
     // ── Top bar ──────────────────────────────────────────────────────────
-    auto* topBar = root->createChild<BoxLayout>(LayoutDir::Horizontal);
+    auto* topBar = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
     topBar->setSize(0, 32);
     topBar->setLayoutAlign(Align::Fill);
+    topBar->setPadding(4, 8, 4, 8);
+    topBar->setSpacing(8);
 
-    auto* backBtn = topBar->createChild<Button>("<  Back");
+    auto* backBtn = topBar->createChild<Button>("\u2190 Menu");
     backBtn->clicked.connect([&app]() { backToMenu(app); });
 
-    auto* title = topBar->createChild<Label>("  Animation + Model/View Demo");
+    auto* title = topBar->createChild<Label>("Animation + Model/View Demo");
+    title->setStretch(1);
 
     // ── Main split ───────────────────────────────────────────────────────
-    auto* hbox = root->createChild<BoxLayout>(LayoutDir::Horizontal);
+    auto* hbox = outer->createChild<BoxLayout>(LayoutDir::Horizontal);
     hbox->setStretch(1.0f);
     hbox->setSpacing(12.0f);
     hbox->setMargins(8);

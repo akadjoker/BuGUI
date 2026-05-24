@@ -13,6 +13,14 @@ void registerFileDialogStage(WidgetApp& app)
     vbox->setSpacing(12);
     vbox->setPadding(40);
 
+    auto* topBar = vbox->createChild<BoxLayout>(LayoutDir::Horizontal);
+    topBar->setSpacing(8);
+    auto* backTop = topBar->createChild<Button>("\u2190 Menu");
+    backTop->clicked.connect([&app] {
+        app.setStage("menu", TransitionType::CoverRight);
+    });
+    topBar->createChild<Spacer>(1)->setStretch(1);
+
     vbox->createChild<Label>("FileDialog Demo");
     vbox->createChild<Spacer>(10);
 

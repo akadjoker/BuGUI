@@ -506,7 +506,20 @@ void StackLayout::setCurrentIndex(int idx)
 {
     if (currentIndex_ != idx)
     {
+        previousIndex_ = currentIndex_;
+        animDir_ = (idx > currentIndex_) ? 1 : -1;
         currentIndex_ = idx;
+        if (animated_ && previousIndex_ >= 0)
+        {
+            animating_ = true;
+            animProgress_ = 0.0f;
+        }
+        else
+        {
+            previousIndex_ = -1;
+            animating_ = false;
+            animProgress_ = 1.0f;
+        }
         currentChanged.emit(idx);
         markDirty();
         WidgetApp::instance().requestLayout();
@@ -542,7 +555,7 @@ void StackLayout::layout()
     int i = 0;
     for (auto* c : children_)
     {
-        if (i == currentIndex_)
+        if (i == currentIndex_ || (animating_ && i == previousIndex_))
         {
             c->setVisible(true);
             c->setRect({0, 0, rect_.w, rect_.h});
@@ -561,6 +574,53 @@ void StackLayout::paint(PaintContext& ctx)
     if (!visible_) return;
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
+
+    if (animating_)
+    {
+        const float dt = WidgetApp::instance().deltaTime();
+        const float step = (animDuration_ > 0.0f) ? (dt / animDuration_) : 1.0f;
+        animProgress_ += step;
+        if (animProgress_ >= 1.0f)
+        {
+            animProgress_ = 1.0f;
+            animating_ = false;
+            previousIndex_ = -1;
+            WidgetApp::instance().requestLayout();
+        }
+        markDirty();
+    }
+
+    if (animating_ && previousIndex_ >= 0)
+    {
+        Widget* prev = nullptr;
+        Widget* cur = nullptr;
+        int i = 0;
+        for (auto* c : children_)
+        {
+            if (i == previousIndex_) prev = c;
+            if (i == currentIndex_) cur = c;
+            ++i;
+        }
+
+        const float t = applyEasing(easeType_, animProgress_);
+        const float oldX = -animDir_ * t * rect_.w;
+        const float newX = animDir_ * (1.0f - t) * rect_.w;
+        ctx.pushClip(abs);
+
+        auto paintShifted = [&](Widget* w, float xOff)
+        {
+            if (!w || !w->isVisible()) return;
+            Rect saved = w->rect();
+            w->setRect({xOff, 0, rect_.w, rect_.h});
+            w->paint(ctx);
+            w->setRect(saved);
+        };
+
+        paintShifted(prev, oldX);
+        paintShifted(cur, newX);
+        ctx.popClip();
+        return;
+    }
 
     // Only paint the active child
     Widget* cur = currentWidget();
@@ -750,7 +810,6 @@ void Overlay::layout()
 {
     for (auto* c : children_)
     {
-        if (!c->isVisible()) continue;
         // All layers fill the full overlay area
         c->setRect({0, 0, rect_.w, rect_.h});
         c->layout();
@@ -1850,6 +1909,7 @@ void SlidePanel::open()
     visible_   = true;   // make hittable
     // animProgress_ keeps its current value so reverse is smooth
     openChanged.emit(true);
+    WidgetApp::instance().requestLayout();
     markDirty();
 }
 
@@ -1879,8 +1939,9 @@ void SlidePanel::layout()
     // Its first child is the drawer content, sized to panelWidth_ x full height.
     if (children_.empty()) return;
 
+    const float drawerW = std::max(1.0f, std::min(panelWidth_, rect_.w));
     Widget* content = children_[0];
-    content->setRect({0, 0, panelWidth_, rect_.h});
+    content->setRect({0, 0, drawerW, rect_.h});
     content->layout();
 }
 
@@ -1915,6 +1976,7 @@ void SlidePanel::paint(PaintContext& ctx)
     if (animProgress_ <= 0.0f && !animating_) return;
 
     Rect abs = absoluteRect();
+    const float drawerW = std::max(1.0f, std::min(panelWidth_, abs.w));
     float t = applyEasing(easeType_, animProgress_);
 
     // Scrim (dim background)
@@ -1928,11 +1990,11 @@ void SlidePanel::paint(PaintContext& ctx)
     // Drawer offset
     float drawerX;
     if (side_ == Left)
-        drawerX = abs.x + (t - 1.0f) * panelWidth_;   // slides from left
+        drawerX = abs.x + (t - 1.0f) * drawerW;   // slides from left
     else
-        drawerX = abs.x + abs.w - t * panelWidth_;     // slides from right
+        drawerX = abs.x + abs.w - t * drawerW;     // slides from right
 
-    Rect drawerRect = {drawerX, abs.y, panelWidth_, abs.h};
+    Rect drawerRect = {drawerX, abs.y, drawerW, abs.h};
     ctx.pushClip(drawerRect);
 
     // Draw panel background
@@ -1946,9 +2008,9 @@ void SlidePanel::paint(PaintContext& ctx)
         Widget* content = children_[0];
         // Temporarily shift child for painting
         float savedX = content->rect().x;
-        content->setRect({drawerX - abs.x, 0, panelWidth_, abs.h});
+        content->setRect({drawerX - abs.x, 0, drawerW, abs.h});
         content->paint(ctx);
-        content->setRect({savedX, 0, panelWidth_, abs.h});
+        content->setRect({savedX, 0, drawerW, abs.h});
     }
 
     // Right/left border line
@@ -1968,16 +2030,17 @@ void SlidePanel::onMousePress(MouseEvent& e)
     if (animProgress_ <= 0.0f) return;  // fully closed, ignore
 
     Rect abs = absoluteRect();
+    const float drawerW = std::max(1.0f, std::min(panelWidth_, abs.w));
     float t = applyEasing(easeType_, animProgress_);
 
     // Compute drawer rect in screen coords
     float drawerX;
     if (side_ == Left)
-        drawerX = abs.x + (t - 1.0f) * panelWidth_;
+        drawerX = abs.x + (t - 1.0f) * drawerW;
     else
-        drawerX = abs.x + abs.w - t * panelWidth_;
+        drawerX = abs.x + abs.w - t * drawerW;
 
-    Rect drawerRect = {drawerX, abs.y, panelWidth_, abs.h};
+    Rect drawerRect = {drawerX, abs.y, drawerW, abs.h};
 
     // If click is outside drawer, close it
     if (e.x < drawerRect.x || e.x > drawerRect.x + drawerRect.w ||

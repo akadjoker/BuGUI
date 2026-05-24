@@ -23,7 +23,13 @@ void registerDockStage(WidgetApp& app)
         hdr->setPadding({4, 8, 4, 8});
         hdr->setSpacing(12);
 
+        auto* back = hdr->createChild<Button>("\u2190 Menu");
+        back->clicked.connect([&app]() {
+            app.setStage("menu", TransitionType::CoverRight);
+        });
+
         auto* lbl = hdr->createChild<Label>("DockPanel  —  drag tabs to rearrange");
+        lbl->setStretch(1);
     }
 
     // ── DockPanel ────────────────────────────────────────────────────────

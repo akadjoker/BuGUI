@@ -157,6 +157,31 @@ void DockPanel::closePanel(const std::string& name)
     markDirty();
 }
 
+void DockPanel::moveTabToLeaf(const std::string& sourceName, const std::string& targetName)
+{
+    ensureRoot();
+    int srcIdx = -1;
+    DockNode* srcLeaf = root_->findTab(sourceName, &srcIdx);
+    if (!srcLeaf || srcIdx < 0) return;
+    int dstIdx = -1;
+    DockNode* dstLeaf = root_->findTab(targetName, &dstIdx);
+    if (!dstLeaf || dstIdx < 0 || srcLeaf == dstLeaf) return;
+
+    DockNode::Tab movedTab = srcLeaf->tabs[srcIdx];
+    movedTab.content->setVisible(false);
+
+    srcLeaf->tabs.erase(srcLeaf->tabs.begin() + srcIdx);
+    if (srcLeaf->currentTab >= (int)srcLeaf->tabs.size())
+        srcLeaf->currentTab = (int)srcLeaf->tabs.size() - 1;
+    if (srcLeaf->currentTab >= 0 && !srcLeaf->tabs.empty())
+        srcLeaf->tabs[srcLeaf->currentTab].content->setVisible(true);
+
+    dstLeaf->tabs.push_back(movedTab);
+
+    pruneNode(root_);
+    markDirty();
+}
+
 void DockPanel::showPanel(const std::string& name)
 {
     ensureRoot();

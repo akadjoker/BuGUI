@@ -86,6 +86,8 @@ public:
     void closePanel(const std::string& name);
     /// @brief Bring a panel to front in its tab group.
     void showPanel(const std::string& name);
+    /// @brief Move a panel tab into the same leaf as another named panel.
+    void moveTabToLeaf(const std::string& sourceName, const std::string& targetName);
 
     /// @brief Set the tab bar height.
     void  setTabBarHeight(float h) { tabBarH_ = h; markDirty(); }

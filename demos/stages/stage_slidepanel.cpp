@@ -10,9 +10,11 @@ void registerSlidePanelStage(WidgetApp& app)
 
     // ── Full-size overlay container ──────────────────────────────────────
     auto* overlay = root->createChild<Overlay>();
+    overlay->setStretch(1);
 
     // ── Layer 0: Main content ────────────────────────────────────────────
     auto* main = overlay->createChild<BoxLayout>(LayoutDir::Vertical);
+    main->setStretch(1);
     main->setSpacing(0);
     main->setPadding(0);
 
@@ -39,6 +41,9 @@ void registerSlidePanelStage(WidgetApp& app)
     // Content area — switches when user picks from drawer
     auto* stack = main->createChild<StackLayout>();
     stack->setStretch(1);
+    stack->setAnimated(true);
+    stack->setAnimDuration(0.28f);
+    stack->setEaseType(EaseType::OutCubic);
 
     // Page 0: Welcome
     {
