@@ -90,6 +90,8 @@ public:
     Signal<TreeNode*> nodeExpanded;
     /// @brief Emitted when a node is collapsed.
     Signal<TreeNode*> nodeCollapsed;
+    /// @brief Emitted on right-click over a node.
+    Signal<TreeNode*> onRightClick;
 
     Vec2f sizeHint()                   const override;
     void  paint(PaintContext& ctx)           override;
@@ -120,6 +122,9 @@ class PropertyGrid : public Widget
 {
 public:
     PropertyGrid();
+
+    /// @brief Clear all rows and reset all internal state.
+    void clearRows();
 
     /// @brief Add a section header.
     int addSection  (const std::string& title);

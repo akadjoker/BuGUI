@@ -129,6 +129,21 @@ void Menu::exec(float x, float y)
     WidgetApp::instance().showPopup(this, nullptr, false);
 }
 
+void Menu::execOwned(float x, float y)
+{
+    Vec2f sz = sizeHint();
+    float sw = static_cast<float>(WidgetApp::instance().width());
+    float sh = static_cast<float>(WidgetApp::instance().height());
+    if (x + sz.x > sw) x = sw - sz.x;
+    if (y + sz.y > sh) y = sh - sz.y;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    setPosition(x, y);
+    setSize(sz.x, sz.y);
+    hoveredIdx_ = -1;
+    WidgetApp::instance().showPopup(this, nullptr, true);
+}
+
 void Menu::resetPopupState()
 {
     hideSubmenu_();

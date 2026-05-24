@@ -430,8 +430,14 @@ void TreeView::onMousePress(MouseEvent& e)
     if (idx < 0 || idx >= static_cast<int>(flatRows_.size())) return;
 
     auto& row = flatRows_[idx];
-    float indX = 4.f + row.depth * indent_;
 
+    if (e.button == 1) {
+        setSelectedNode(row.node);
+        onRightClick.emit(row.node);
+        return;
+    }
+
+    float indX = 4.f + row.depth * indent_;
     if (row.node->hasChildren()) {
         float triEnd = indX + 11.f;
         if ((e.x - abs.x) < triEnd) {
@@ -461,6 +467,20 @@ void TreeView::onMouseScroll(MouseEvent& e)
 // ═════════════════════════════════════════════════════════════════════════════
 
 PropertyGrid::PropertyGrid() { acceptsFocus_ = true; }
+
+void PropertyGrid::clearRows()
+{
+    rows_.clear();
+    cachedVisibleRows_.clear();
+    visDirty_     = true;
+    selectedRow_  = -1;
+    hoveredRow_   = -1;
+    activeRow_    = -1;
+    editing_      = false;
+    draggingSlider_ = false;
+    scrollOffset_ = 0.f;
+    markDirty();
+}
 
 int PropertyGrid::addSection(const std::string& title)
 {
@@ -935,28 +955,22 @@ void PropertyGrid::onMousePress(MouseEvent& e)
         auto& d=std::get<PropFloat>(row.data);
         if (editing_&&activeRow_==idx) break;
         draggingSlider_=true; activeRow_=idx; dragStartX_=e.x; dragComponent_=0;
-        float ratio=clamp((e.x-valTextX)/valW,0.f,1.f);
-        d.value=d.min+ratio*(d.max-d.min); dragStartVal_=d.value;
-        if (d.onChange) d.onChange(d.value); markDirty(); break;
+        dragStartVal_=d.value;  // no snap on click — drag from current value
+        markDirty(); break;
     }
     case PropType::Int: {
         auto& d=std::get<PropInt>(row.data);
         if (editing_&&activeRow_==idx) break;
         draggingSlider_=true; activeRow_=idx; dragStartX_=e.x; dragComponent_=0;
-        float ratio=clamp((e.x-valTextX)/valW,0.f,1.f);
-        d.value=static_cast<int>(d.min+ratio*(d.max-d.min)+0.5f); dragStartVal_=(float)d.value;
-        if (d.onChange) d.onChange(d.value); markDirty(); break;
+        dragStartVal_=(float)d.value;  // no snap on click
+        markDirty(); break;
     }
     case PropType::Vec2: case PropType::Vec3: case PropType::Vec4: {
         auto& d=std::get<PropVec>(row.data);
         int nc=d.components; float gap=2.f, compW=(valW-gap*(nc-1))/nc;
         int comp=clamp((int)((e.x-valTextX)/(compW+gap)),0,nc-1);
         draggingSlider_=true; activeRow_=idx; dragStartX_=e.x; dragComponent_=comp;
-        float cx2=valTextX+comp*(compW+gap), ratio=clamp((e.x-cx2)/compW,0.f,1.f);
-        d.value[comp]=d.min+ratio*(d.max-d.min); dragStartVal_=d.value[comp];
-        if (row.type==PropType::Vec2&&d.onChange2) d.onChange2(d.value[0],d.value[1]);
-        else if (row.type==PropType::Vec3&&d.onChange3) d.onChange3(d.value[0],d.value[1],d.value[2]);
-        else if (row.type==PropType::Vec4&&d.onChange4) d.onChange4(d.value[0],d.value[1],d.value[2],d.value[3]);
+        dragStartVal_=d.value[comp];  // no snap on click
         markDirty(); break;
     }
     case PropType::String: if (!editing_||activeRow_!=idx) startEdit(idx); break;
@@ -1032,20 +1046,21 @@ void PropertyGrid::onMouseMove(MouseEvent& e)
     if (draggingSlider_ && activeRow_>=0 && activeRow_<(int)rows_.size()) {
         e.consumed = true;
         auto& row = rows_[activeRow_];
-        float labelW=abs.w*labelRatio_, valueX=abs.x+labelW, valueW=abs.w-labelW;
-        float pad=4.f, valTextX=valueX+pad, valW=valueW-pad*2;
-        float mn=0,mx2=1,sliderX=valTextX,sliderW=valW;
+        float labelW=abs.w*labelRatio_, valueW=abs.w-labelW;
+        float valW=valueW-8.f;
+        float mn=0,mx2=1,sliderW=valW;
         if (row.type==PropType::Float) { auto& d=std::get<PropFloat>(row.data); mn=d.min; mx2=d.max; }
         else if (row.type==PropType::Int) { auto& d=std::get<PropInt>(row.data); mn=(float)d.min; mx2=(float)d.max; }
         else if (row.type==PropType::Vec2||row.type==PropType::Vec3||row.type==PropType::Vec4) {
             auto& d=std::get<PropVec>(row.data); mn=d.min; mx2=d.max;
             int nc=d.components; float gap=2.f, compW=(valW-gap*(nc-1))/nc;
-            sliderX=valTextX+dragComponent_*(compW+gap); sliderW=compW;
+            sliderW=compW;
         } else if (row.type==PropType::Range) { auto& d=std::get<PropRange>(row.data); mn=d.min; mx2=d.max; }
 
         float range=mx2-mn;
         if (range>0.0001f&&sliderW>1.f) {
-            float ratio=clamp((e.x-sliderX)/sliderW,0.f,1.f), newVal=mn+ratio*range;
+            // delta drag: value changes proportionally to mouse movement from press point
+            float dx=e.x-dragStartX_, newVal=clamp(dragStartVal_+dx/sliderW*range,mn,mx2);
             if (row.type==PropType::Float) { auto& d=std::get<PropFloat>(row.data); d.value=newVal; if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::Int) { auto& d=std::get<PropInt>(row.data); d.value=(int)(newVal+0.5f); if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::Range) {

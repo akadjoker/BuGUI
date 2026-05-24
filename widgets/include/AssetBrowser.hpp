@@ -62,6 +62,8 @@ public:
     Signal<AssetItem> onSelect;
     /// @brief Emitted when an item is opened (double-click).
     Signal<AssetItem> onOpen;
+    /// @brief Emitted when an item is right-clicked (for context menus).
+    Signal<AssetItem> onRightClick;
 
     void paint(PaintContext& ctx) override;
     void onMousePress(MouseEvent& e) override;

@@ -264,6 +264,16 @@ void AssetBrowser::paint(PaintContext& ctx)
 
 void AssetBrowser::onMousePress(MouseEvent& e)
 {
+    if (e.button == 1) {  // right-click → context menu signal
+        int idx = hitItem(e.x, e.y);
+        if (idx >= 0) {
+            selected_ = idx;
+            markDirty();
+            onRightClick.emit(items_[idx]);
+            e.consumed = true;
+        }
+        return;
+    }
     if (e.button != 0) return;
     const Rect b = absoluteRect();
 

@@ -99,6 +99,8 @@ public:
 
     /// @brief Show the menu as a popup at screen coordinates.
     void exec(float x, float y);
+    /// @brief Like exec() but transfers ownership to WidgetApp (it will delete this).
+    void execOwned(float x, float y);
 
     // ── Widget overrides ──────────────────────────────────────────────────
     void resetPopupState()                     override;
