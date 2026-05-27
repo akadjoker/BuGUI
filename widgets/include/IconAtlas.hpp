@@ -103,6 +103,12 @@ private:
     void drawStepForward(BuImage& pm, int ox, int oy, int sz);
     void drawStepBack   (BuImage& pm, int ox, int oy, int sz);
     void drawRecord     (BuImage& pm, int ox, int oy, int sz);
+    void drawCursor     (BuImage& pm, int ox, int oy, int sz);
+    void drawMove       (BuImage& pm, int ox, int oy, int sz);
+    void drawRotateCW   (BuImage& pm, int ox, int oy, int sz);
+    void drawScaleArrows(BuImage& pm, int ox, int oy, int sz);
+    void drawExpand     (BuImage& pm, int ox, int oy, int sz);
+    void drawSave       (BuImage& pm, int ox, int oy, int sz);
 
     BuGUI::TextureHandle tex_;
     int atlasW_    = 0;

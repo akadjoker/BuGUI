@@ -19,15 +19,33 @@ AssetBrowser::AssetBrowser() {}
 void AssetBrowser::addItem(const AssetItem& item)
 {
     items_.push_back(item);
+    rebuildFiltered();
     markDirty();
 }
 
 void AssetBrowser::clearItems()
 {
+    auto& wa = WidgetApp::instance();
+    for (auto& it : items_) {
+        if (it.thumb) wa.destroyTexture(it.thumb);
+    }
     items_.clear();
+    filtered_.clear();
     selected_ = -1;
+    hovered_  = -1;
     scrollY_  = 0.f;
     markDirty();
+}
+
+void AssetBrowser::rebuildFiltered()
+{
+    filtered_.clear();
+    for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
+        if (filter_ == AssetType::Generic || items_[i].type == filter_)
+            filtered_.push_back(i);
+    }
+    selected_ = -1;
+    scrollY_  = 0.f;
 }
 
 // ── Type helpers ──────────────────────────────────────────────────────────
@@ -73,7 +91,7 @@ AssetBrowser::GridLayout AssetBrowser::computeGrid(const Rect& b) const
     g.cols   = std::max(1, static_cast<int>((b.w - pad * 2 + gap) / (g.cellW + gap)));
     g.startX = b.x + pad;
     g.startY = b.y + 28.f;
-    int rows = (static_cast<int>(items_.size()) + g.cols - 1) / g.cols;
+    int rows = (filteredCount() + g.cols - 1) / g.cols;
     g.totalH = rows * (g.cellH + gap) + pad;
     return g;
 }
@@ -86,7 +104,7 @@ int AssetBrowser::hitItem(float mx, float my) const
     if (viewMode_ == ViewMode::List) {
         const float row = 22.f;
         float y0 = b.y + 28.f;
-        for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
+        for (int i = 0; i < filteredCount(); ++i) {
             float y = y0 + i * row - scrollY_;
             if (my >= y && my < y + row && mx >= b.x && mx < b.x + b.w)
                 return i;
@@ -96,7 +114,7 @@ int AssetBrowser::hitItem(float mx, float my) const
 
     const float gap = 6.f;
     auto g = computeGrid(b);
-    for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
+    for (int i = 0; i < filteredCount(); ++i) {
         int col = i % g.cols;
         int row = i / g.cols;
         float cx = g.startX + col * (g.cellW + gap);
@@ -147,6 +165,31 @@ void AssetBrowser::paint(PaintContext& ctx)
     ctx.fillRect(bx + 26.f, by, 22.f, 20.f);
     if (ctx.icons) ctx.drawIcon(IconId::ViewList, bx + 29.f, by + 3.f, 14.f);
 
+    // Filter buttons (after path, before view toggle)
+    {
+        struct FB { const char* label; AssetType t; Color c; };
+        FB btns[] = {
+            {"All",  AssetType::Generic, Color(160,165,175,255)},
+            {"Img",  AssetType::Image,   Color( 60,160,210,255)},
+            {"Snd",  AssetType::Audio,   Color(100,200,140,255)},
+            {"Scr",  AssetType::Script,  Color(220,180, 60,255)},
+            {"Scn",  AssetType::Scene,   Color(240,100, 80,255)},
+        };
+        float fx = b.x + 8.f + ctx.font.GetTextWidth(path_.c_str()) + 16.f;
+        float fy = b.y + 4.f;
+        filterBtnRects_.clear();
+        for (auto& fb : btns) {
+            bool active = (filter_ == fb.t);
+            float tw = ctx.font.GetTextWidth(fb.label) + 8.f;
+            ctx.fill.SetColor(active ? fb.c.r/2 : 35, active ? fb.c.g/2 : 38, active ? fb.c.b/2 : 42, 255);
+            ctx.fillRect(fx, fy, tw, 18.f);
+            asc = setupFont(ctx, active ? fb.c : Color(100,105,115,255), th.fontSize * 0.75f);
+            ctx.font.Print(fb.label, fx + 4.f, fy + 2.f + asc);
+            filterBtnRects_.push_back({fx, fy, tw, 18.f, fb.t});
+            fx += tw + 3.f;
+        }
+    }
+
     // ── Clip content area ────────────────────────────────────────────────
     Rect ca = {b.x, b.y + 27.f, b.w, b.h - 27.f};
     ctx.pushClip(ca);
@@ -155,8 +198,8 @@ void AssetBrowser::paint(PaintContext& ctx)
         auto g = computeGrid(b);
         const float gap = 6.f;
 
-        for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
-            const auto& it = items_[i];
+        for (int i = 0; i < filteredCount(); ++i) {
+            const auto& it = filteredItem(i);
             int col = i % g.cols;
             int row = i / g.cols;
             float cx = g.startX + col * (g.cellW + gap);
@@ -165,23 +208,41 @@ void AssetBrowser::paint(PaintContext& ctx)
             if (cy + g.cellH < ca.y || cy > ca.y + ca.h) continue;
 
             bool sel = (selected_ == i);
+            bool hov = (hovered_ == i);
 
-            Color tc = (it.thumbColor.r != 60) ? it.thumbColor : typeToColor(it.type);
-            ctx.fill.SetColor(sel ? tc.r + 20 : tc.r * 40 / 100,
-                              sel ? tc.g + 20 : tc.g * 40 / 100,
-                              sel ? tc.b + 20 : tc.b * 40 / 100, 255);
-            ctx.fillRect(cx, cy, g.cellW, thumbSize_);
+            if (it.thumb) {
+                // ── Draw image thumbnail ──
+                // Fit image inside cell keeping aspect ratio
+                float iw = (float)it.thumbW, ih = (float)it.thumbH;
+                float scale = std::min(g.cellW / iw, thumbSize_ / ih);
+                float dw = iw * scale, dh = ih * scale;
+                float dx = cx + (g.cellW - dw) * 0.5f;
+                float dy = cy + (thumbSize_ - dh) * 0.5f;
 
-            ctx.fill.SetColor(tc.r, tc.g, tc.b, sel ? 255 : 180);
-            float ts = thumbSize_ * 0.5f;
-            ctx.fillRect(cx + (g.cellW - ts) * 0.5f, cy + (thumbSize_ - ts) * 0.5f, ts, ts);
+                // Background
+                ctx.fill.SetColor(sel ? 40 : 22, sel ? 50 : 24, sel ? 70 : 28, 255);
+                ctx.fillRect(cx, cy, g.cellW, thumbSize_);
 
-            if (ctx.icons) {
-                float is = std::min(32.f, thumbSize_ * 0.5f);
-                ctx.drawIcon(typeToIcon(it.type),
-                             cx + (g.cellW - is) * 0.5f,
-                             cy + (thumbSize_ - is) * 0.5f, is,
-                             Color(255, 255, 255, 200));
+                ctx.drawImage(it.thumb, {dx, dy, dw, dh});
+            } else {
+                // ── Fallback: colored rect + icon ──
+                Color tc = (it.thumbColor.r != 60) ? it.thumbColor : typeToColor(it.type);
+                ctx.fill.SetColor(sel ? tc.r + 20 : tc.r * 40 / 100,
+                                  sel ? tc.g + 20 : tc.g * 40 / 100,
+                                  sel ? tc.b + 20 : tc.b * 40 / 100, 255);
+                ctx.fillRect(cx, cy, g.cellW, thumbSize_);
+
+                ctx.fill.SetColor(tc.r, tc.g, tc.b, sel ? 255 : 180);
+                float ts = thumbSize_ * 0.5f;
+                ctx.fillRect(cx + (g.cellW - ts) * 0.5f, cy + (thumbSize_ - ts) * 0.5f, ts, ts);
+
+                if (ctx.icons) {
+                    float is = std::min(32.f, thumbSize_ * 0.5f);
+                    ctx.drawIcon(typeToIcon(it.type),
+                                 cx + (g.cellW - is) * 0.5f,
+                                 cy + (thumbSize_ - is) * 0.5f, is,
+                                 Color(255, 255, 255, 200));
+                }
             }
 
             if (sel) {
@@ -204,8 +265,8 @@ void AssetBrowser::paint(PaintContext& ctx)
     } else {
         // ── List view ────────────────────────────────────────────────────
         const float rowH = 22.f;
-        for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
-            const auto& it = items_[i];
+        for (int i = 0; i < filteredCount(); ++i) {
+            const auto& it = filteredItem(i);
             float ry = ca.y + i * rowH - scrollY_;
             if (ry + rowH < ca.y || ry > ca.y + ca.h) continue;
 
@@ -246,7 +307,7 @@ void AssetBrowser::paint(PaintContext& ctx)
         auto g = computeGrid(b);
         totalH = g.totalH;
     } else {
-        totalH = items_.size() * 22.f;
+        totalH = filteredCount() * 22.f;
     }
     float viewH = ca.h;
     if (totalH > viewH) {
@@ -255,6 +316,41 @@ void AssetBrowser::paint(PaintContext& ctx)
         float sbY   = ca.y + (scrollY_ / (totalH - viewH)) * (viewH - sbH);
         ctx.fill.SetColor(60, 65, 75, 200);
         ctx.fillRect(b.x + b.w - 6.f, sbY, 4.f, sbH);
+    }
+
+    // ── Hover preview popup ──────────────────────────────────────────────
+    if (hovered_ >= 0 && hovered_ < filteredCount()) {
+        const auto& hi = filteredItem(hovered_);
+        if (hi.thumb && hi.type == AssetType::Image) {
+            const float maxPrev = 200.f;
+            float iw = (float)hi.thumbW, ih = (float)hi.thumbH;
+            float scale = std::min(maxPrev / iw, maxPrev / ih);
+            float pw = iw * scale, ph = ih * scale;
+            float pad = 4.f;
+            float totalW = pw + pad * 2, totalH = ph + pad * 2;
+
+            // Position: to the right of cursor, clamped to widget bounds
+            float px = hoverX_ + 16.f;
+            float py = hoverY_ - totalH * 0.5f;
+            if (px + totalW > b.x + b.w) px = hoverX_ - totalW - 4.f;
+            if (py < b.y)                py = b.y;
+            if (py + totalH > b.y + b.h) py = b.y + b.h - totalH;
+
+            // Shadow
+            ctx.fill.SetColor(0, 0, 0, 100);
+            ctx.fillRect(px + 2.f, py + 2.f, totalW, totalH);
+            // Background
+            ctx.fill.SetColor(30, 33, 38, 240);
+            ctx.fillRect(px, py, totalW, totalH);
+            // Border
+            ctx.line.SetColor(70, 75, 85, 255);
+            ctx.drawLine(px,          py,          px + totalW, py);
+            ctx.drawLine(px,          py + totalH, px + totalW, py + totalH);
+            ctx.drawLine(px,          py,          px,          py + totalH);
+            ctx.drawLine(px + totalW, py,          px + totalW, py + totalH);
+            // Image
+            ctx.drawImage(hi.thumb, {px + pad, py + pad, pw, ph});
+        }
     }
 
     ctx.popClip();
@@ -269,13 +365,22 @@ void AssetBrowser::onMousePress(MouseEvent& e)
         if (idx >= 0) {
             selected_ = idx;
             markDirty();
-            onRightClick.emit(items_[idx]);
+            onRightClick.emit(filteredItem(idx));
             e.consumed = true;
         }
         return;
     }
     if (e.button != 0) return;
     const Rect b = absoluteRect();
+
+    // Filter buttons
+    for (auto& fb : filterBtnRects_) {
+        if (e.x >= fb.x && e.x < fb.x + fb.w && e.y >= fb.y && e.y < fb.y + fb.h) {
+            setFilter(fb.type);
+            e.consumed = true;
+            return;
+        }
+    }
 
     // View toggle buttons
     float bx = b.x + b.w - 52.f;
@@ -289,12 +394,12 @@ void AssetBrowser::onMousePress(MouseEvent& e)
     if (idx < 0) return;
 
     selected_ = idx;
-    onSelect.emit(items_[idx]);
+    onSelect.emit(filteredItem(idx));
 
     // Double-click detection using accumulated time
     float now = timeAcc_;
     if (lastClick_ == idx && (now - lastClickT_) < 0.5f) {
-        onOpen.emit(items_[idx]);
+        onOpen.emit(filteredItem(idx));
         lastClick_ = -1;
     } else {
         lastClick_  = idx;
@@ -313,11 +418,30 @@ void AssetBrowser::onMouseScroll(MouseEvent& e)
         auto g = computeGrid(b);
         totalH = g.totalH;
     } else {
-        totalH = items_.size() * 22.f;
+        totalH = filteredCount() * 22.f;
     }
     float viewH    = b.h - 28.f;
     float maxScroll = std::max(0.f, totalH - viewH);
     scrollY_ = std::clamp(scrollY_ - e.scrollY * 24.f, 0.f, maxScroll);
     markDirty();
     e.consumed = true;
+}
+
+void AssetBrowser::onMouseMove(MouseEvent& e)
+{
+    int idx = hitItem(e.x, e.y);
+    if (idx != hovered_ || (idx >= 0 && (hoverX_ != e.x || hoverY_ != e.y))) {
+        hovered_ = idx;
+        hoverX_  = e.x;
+        hoverY_  = e.y;
+        markDirty();
+    }
+}
+
+void AssetBrowser::onMouseLeave()
+{
+    if (hovered_ >= 0) {
+        hovered_ = -1;
+        markDirty();
+    }
 }

@@ -570,7 +570,14 @@ void ToolBar::onMouseMove(MouseEvent& e)
         Rect ir = {abs.x + it.rect.x, abs.y + it.rect.y, it.rect.w, it.rect.h};
         bool wasHovered = it.hovered;
         it.hovered = ir.contains(e.x, e.y) && it.enabled;
-        if (wasHovered != it.hovered) markDirty();
+        if (wasHovered != it.hovered) {
+            markDirty();
+            // Propagate tooltip to widget system
+            if (it.hovered && !it.tooltip.empty())
+                setTooltip(it.tooltip);
+            else if (!it.hovered)
+                setTooltip("");
+        }
     }
 
     // Drag reorder

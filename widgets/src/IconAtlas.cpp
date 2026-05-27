@@ -93,6 +93,12 @@ void IconAtlas::drawIcon(BuImage& pm, IconId id, int ox, int oy, int sz)
     case IconId::StepForward: drawStepForward(pm, ox, oy, sz); break;
     case IconId::StepBack:    drawStepBack(pm, ox, oy, sz);    break;
     case IconId::Record:      drawRecord(pm, ox, oy, sz);      break;
+    case IconId::Cursor:      drawCursor(pm, ox, oy, sz);      break;
+    case IconId::Move:        drawMove(pm, ox, oy, sz);        break;
+    case IconId::RotateCW:    drawRotateCW(pm, ox, oy, sz);    break;
+    case IconId::ScaleArrows: drawScaleArrows(pm, ox, oy, sz); break;
+    case IconId::Expand:      drawExpand(pm, ox, oy, sz);      break;
+    case IconId::Save:        drawSave(pm, ox, oy, sz);        break;
     default: break;
     }
 }
@@ -634,4 +640,169 @@ void IconAtlas::drawRecord(BuImage& pm, int ox, int oy, int sz)
     int cy = oy + sz / 2;
     int r  = sz / 3;
     pm.DrawCircle(cx, cy, r, red, true);
+}
+
+// ── Cursor (mouse pointer arrow) ────────────────────────────────────────────
+
+void IconAtlas::drawCursor(BuImage& pm, int ox, int oy, int sz)
+{
+    // Simple mouse cursor pointing top-left
+    int m = sz / 5;
+    int x0 = ox + m + 1;
+    int y0 = oy + m;
+    int h = sz - 2 * m;
+    // Main arrow body (filled triangle pointing down-right)
+    for (int row = 0; row < h; ++row) {
+        int w = (row * (h / 3)) / h;
+        pm.DrawLine(x0, y0 + row, x0 + w, y0 + row, IC);
+    }
+    // Stem/tail: diagonal line bottom-right
+    int tailLen = h / 3;
+    for (int i = 0; i < tailLen; ++i) {
+        int px = x0 + h / 3 + i;
+        int py = y0 + h - h / 4 + i;
+        if (px < ox + sz && py < oy + sz)
+            pm.DrawLine(px, py, px + 1, py, IC);
+    }
+}
+
+// ── Move (4-directional arrows) ─────────────────────────────────────────────
+
+void IconAtlas::drawMove(BuImage& pm, int ox, int oy, int sz)
+{
+    int cx = ox + sz / 2;
+    int cy = oy + sz / 2;
+    int arm = sz / 3;
+    int head = sz / 6;
+    // Horizontal line
+    pm.DrawLine(cx - arm, cy, cx + arm, cy, IC);
+    // Vertical line
+    for (int y = cy - arm; y <= cy + arm; ++y)
+        pm.DrawLine(cx, y, cx, y, IC);
+    // Right arrow head
+    for (int i = 0; i < head; ++i) {
+        pm.DrawLine(cx + arm - i, cy - i, cx + arm - i, cy + i, IC);
+    }
+    // Left arrow head
+    for (int i = 0; i < head; ++i) {
+        pm.DrawLine(cx - arm + i, cy - i, cx - arm + i, cy + i, IC);
+    }
+    // Up arrow head
+    for (int i = 0; i < head; ++i) {
+        pm.DrawLine(cx - i, cy - arm + i, cx + i, cy - arm + i, IC);
+    }
+    // Down arrow head
+    for (int i = 0; i < head; ++i) {
+        pm.DrawLine(cx - i, cy + arm - i, cx + i, cy + arm - i, IC);
+    }
+}
+
+// ── RotateCW (clockwise rotation arc with arrow) ────────────────────────────
+
+void IconAtlas::drawRotateCW(BuImage& pm, int ox, int oy, int sz)
+{
+    int cx = ox + sz / 2;
+    int cy = oy + sz / 2;
+    int r  = sz / 3;
+    // Draw 3/4 circle arc (skip bottom-right quadrant)
+    for (int deg = 45; deg < 315; deg += 3) {
+        float rad = deg * 3.14159f / 180.f;
+        int px = cx + static_cast<int>(r * cosf(rad));
+        int py = cy - static_cast<int>(r * sinf(rad));
+        pm.DrawLine(px, py, px, py, IC);
+        // Thicken
+        pm.DrawLine(px + 1, py, px + 1, py, IC);
+    }
+    // Arrow head at the opening (bottom-right, ~45 degrees)
+    int ax = cx + static_cast<int>(r * cosf(45.f * 3.14159f / 180.f));
+    int ay = cy - static_cast<int>(r * sinf(45.f * 3.14159f / 180.f));
+    int hs = sz / 7;
+    for (int i = 0; i < hs; ++i) {
+        pm.DrawLine(ax, ay, ax + i, ay + i, IC);
+        pm.DrawLine(ax, ay, ax - i, ay + i, IC);
+    }
+}
+
+// ── ScaleArrows (diagonal resize) ───────────────────────────────────────────
+
+void IconAtlas::drawScaleArrows(BuImage& pm, int ox, int oy, int sz)
+{
+    int m = sz / 4;
+    // Diagonal line from top-left to bottom-right
+    for (int i = 0; i < sz - 2 * m; ++i) {
+        int px = ox + m + i;
+        int py = oy + m + i;
+        pm.DrawLine(px, py, px, py, IC);
+        pm.DrawLine(px + 1, py, px + 1, py, IC); // thicken
+    }
+    // Top-left arrow head
+    int hs = sz / 6;
+    for (int i = 0; i < hs; ++i) {
+        pm.DrawLine(ox + m, oy + m + i, ox + m + i, oy + m, IC); // L-shape
+        pm.DrawLine(ox + m + i, oy + m, ox + m + i, oy + m, IC);
+        pm.DrawLine(ox + m, oy + m + i, ox + m, oy + m + i, IC);
+    }
+    // Bottom-right arrow head
+    int br = ox + sz - m - 1;
+    int bb = oy + sz - m - 1;
+    for (int i = 0; i < hs; ++i) {
+        pm.DrawLine(br, bb - i, br - i, bb, IC);
+        pm.DrawLine(br - i, bb, br - i, bb, IC);
+        pm.DrawLine(br, bb - i, br, bb - i, IC);
+    }
+}
+
+// ── Expand (fullscreen/maximize — four outward corner arrows) ───────────────
+
+void IconAtlas::drawExpand(BuImage& pm, int ox, int oy, int sz)
+{
+    int m = sz / 5;
+    int arm = sz / 4;
+    // Top-left corner
+    pm.DrawLine(ox + m, oy + m, ox + m + arm, oy + m, IC);
+    for (int y = oy + m; y <= oy + m + arm; ++y)
+        pm.DrawLine(ox + m, y, ox + m, y, IC);
+    // Top-right corner
+    pm.DrawLine(ox + sz - m - arm, oy + m, ox + sz - m, oy + m, IC);
+    for (int y = oy + m; y <= oy + m + arm; ++y)
+        pm.DrawLine(ox + sz - m, y, ox + sz - m, y, IC);
+    // Bottom-left corner
+    pm.DrawLine(ox + m, oy + sz - m, ox + m + arm, oy + sz - m, IC);
+    for (int y = oy + sz - m - arm; y <= oy + sz - m; ++y)
+        pm.DrawLine(ox + m, y, ox + m, y, IC);
+    // Bottom-right corner
+    pm.DrawLine(ox + sz - m - arm, oy + sz - m, ox + sz - m, oy + sz - m, IC);
+    for (int y = oy + sz - m - arm; y <= oy + sz - m; ++y)
+        pm.DrawLine(ox + sz - m, y, ox + sz - m, y, IC);
+    // Diagonal lines from corners inward
+    int diag = arm - 1;
+    for (int i = 0; i < diag; ++i) {
+        pm.DrawLine(ox + m + i, oy + m + i, ox + m + i, oy + m + i, IC);
+        pm.DrawLine(ox + sz - m - i, oy + m + i, ox + sz - m - i, oy + m + i, IC);
+        pm.DrawLine(ox + m + i, oy + sz - m - i, ox + m + i, oy + sz - m - i, IC);
+        pm.DrawLine(ox + sz - m - i, oy + sz - m - i, ox + sz - m - i, oy + sz - m - i, IC);
+    }
+}
+
+// ── Save (floppy disk) ──────────────────────────────────────────────────────
+
+void IconAtlas::drawSave(BuImage& pm, int ox, int oy, int sz)
+{
+    int m = sz / 5;
+    int w = sz - 2 * m;
+    int h = sz - 2 * m;
+    // Outer rectangle (disk body)
+    pm.DrawRect(ox + m, oy + m, w, h, IC, false);
+    pm.DrawRect(ox + m + 1, oy + m + 1, w - 2, h - 2, IC, false);
+    // Label slot (top center)
+    int lw = w * 3 / 5;
+    int lh = h / 3;
+    int lx = ox + m + (w - lw) / 2;
+    pm.DrawRect(lx, oy + m, lw, lh, IC, true);
+    // Metal slider (bottom center)
+    int sw = w / 3;
+    int sh = h / 3;
+    int sx = ox + m + (w - sw) / 2;
+    int sy = oy + m + h - sh;
+    pm.DrawRect(sx, sy, sw, sh, IC, true);
 }

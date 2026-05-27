@@ -28,6 +28,9 @@ struct AssetItem
     AssetType   type       = AssetType::Generic;
     Color       thumbColor = Color(60, 64, 72, 255);
     bool        selected   = false;
+    TextureHandle thumb;          // optional thumbnail texture
+    int           thumbW = 0;     // original image width  (for aspect ratio)
+    int           thumbH = 0;     // original image height
 };
 
 class AssetBrowser : public Widget
@@ -65,12 +68,21 @@ public:
     /// @brief Emitted when an item is right-clicked (for context menus).
     Signal<AssetItem> onRightClick;
 
+    /// @brief Set the type filter (Generic = show all).
+    void setFilter(AssetType f) { filter_ = f; rebuildFiltered(); markDirty(); }
+    /// @brief Get the current filter.
+    AssetType filter() const    { return filter_; }
+
     void paint(PaintContext& ctx) override;
     void onMousePress(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onMouseLeave() override;
     void onMouseScroll(MouseEvent& e) override;
 
 private:
     std::vector<AssetItem> items_;
+    std::vector<int>       filtered_;   // indices into items_ (or all if no filter)
+    AssetType              filter_      = AssetType::Generic; // Generic = show all
     std::string            path_        = "/";
     ViewMode               viewMode_    = ViewMode::Grid;
     float                  thumbSize_   = 64.f;
@@ -79,6 +91,16 @@ private:
     int                    lastClick_   = -1;
     float                  lastClickT_  = 0.f;
     float                  timeAcc_     = 0.f;
+    int                    hovered_     = -1;
+    float                  hoverX_      = 0.f;
+    float                  hoverY_      = 0.f;
+
+    void rebuildFiltered();
+    const AssetItem& filteredItem(int i) const { return items_[filtered_[i]]; }
+    int filteredCount() const { return static_cast<int>(filtered_.size()); }
+
+    struct FilterBtn { float x, y, w, h; AssetType type; };
+    std::vector<FilterBtn> filterBtnRects_;
 
     IconId typeToIcon(AssetType t) const;
     Color  typeToColor(AssetType t) const;

@@ -220,6 +220,13 @@ namespace BuGUI
         StepForward,
         StepBack,
         Record,
+        // Editor tool icons
+        Cursor,         // mouse cursor / select
+        Move,           // 4-directional arrows
+        RotateCW,       // clockwise rotation arrow
+        ScaleArrows,    // diagonal resize arrows
+        Expand,         // fullscreen / maximize
+        Save,           // floppy disk
         COUNT  // must be last
     };
 
