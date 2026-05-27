@@ -93,10 +93,27 @@ public:
     /// @brief Emitted on right-click over a node.
     Signal<TreeNode*> onRightClick;
 
+    /// Drop position relative to a node.
+    enum class DropPos { Before, Inside, After };
+    /// @brief Emitted when a node is dropped on another node.
+    /// Args: dragged node, target node, drop position
+    Signal<TreeNode*, TreeNode*, DropPos> onNodeDropped;
+
+    /// @brief Enable or disable drag & drop reordering.
+    void setDragEnabled(bool e) { dragEnabled_ = e; }
+
     Vec2f sizeHint()                   const override;
     void  paint(PaintContext& ctx)           override;
     void  onMousePress(MouseEvent& e)        override;
+    void  onMouseMove(MouseEvent& e)         override;
     void  onMouseScroll(MouseEvent& e)       override;
+
+    // Drag & drop overrides
+    bool        isDragSource()  const        override;
+    DragPayload onDragBegin()                override;
+    void        onDragEnd(bool accepted)     override;
+    bool        acceptsDrop(const DragPayload& p) override;
+    void        onDropReceive(const DragPayload& p) override;
 
 private:
     struct FlatRow { TreeNode* node; int depth; };
@@ -113,6 +130,13 @@ private:
     float                  rowHeight_     = 24.0f;
     float                  indent_        = 16.0f;
     bool                   flatDirty_     = true;
+
+    // Drag & drop state
+    bool                   dragEnabled_   = false;
+    TreeNode*              dragNode_      = nullptr;
+    TreeNode*              dropTarget_    = nullptr;
+    DropPos                dropPos_       = DropPos::Inside;
+    bool                   showDropIndicator_ = false;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════

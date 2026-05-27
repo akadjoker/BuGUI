@@ -412,6 +412,31 @@ void TreeView::paint(PaintContext& ctx)
         ctx.font.Print(row.node->text().c_str(), indX, ty);
     }
 
+    // ── Drop indicator ────────────────────────────────────────────────────
+    if (showDropIndicator_ && dropTarget_) {
+        for (int i = first; i < last; ++i) {
+            if (flatRows_[i].node == dropTarget_) {
+                float rowY = abs.y + i * rowHeight_ - scrollOffset_;
+                float indX = abs.x + 4.f + flatRows_[i].depth * indent_;
+
+                if (dropPos_ == DropPos::Before) {
+                    ctx.fill.SetColor(80, 180, 255, 200);
+                    ctx.fillRect(indX, rowY - 1.f, abs.w - (indX - abs.x) - 4.f, 2.f);
+                } else if (dropPos_ == DropPos::After) {
+                    ctx.fill.SetColor(80, 180, 255, 200);
+                    ctx.fillRect(indX, rowY + rowHeight_ - 1.f, abs.w - (indX - abs.x) - 4.f, 2.f);
+                } else {
+                    // Inside: highlight the entire row
+                    ctx.fill.SetColor(80, 180, 255, 40);
+                    ctx.fillRect(abs.x, rowY, abs.w, rowHeight_);
+                    ctx.line.SetColor(80, 180, 255, 160);
+                    ctx.lineRect(abs.x + 1, rowY, abs.w - 2, rowHeight_);
+                }
+                break;
+            }
+        }
+    }
+
     ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
     ctx.lineRect(abs.x, abs.y, abs.w, abs.h);
     ctx.popClip();
@@ -450,6 +475,95 @@ void TreeView::onMousePress(MouseEvent& e)
         }
     }
     setSelectedNode(row.node);
+
+    // Begin drag tracking
+    if (dragEnabled_)
+        dragNode_ = row.node;
+}
+
+void TreeView::onMouseMove(MouseEvent& e)
+{
+    if (!visible_ || !enabled_ || !dragEnabled_ || !dragNode_) return;
+    Rect abs = absoluteRect();
+
+    rebuildFlat();
+    float localY = e.y - abs.y + scrollOffset_;
+    int idx = static_cast<int>(localY / rowHeight_);
+    if (idx < 0 || idx >= static_cast<int>(flatRows_.size())) {
+        showDropIndicator_ = false;
+        markDirty();
+        return;
+    }
+
+    auto& row = flatRows_[idx];
+    if (row.node == dragNode_) {
+        showDropIndicator_ = false;
+        markDirty();
+        return;
+    }
+
+    // Determine drop position based on Y within the row
+    float rowY = idx * rowHeight_ - scrollOffset_;
+    float relY = (e.y - abs.y) - rowY;
+    float zone = rowHeight_ / 4.0f;
+
+    if (relY < zone) {
+        dropPos_ = DropPos::Before;
+    } else if (relY > rowHeight_ - zone) {
+        dropPos_ = DropPos::After;
+    } else {
+        dropPos_ = DropPos::Inside;
+    }
+
+    dropTarget_ = row.node;
+    showDropIndicator_ = true;
+    markDirty();
+}
+
+// Drag & drop overrides
+bool TreeView::isDragSource() const { return dragEnabled_ && dragNode_ != nullptr; }
+
+DragPayload TreeView::onDragBegin()
+{
+    DragPayload p;
+    p.type = "tree_node";
+    p.data = dragNode_;
+    p.source = const_cast<TreeView*>(this);
+    return p;
+}
+
+void TreeView::onDragEnd(bool accepted)
+{
+    (void)accepted;
+    dragNode_ = nullptr;
+    dropTarget_ = nullptr;
+    showDropIndicator_ = false;
+    markDirty();
+}
+
+bool TreeView::acceptsDrop(const DragPayload& p)
+{
+    return p.type == "tree_node" && p.source == this;
+}
+
+void TreeView::onDropReceive(const DragPayload& p)
+{
+    if (p.type != "tree_node" || !dropTarget_ || !showDropIndicator_) return;
+    TreeNode* dragged = std::any_cast<TreeNode*>(p.data);
+    if (!dragged || dragged == dropTarget_) return;
+
+    // Check that we're not dropping a parent onto its own child
+    TreeNode* check = dropTarget_;
+    while (check) {
+        if (check == dragged) return;  // would create cycle
+        check = check->parent();
+    }
+
+    onNodeDropped.emit(dragged, dropTarget_, dropPos_);
+    dragNode_ = nullptr;
+    dropTarget_ = nullptr;
+    showDropIndicator_ = false;
+    markDirty();
 }
 
 void TreeView::onMouseScroll(MouseEvent& e)
