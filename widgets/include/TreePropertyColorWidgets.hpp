@@ -199,10 +199,14 @@ public:
     /// @brief Add a visual separator row.
     int addSeparator();
     /// @brief Add a min/max range slider property.
-    int addRange    (const std::string& name, float lo, float hi,
-                     float minVal, float maxVal,
-                     std::function<void(float,float)> onChange = nullptr,
-                     const std::string& desc = "");
+    int addRange       (const std::string& name, float lo, float hi,
+                        float minVal, float maxVal,
+                        std::function<void(float,float)> onChange = nullptr,
+                        const std::string& desc = "");
+    /// @brief Add a scaled-float slider with − / + buttons to change the range ×10/÷10.
+    int addScaledFloat (const std::string& name, float value, bool allowNeg = false,
+                        std::function<void(float)> onChange = nullptr,
+                        const std::string& desc = "");
 
     /// @brief Set a string property value by row.
     void setString (int row, const std::string& v);
@@ -240,7 +244,7 @@ public:
     // Public for ColorPickerPopup_ internal access
     enum class PropType {
         Section, String, Float, Int, Bool, Color,
-        Combo, Vec2, Vec3, Vec4, Button, Separator, Range
+        Combo, Vec2, Vec3, Vec4, Button, Separator, Range, ScaledFloat
     };
 
     // ── Per-type value structs ───────────────────────────────────────────
@@ -257,11 +261,14 @@ public:
                           std::function<void(float,float,float,float)> onChange4; };
     struct PropButton   { std::function<void()> onClick; };
     struct PropSeparator{};
-    struct PropRange    { float lo = 0, hi = 1, min = 0, max = 1; std::function<void(float,float)> onChange; };
+    struct PropRange      { float lo = 0, hi = 1, min = 0, max = 1; std::function<void(float,float)> onChange; };
+    // ScaledFloat: slider whose range scales ×10/÷10 via − and + buttons.
+    struct PropScaledFloat { float value = 0.f, scale = 1.f; bool allowNeg = false;
+                             std::function<void(float)> onChange; };
 
     using PropData = std::variant<PropSection, PropString, PropFloat, PropInt,
                                   PropBool, PropColor, PropCombo, PropVec,
-                                  PropButton, PropSeparator, PropRange>;
+                                  PropButton, PropSeparator, PropRange, PropScaledFloat>;
 
     struct PropRow {
         PropType    type;

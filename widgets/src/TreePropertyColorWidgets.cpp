@@ -705,6 +705,18 @@ int PropertyGrid::addRange(const std::string& name, float lo, float hi, float mn
     return static_cast<int>(rows_.size()) - 1;
 }
 
+int PropertyGrid::addScaledFloat(const std::string& name, float value, bool allowNeg,
+                                  std::function<void(float)> onChange, const std::string& desc)
+{
+    // Auto-scale: smallest power of 10 that contains |value|
+    float scale = 1.f;
+    float absVal = std::abs(value);
+    while (scale < absVal) scale *= 10.f;
+    PropRow r{PropType::ScaledFloat, name, desc, PropScaledFloat{value, scale, allowNeg, std::move(onChange)}};
+    rows_.push_back(std::move(r)); visDirty_=true; markDirty();
+    return static_cast<int>(rows_.size()) - 1;
+}
+
 void PropertyGrid::setString(int row, const std::string& v)
 { if (row>=0&&row<(int)rows_.size()&&rows_[row].type==PropType::String) std::get<PropString>(rows_[row].data).value=v; markDirty(); }
 void PropertyGrid::setFloat(int row, float v)
@@ -782,9 +794,10 @@ void PropertyGrid::startEdit(int row)
     auto& r = rows_[row];
     editing_ = true; activeRow_ = row;
     switch (r.type) {
-    case PropType::String: editBuf_ = std::get<PropString>(r.data).value; break;
-    case PropType::Float:  { char b[32]; snprintf(b,32,"%.2f",std::get<PropFloat>(r.data).value); editBuf_=b; break; }
-    case PropType::Int:    { char b[32]; snprintf(b,32,"%d",std::get<PropInt>(r.data).value);     editBuf_=b; break; }
+    case PropType::String:      editBuf_ = std::get<PropString>(r.data).value; break;
+    case PropType::Float:       { char b[32]; snprintf(b,32,"%.2f",std::get<PropFloat>(r.data).value);       editBuf_=b; break; }
+    case PropType::Int:         { char b[32]; snprintf(b,32,"%d",std::get<PropInt>(r.data).value);           editBuf_=b; break; }
+    case PropType::ScaledFloat: { char b[32]; snprintf(b,32,"%.4g",std::get<PropScaledFloat>(r.data).value); editBuf_=b; break; }
     default: editing_ = false; return;
     }
     editCursor_ = static_cast<int>(editBuf_.size());
@@ -799,6 +812,17 @@ void PropertyGrid::commitEdit()
     case PropType::String: { auto& d=std::get<PropString>(r.data); d.value=editBuf_; if (d.onChange) d.onChange(d.value); break; }
     case PropType::Float:  { auto& d=std::get<PropFloat>(r.data); float v=0; try{v=std::stof(editBuf_);}catch(...){} d.value=clamp(v,d.min,d.max); if (d.onChange) d.onChange(d.value); break; }
     case PropType::Int:    { auto& d=std::get<PropInt>(r.data); int v=0; try{v=std::stoi(editBuf_);}catch(...){} d.value=clamp(v,d.min,d.max); if (d.onChange) d.onChange(d.value); break; }
+    case PropType::ScaledFloat: {
+        auto& d=std::get<PropScaledFloat>(r.data);
+        float v=0; try{v=std::stof(editBuf_);}catch(...){}
+        // Expand scale to contain the typed value if needed
+        float absV=std::abs(v);
+        while (d.scale < absV) d.scale *= 10.f;
+        float mn=d.allowNeg?-d.scale:0.f;
+        d.value=clamp(v,mn,d.scale);
+        if (d.onChange) d.onChange(d.value);
+        break;
+    }
     default: break;
     }
     propertyChanged.emit(activeRow_);
@@ -979,6 +1003,38 @@ void PropertyGrid::paintRow(PaintContext& ctx, const Rect& abs, int idx, float y
         ctx.font.SetColor(Color(230,230,230,255)); ctx.font.Print(buf,valTextX+3,textY);
         break;
     }
+    case PropType::ScaledFloat: {
+        auto& d = std::get<PropScaledFloat>(row.data);
+        const float btnW = 16.f, gap = 2.f;
+        float by2 = y + 2, bh2 = rowHeight_ - 4;
+        float slX  = valTextX + btnW + gap;
+        float slW  = valW - btnW * 2.f - gap * 2.f;
+
+        // Scale-down [−] button
+        bool hovBtn = (hoveredRow_ == idx);
+        ctx.fill.SetColor(hovBtn?55:40, hovBtn?58:43, hovBtn?68:52, 255);
+        ctx.fillRect(valTextX, by2, btnW, bh2);
+        ctx.line.SetColor(70,75,85,180); ctx.lineRect(valTextX, by2, btnW, bh2);
+        ctx.font.SetColor(Color(200,200,220,255));
+        ctx.font.Print("-", valTextX + (btnW - ctx.font.GetTextWidth("-")) * 0.5f, textY);
+
+        // Scale-up [+] button
+        float pBtnX = valTextX + valW - btnW;
+        ctx.fill.SetColor(hovBtn?55:40, hovBtn?58:43, hovBtn?68:52, 255);
+        ctx.fillRect(pBtnX, by2, btnW, bh2);
+        ctx.line.SetColor(70,75,85,180); ctx.lineRect(pBtnX, by2, btnW, bh2);
+        ctx.font.Print("+", pBtnX + (btnW - ctx.font.GetTextWidth("+")) * 0.5f, textY);
+
+        // Slider bar in the middle
+        float mn2 = d.allowNeg ? -d.scale : 0.f;
+        char buf[40];
+        snprintf(buf, 40, "%.4g  [%.0f]", d.value, d.scale);
+        Color bc(60,100,160,200);
+        if (draggingSlider_&&activeRow_==idx) bc=Color(80,130,200,220);
+        else if (hoveredRow_==idx) bc=Color(70,110,175,210);
+        drawSliderBar(slX, by2, slW, bh2, d.value, mn2, d.scale, buf, bc);
+        break;
+    }
     default: break;
     }
 }
@@ -1072,6 +1128,31 @@ void PropertyGrid::onMousePress(MouseEvent& e)
         dragStartVal_=d.value;  // no snap on click — drag from current value
         markDirty(); break;
     }
+    case PropType::ScaledFloat: {
+        auto& d=std::get<PropScaledFloat>(row.data);
+        const float btnW=16.f, gap=2.f;
+        float pBtnX=valTextX+valW-btnW;
+        // [-] button: divide scale by 10
+        if (e.x>=valTextX&&e.x<valTextX+btnW) {
+            d.scale=std::max(0.001f, d.scale/10.f);
+            float mn2=d.allowNeg?-d.scale:0.f;
+            d.value=clamp(d.value,mn2,d.scale);
+            if (d.onChange) d.onChange(d.value);
+            propertyChanged.emit(idx); markDirty(); break;
+        }
+        // [+] button: multiply scale by 10
+        if (e.x>=pBtnX&&e.x<pBtnX+btnW) {
+            d.scale*=10.f;
+            markDirty(); break;
+        }
+        // Slider drag
+        if (editing_&&activeRow_==idx) break;
+        draggingSlider_=true; activeRow_=idx;
+        dragStartX_=valTextX+btnW+gap; // slider origin for delta calc
+        dragStartX_=e.x;
+        dragComponent_=0; dragStartVal_=d.value;
+        markDirty(); break;
+    }
     case PropType::Int: {
         auto& d=std::get<PropInt>(row.data);
         if (editing_&&activeRow_==idx) break;
@@ -1144,7 +1225,7 @@ void PropertyGrid::onMouseRelease(MouseEvent& e)
             float dx = std::abs(e.x - dragStartX_);
             if (dx < 3.f) {
                 auto& row = rows_[activeRow_];
-                if (row.type==PropType::Float||row.type==PropType::Int) startEdit(activeRow_);
+                if (row.type==PropType::Float||row.type==PropType::Int||row.type==PropType::ScaledFloat) startEdit(activeRow_);
             } else propertyChanged.emit(activeRow_);
             if (!editing_) activeRow_ = -1;
         }
@@ -1170,6 +1251,11 @@ void PropertyGrid::onMouseMove(MouseEvent& e)
             int nc=d.components; float gap=2.f, compW=(valW-gap*(nc-1))/nc;
             sliderW=compW;
         } else if (row.type==PropType::Range) { auto& d=std::get<PropRange>(row.data); mn=d.min; mx2=d.max; }
+        else if (row.type==PropType::ScaledFloat) {
+            auto& d=std::get<PropScaledFloat>(row.data);
+            mn=d.allowNeg?-d.scale:0.f; mx2=d.scale;
+            sliderW=valW-36.f; // 16px btn + 2px gap each side
+        }
 
         float range=mx2-mn;
         if (range>0.0001f&&sliderW>1.f) {
@@ -1177,6 +1263,7 @@ void PropertyGrid::onMouseMove(MouseEvent& e)
             float dx=e.x-dragStartX_, newVal=clamp(dragStartVal_+dx/sliderW*range,mn,mx2);
             if (row.type==PropType::Float) { auto& d=std::get<PropFloat>(row.data); d.value=newVal; if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::Int) { auto& d=std::get<PropInt>(row.data); d.value=(int)(newVal+0.5f); if (d.onChange) d.onChange(d.value); }
+            else if (row.type==PropType::ScaledFloat) { auto& d=std::get<PropScaledFloat>(row.data); d.value=newVal; if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::Range) {
                 auto& d=std::get<PropRange>(row.data);
                 if (dragComponent_==0) d.lo=clamp(newVal,d.min,d.hi);
