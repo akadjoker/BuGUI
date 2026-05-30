@@ -106,6 +106,8 @@ public:
     void  paint(PaintContext& ctx)           override;
     void  onMousePress(MouseEvent& e)        override;
     void  onMouseMove(MouseEvent& e)         override;
+    void  onMouseRelease(MouseEvent& e)      override;
+    void  onMouseLeave()                     override;
     void  onMouseScroll(MouseEvent& e)       override;
 
     // Drag & drop overrides

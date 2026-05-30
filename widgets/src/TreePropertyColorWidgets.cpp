@@ -566,6 +566,25 @@ void TreeView::onDropReceive(const DragPayload& p)
     markDirty();
 }
 
+void TreeView::onMouseRelease(MouseEvent& /*e*/)
+{
+    // If no BuGUI drag operation took over (onDragEnd was not called), clear state.
+    // For real drags, onDragEnd/onDropReceive already cleared dragNode_.
+    if (dragNode_) {
+        dragNode_          = nullptr;
+        showDropIndicator_ = false;
+        markDirty();
+    }
+}
+
+void TreeView::onMouseLeave()
+{
+    if (showDropIndicator_) {
+        showDropIndicator_ = false;
+        markDirty();
+    }
+}
+
 void TreeView::onMouseScroll(MouseEvent& e)
 {
     if (!visible_ || !enabled_) return;
