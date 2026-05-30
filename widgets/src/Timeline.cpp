@@ -23,6 +23,52 @@ namespace {
 
 Timeline::Timeline() {}
 
+void Timeline::layout()
+{
+    Widget::layout();
+    float contentH = static_cast<float>(tracks_.size()) * kTrackH;
+    float viewH    = rect_.h - kRulerH;
+    bool  needed   = contentH > viewH + 0.5f;
+
+    if (!vbar_) {
+        vbar_ = createChild<ScrollBar>(ScrollBarOrientation::Vertical);
+        vbar_->scrolled.connect([this](float v) {
+            scrollY_ = v;
+            markDirty();
+        });
+    }
+    vbar_->setVisible(needed);
+    if (needed) {
+        float bw = ScrollBar::kBarThickness;
+        vbar_->setRect({rect_.x + rect_.w - bw, rect_.y + kRulerH, bw, viewH});
+        vbar_->setContentSize(contentH);
+        vbar_->setViewSize(viewH);
+        vbar_->setValue(scrollY_);
+        vbar_->layout();
+        // clamp scroll
+        float maxScroll = std::max(0.f, contentH - viewH);
+        if (scrollY_ > maxScroll) scrollY_ = maxScroll;
+    } else {
+        scrollY_ = 0.f;
+    }
+}
+
+void Timeline::clearSelection()
+{
+    for (auto& tr : tracks_)
+        for (auto& kf : tr.keyframes)
+            kf.selected = false;
+    markDirty();
+}
+
+bool Timeline::hasSelection() const
+{
+    for (const auto& tr : tracks_)
+        for (const auto& kf : tr.keyframes)
+            if (kf.selected) return true;
+    return false;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Track / Keyframe / Clip management
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +150,35 @@ void Timeline::setTimeRange(float start, float end)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  View clamping
+// ─────────────────────────────────────────────────────────────────────────────
+
+void Timeline::clampView()
+{
+    // Never go before t=0
+    if (viewStart_ < 0.f) {
+        viewEnd_   -= viewStart_;
+        viewStart_  = 0.f;
+    }
+
+    // Enforce minimum visible range (prevent zooming to nothing)
+    const float kMinRange = 0.05f;
+    if (viewEnd_ - viewStart_ < kMinRange)
+        viewEnd_ = viewStart_ + kMinRange;
+
+    // If endTime is set, don't pan/zoom so far right that content disappears
+    if (endTime_ > 0.f) {
+        const float margin = (viewEnd_ - viewStart_) * 0.25f; // allow 25% margin past end
+        float maxEnd = endTime_ + margin;
+        if (viewEnd_ > maxEnd) {
+            float excess = viewEnd_ - maxEnd;
+            viewEnd_   -= excess;
+            viewStart_  = std::max(0.f, viewStart_ - excess);
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  Coordinate helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -124,7 +199,7 @@ float Timeline::xToTime(float x) const
 int Timeline::trackAtY(float y) const
 {
     Rect b = absoluteRect();
-    float trackArea = y - b.y - kRulerH;
+    float trackArea = y - b.y - kRulerH + scrollY_;
     if (trackArea < 0) return -1;
     int idx = static_cast<int>(trackArea / kTrackH);
     if (idx >= static_cast<int>(tracks_.size())) return -1;
@@ -162,6 +237,13 @@ void Timeline::onMousePress(MouseEvent& e)
 
     int ti = trackAtY(e.y);
     if (ti < 0) return;
+
+    // Left-click on track header → select track (bone selection)
+    if (e.x < b.x + kHeaderW) {
+        onTrackClicked.emit(ti);
+        e.consumed = true;
+        return;
+    }
 
     auto& trk = tracks_[ti];
 
@@ -206,10 +288,43 @@ void Timeline::onMousePress(MouseEvent& e)
             return;
         }
     }
+
+    // Empty space — wait for drag before starting selection rect
+    dragMode_   = DragMode::SelectRectPending;
+    selRectX0_  = selRectX1_ = e.x;
+    selRectY0_  = selRectY1_ = e.y;
+    dragStartX_ = e.x;
+    dragStartY_ = e.y;
+    e.consumed  = true;
 }
 
 void Timeline::onMouseRelease(MouseEvent& e)
 {
+    if (dragMode_ == DragMode::MoveKey && dragTrack_ >= 0 && dragIndex_ >= 0) {
+        float newTime = tracks_[dragTrack_].keyframes[dragIndex_].time;
+        onKeyframeMoved.emit(dragTrack_, dragIndex_, newTime);
+    }
+    if (dragMode_ == DragMode::SelectRectPending) {
+        // click without drag — do nothing, selection unchanged
+    }
+    if (dragMode_ == DragMode::SelectRect) {
+        // Finalise rectangle selection: mark all keyframes inside
+        Rect b = absoluteRect();
+        float t0 = xToTime(std::min(selRectX0_, selRectX1_));
+        float t1 = xToTime(std::max(selRectX0_, selRectX1_));
+        float y0 = std::min(selRectY0_, selRectY1_);
+        float y1 = std::max(selRectY0_, selRectY1_);
+        int count = 0;
+        for (int ti = 0; ti < (int)tracks_.size(); ++ti) {
+            float ky = b.y + kRulerH + ti * kTrackH + kTrackH * 0.5f;
+            if (ky < y0 - kTrackH * 0.5f || ky > y1 + kTrackH * 0.5f) continue;
+            for (auto& kf : tracks_[ti].keyframes) {
+                if (kf.time >= t0 && kf.time <= t1) { kf.selected = true; ++count; }
+            }
+        }
+        onSelectionChanged.emit(count);
+        markDirty();
+    }
     dragMode_  = DragMode::None;
     dragTrack_ = -1;
     dragIndex_ = -1;
@@ -230,6 +345,7 @@ void Timeline::onMouseMove(MouseEvent& e)
         float dt  = xToTime(dragStartX_) - xToTime(e.x);
         viewStart_ = panStartView_ + dt;
         viewEnd_   = panStartEnd_  + dt;
+        clampView();
         markDirty();
         e.consumed = true;
         break;
@@ -266,6 +382,21 @@ void Timeline::onMouseMove(MouseEvent& e)
         e.consumed = true;
         break;
     }
+    case DragMode::SelectRectPending: {
+        float dx = e.x - dragStartX_, dy = e.y - dragStartY_;
+        if (dx*dx + dy*dy > 16.f) {
+            clearSelection();
+            dragMode_ = DragMode::SelectRect;
+        }
+        e.consumed = true;
+        break;
+    }
+    case DragMode::SelectRect:
+        selRectX1_ = e.x;
+        selRectY1_ = e.y;
+        markDirty();
+        e.consumed = true;
+        break;
     case DragMode::None:
         break;
     }
@@ -273,11 +404,32 @@ void Timeline::onMouseMove(MouseEvent& e)
 
 void Timeline::onMouseScroll(MouseEvent& e)
 {
-    // Zoom centred on mouse X
-    float tAtMouse = xToTime(e.x);
-    float factor   = (e.scrollY > 0) ? 0.9f : 1.1f;
-    viewStart_ = tAtMouse + (viewStart_ - tAtMouse) * factor;
-    viewEnd_   = tAtMouse + (viewEnd_   - tAtMouse) * factor;
+    Rect b = absoluteRect();
+    bool inRuler = (e.y < b.y + kRulerH);
+
+    if (inRuler) {
+        // Horizontal zoom centred on mouse X
+        float tAtMouse = xToTime(e.x);
+        float factor   = (e.scrollY > 0) ? 0.9f : 1.1f;
+        viewStart_ = tAtMouse + (viewStart_ - tAtMouse) * factor;
+        viewEnd_   = tAtMouse + (viewEnd_   - tAtMouse) * factor;
+        clampView();
+    } else if (vbar_ && vbar_->isVisible()) {
+        // Vertical scroll of tracks
+        float step  = kTrackH * 2.f;
+        scrollY_   -= e.scrollY * step;
+        float maxSc = std::max(0.f, static_cast<float>(tracks_.size()) * kTrackH - (b.h - kRulerH));
+        if (scrollY_ < 0.f)     scrollY_ = 0.f;
+        if (scrollY_ > maxSc)   scrollY_ = maxSc;
+        vbar_->setValue(scrollY_);
+    } else {
+        // No vbar — zoom horizontally anyway
+        float tAtMouse = xToTime(e.x);
+        float factor   = (e.scrollY > 0) ? 0.9f : 1.1f;
+        viewStart_ = tAtMouse + (viewStart_ - tAtMouse) * factor;
+        viewEnd_   = tAtMouse + (viewEnd_   - tAtMouse) * factor;
+        clampView();
+    }
     markDirty();
     e.consumed = true;
 }
@@ -291,6 +443,30 @@ void Timeline::paint(PaintContext& ctx)
     if (!visible_) return;
     Rect b = absoluteRect();
 
+    // Update vbar geometry every frame (track count may have changed)
+    {
+        float contentH = static_cast<float>(tracks_.size()) * kTrackH;
+        float viewH    = b.h - kRulerH;
+        bool  needed   = contentH > viewH + 0.5f;
+        if (!vbar_) {
+            vbar_ = createChild<ScrollBar>(ScrollBarOrientation::Vertical);
+            vbar_->scrolled.connect([this](float v) { scrollY_ = v; markDirty(); });
+        }
+        vbar_->setVisible(needed);
+        if (needed) {
+            float bw = ScrollBar::kBarThickness;
+            vbar_->setRect({b.x + b.w - bw, b.y + kRulerH, bw, viewH});
+            vbar_->setContentSize(contentH);
+            vbar_->setViewSize(viewH);
+            float maxSc = std::max(0.f, contentH - viewH);
+            if (scrollY_ > maxSc) scrollY_ = maxSc;
+            vbar_->setValue(scrollY_);
+            vbar_->layout();
+        } else {
+            scrollY_ = 0.f;
+        }
+    }
+
     ctx.pushClip(b);
 
     // Background
@@ -300,6 +476,7 @@ void Timeline::paint(PaintContext& ctx)
     paintRuler(ctx, b);
     paintTracks(ctx, b);
     paintPlayhead(ctx, b);
+    paintSelectionRect(ctx, b);
 
     // Border (4 edges)
     ctx.fill.SetColor(50, 52, 58, 255);
@@ -377,19 +554,32 @@ void Timeline::paintRuler(PaintContext& ctx, const Rect& b)
 void Timeline::paintTracks(PaintContext& ctx, const Rect& b)
 {
     float ascName = setupFont(ctx, Color(180, 180, 180, 255), 10.0f);
+    float barW = (vbar_ && vbar_->isVisible()) ? ScrollBar::kBarThickness : 0.f;
+    float trackW = b.w - barW;
+    float viewBottom = b.y + b.h;
 
     for (int ti = 0; ti < static_cast<int>(tracks_.size()); ++ti) {
         const auto& trk = tracks_[ti];
-        float ty = b.y + kRulerH + ti * kTrackH;
+        float ty = b.y + kRulerH + ti * kTrackH - scrollY_;
 
-        // Track background (alternating)
-        Color bg = (ti % 2 == 0) ? Color(34, 36, 40, 255) : Color(30, 32, 36, 255);
+        // Skip tracks outside visible area
+        if (ty + kTrackH < b.y + kRulerH || ty > viewBottom) continue;
+
+        bool isSel = (ti == selectedTrack_);
+        Color bg = isSel ? Color(45, 55, 80, 255)
+                         : (ti % 2 == 0) ? Color(34, 36, 40, 255) : Color(30, 32, 36, 255);
         ctx.fill.SetColor(bg.r, bg.g, bg.b, bg.a);
-        ctx.fillRect(b.x, ty, b.w, kTrackH);
+        ctx.fillRect(b.x, ty, trackW, kTrackH);
 
-        // Header area
-        ctx.fill.SetColor(36, 38, 44, 255);
+        // Header area (brighter when selected)
+        Color hdrBg = isSel ? Color(55, 70, 110, 255) : Color(36, 38, 44, 255);
+        ctx.fill.SetColor(hdrBg.r, hdrBg.g, hdrBg.b, hdrBg.a);
         ctx.fillRect(b.x, ty, kHeaderW, kTrackH);
+        // Selection indicator bar on left edge
+        if (isSel) {
+            ctx.fill.SetColor(100, 160, 255, 255);
+            ctx.fillRect(b.x, ty, 3, kTrackH);
+        }
 
         // Track name — vertically centred in track header
         Color tc = trk.muted ? Color(80, 80, 80, 180) : trk.color;
@@ -465,11 +655,48 @@ void Timeline::paintPlayhead(PaintContext& ctx, const Rect& b)
     float top = b.y;
     float bot = b.y + kRulerH + static_cast<float>(tracks_.size()) * kTrackH;
 
-    // Playhead line (2px for visibility)
     ctx.fill.SetColor(255, 80, 80, 220);
     ctx.fillRect(x, top, 1, bot - top);
 
-    // Triangle marker at ruler bottom
     ctx.fill.SetColor(255, 80, 80, 240);
     ctx.fillTriangle(x - 6, b.y + kRulerH, x + 6, b.y + kRulerH, x, b.y + kRulerH - 8);
+
+    // Frame / time label above the triangle
+    {
+        char buf[24];
+        if (fps_ > 0.f)
+            snprintf(buf, sizeof(buf), "%d", (int)std::roundf(playhead_ * fps_));
+        else
+            snprintf(buf, sizeof(buf), "%.2f", playhead_);
+
+        float asc = setupFont(ctx, Color(255, 200, 200, 255), 9.f);
+        float tw  = ctx.font.GetTextWidth(buf);
+        float lx  = x - tw * 0.5f;
+        // Keep within bounds
+        if (lx < b.x + kHeaderW) lx = b.x + kHeaderW;
+        if (lx + tw > b.x + b.w) lx = b.x + b.w - tw;
+        // Small bg pill
+        ctx.fill.SetColor(180, 50, 50, 200);
+        ctx.fillRect(lx - 2, b.y + 2, tw + 4, 11);
+        ctx.font.Print(buf, lx, b.y + 2 + asc);
+    }
+}
+
+void Timeline::paintSelectionRect(PaintContext& ctx, const Rect& /*b*/)
+{
+    if (dragMode_ != DragMode::SelectRect) return;
+    float x0 = std::min(selRectX0_, selRectX1_);
+    float y0 = std::min(selRectY0_, selRectY1_);
+    float w  = std::abs(selRectX1_ - selRectX0_);
+    float h  = std::abs(selRectY1_ - selRectY0_);
+    if (w < 1.f || h < 1.f) return;
+    // Fill
+    ctx.fill.SetColor(80, 160, 255, 40);
+    ctx.fillRect(x0, y0, w, h);
+    // Border
+    ctx.fill.SetColor(80, 160, 255, 180);
+    ctx.fillRect(x0,         y0,         w, 1);
+    ctx.fillRect(x0,         y0 + h - 1, w, 1);
+    ctx.fillRect(x0,         y0,         1, h);
+    ctx.fillRect(x0 + w - 1, y0,         1, h);
 }

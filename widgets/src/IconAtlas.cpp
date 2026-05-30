@@ -99,6 +99,7 @@ void IconAtlas::drawIcon(BuImage& pm, IconId id, int ox, int oy, int sz)
     case IconId::ScaleArrows: drawScaleArrows(pm, ox, oy, sz); break;
     case IconId::Expand:      drawExpand(pm, ox, oy, sz);      break;
     case IconId::Save:        drawSave(pm, ox, oy, sz);        break;
+    case IconId::Keyframe:    drawKeyframe(pm, ox, oy, sz);    break;
     default: break;
     }
 }
@@ -805,4 +806,21 @@ void IconAtlas::drawSave(BuImage& pm, int ox, int oy, int sz)
     int sx = ox + m + (w - sw) / 2;
     int sy = oy + m + h - sh;
     pm.DrawRect(sx, sy, sw, sh, IC, true);
+}
+
+// ── Keyframe (filled diamond) ───────────────────────────────────────────────
+
+void IconAtlas::drawKeyframe(BuImage& pm, int ox, int oy, int sz)
+{
+    int cx = ox + sz / 2;
+    int cy = oy + sz / 2;
+    int r  = sz * 5 / 14;  // half-size of diamond
+    // Fill diamond by drawing horizontal lines (scan fill)
+    for (int dy = -r; dy <= r; ++dy)
+    {
+        int hw = r - std::abs(dy);
+        if (hw <= 0) continue;
+        for (int dx = -hw; dx <= hw; ++dx)
+            pm.DrawRect(cx + dx, cy + dy, 1, 1, IC, true);
+    }
 }

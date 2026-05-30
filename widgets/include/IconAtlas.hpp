@@ -109,6 +109,7 @@ private:
     void drawScaleArrows(BuImage& pm, int ox, int oy, int sz);
     void drawExpand     (BuImage& pm, int ox, int oy, int sz);
     void drawSave       (BuImage& pm, int ox, int oy, int sz);
+    void drawKeyframe   (BuImage& pm, int ox, int oy, int sz);
 
     BuGUI::TextureHandle tex_;
     int atlasW_    = 0;

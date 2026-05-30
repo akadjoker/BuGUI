@@ -566,15 +566,14 @@ void TreeView::onDropReceive(const DragPayload& p)
     markDirty();
 }
 
-void TreeView::onMouseRelease(MouseEvent& /*e*/)
+void TreeView::onMouseRelease(MouseEvent& e)
 {
-    // If no BuGUI drag operation took over (onDragEnd was not called), clear state.
-    // For real drags, onDragEnd/onDropReceive already cleared dragNode_.
     if (dragNode_) {
         dragNode_          = nullptr;
         showDropIndicator_ = false;
         markDirty();
     }
+    Widget::onMouseRelease(e);  // MUST call base to clear capture state
 }
 
 void TreeView::onMouseLeave()
@@ -583,6 +582,7 @@ void TreeView::onMouseLeave()
         showDropIndicator_ = false;
         markDirty();
     }
+    Widget::onMouseLeave();     // MUST call base to reset hover state
 }
 
 void TreeView::onMouseScroll(MouseEvent& e)

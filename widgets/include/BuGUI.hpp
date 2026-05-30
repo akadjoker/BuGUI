@@ -227,6 +227,7 @@ namespace BuGUI
         ScaleArrows,    // diagonal resize arrows
         Expand,         // fullscreen / maximize
         Save,           // floppy disk
+        Keyframe,       // diamond shape — animation keyframe
         COUNT  // must be last
     };
 
