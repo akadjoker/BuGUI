@@ -344,7 +344,13 @@ void WidgetApp::dispatchMousePress(float x, float y, int btn)
         if (hit->acceptsFocus() && hit != focused_)
             setFocused(hit);
 
-        // Check for drag source on left-button press
+        // Dispatch onMousePress first so widgets can set their drag state
+        // (e.g. TreeView sets dragNode_ inside onMousePress)
+        MouseEvent me = makeMouseEvent(x, y, btn);
+        bubble(hit, me, &Widget::onMousePress);
+        pressed_ = hit;
+
+        // Check for drag source AFTER onMousePress so state is up to date
         if (btn == 0 && !dragPending_) {
             Widget* ds = hit;
             while (ds) {
@@ -358,10 +364,6 @@ void WidgetApp::dispatchMousePress(float x, float y, int btn)
                 ds = ds->parent();
             }
         }
-
-        MouseEvent me = makeMouseEvent(x, y, btn);
-        bubble(hit, me, &Widget::onMousePress);
-        pressed_ = hit;
     } else {
         setFocused(nullptr);
     }
