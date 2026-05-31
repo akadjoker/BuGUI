@@ -21,7 +21,10 @@ namespace {
 //  Timeline
 // ═════════════════════════════════════════════════════════════════════════════
 
-Timeline::Timeline() {}
+Timeline::Timeline()
+{
+    acceptsFocus_ = true;
+}
 
 void Timeline::layout()
 {
@@ -699,4 +702,32 @@ void Timeline::paintSelectionRect(PaintContext& ctx, const Rect& /*b*/)
     ctx.fillRect(x0,         y0 + h - 1, w, 1);
     ctx.fillRect(x0,         y0,         1, h);
     ctx.fillRect(x0 + w - 1, y0,         1, h);
+}
+
+void Timeline::onKeyPress(KeyEvent& e)
+{
+    // Left/Right arrows move the playhead by one frame (or 1/30s if no FPS set)
+    // Shift multiplies the step by 10
+    float step = (fps_ > 0.f) ? (1.f / fps_) : (1.f / 30.f);
+    if (e.shift) step *= 10.f;
+
+    if (e.key == BuGUI::Key::Left)
+    {
+        float t = std::max(0.f, playhead_ - step);
+        if (fps_ > 0.f) t = std::round(t * fps_) / fps_;
+        playhead_ = t;
+        onPlayheadChanged.emit(playhead_);
+        markDirty();
+        e.consumed = true;
+    }
+    else if (e.key == BuGUI::Key::Right)
+    {
+        float limit = (endTime_ > 0.f) ? endTime_ : viewEnd_;
+        float t = std::min(limit, playhead_ + step);
+        if (fps_ > 0.f) t = std::round(t * fps_) / fps_;
+        playhead_ = t;
+        onPlayheadChanged.emit(playhead_);
+        markDirty();
+        e.consumed = true;
+    }
 }

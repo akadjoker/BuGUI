@@ -137,6 +137,7 @@ public:
     void onMouseRelease(MouseEvent& e) override;
     void onMouseMove(MouseEvent& e) override;
     void onMouseScroll(MouseEvent& e) override;
+    void onKeyPress(KeyEvent& e) override;
 
 private:
     std::vector<TimelineTrack> tracks_;

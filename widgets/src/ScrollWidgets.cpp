@@ -220,14 +220,9 @@ void ScrollView::layout()
 
     updateBars();
 
-    // Second pass: content rect = viewport dimensions (excluding scrollbar areas).
-    // The scroll offset handles showing the overflowing content.
-    float barThick = ScrollBar::kBarThickness + kBarGap;
-    bool needV = vbar_ && vbar_->isVisible();
-    bool needH = hbar_ && hbar_->isVisible();
-    float viewW = needV ? rect_.w - barThick : rect_.w;
-    float viewH = needH ? rect_.h - barThick : rect_.h;
-    contentWidget_->setRect({0, 0, viewW, contentH_});
+    // Second pass: content rect = full content size so absoluteRect() covers all
+    // children for hit-testing. The scroll offset + paint clip handle visibility.
+    contentWidget_->setRect({0, 0, contentW_, contentH_});
     contentWidget_->layout();
 }
 
