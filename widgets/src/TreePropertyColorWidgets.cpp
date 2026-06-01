@@ -794,12 +794,12 @@ void PropertyGrid::spinStep(int row, int dir)
     auto& r = rows_[row];
     if (r.type == PropType::Int) {
         auto& d = std::get<PropInt>(r.data);
-        int step = std::max(1, (d.max - d.min) / 100);
-        d.value = clamp(d.value + dir * step, d.min, d.max);
+        d.value = clamp(d.value + dir, d.min, d.max);
         if (d.onChange) d.onChange(d.value);
     } else if (r.type == PropType::Float) {
         auto& d = std::get<PropFloat>(r.data);
-        float step = (d.max - d.min) / 100.f;
+        float range = d.max - d.min;
+        float step = (range > 0.0001f && range < 10.f) ? range * 0.01f : 1.0f;
         d.value = clamp(d.value + dir * step, d.min, d.max);
         if (d.onChange) d.onChange(d.value);
     }
@@ -1278,8 +1278,16 @@ void PropertyGrid::onMouseMove(MouseEvent& e)
 
         float range=mx2-mn;
         if (range>0.0001f&&sliderW>1.f) {
-            // delta drag: value changes proportionally to mouse movement from press point
-            float dx=e.x-dragStartX_, newVal=clamp(dragStartVal_+dx/sliderW*range,mn,mx2);
+            // ── Godot/Unity-style scrub: fixed speed per pixel, not proportional to range ──
+            // Base: 1 unit/px. Hold Ctrl = ÷10 (fine). Hold Shift = ×10 (coarse).
+            const auto& io = BuGUI::GetIO();
+            float speed = 1.0f;
+            if (io.keyCtrl  && !io.keyShift) speed = 0.1f;
+            if (io.keyShift && !io.keyCtrl)  speed = 10.0f;
+            // For very small ranges (e.g. 0–1 sliders like opacity) scale down automatically
+            if (range < 10.0f) speed *= range * 0.1f;
+            float dx = e.x - dragStartX_;
+            float newVal = clamp(dragStartVal_ + dx * speed, mn, mx2);
             if (row.type==PropType::Float) { auto& d=std::get<PropFloat>(row.data); d.value=newVal; if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::Int) { auto& d=std::get<PropInt>(row.data); d.value=(int)(newVal+0.5f); if (d.onChange) d.onChange(d.value); }
             else if (row.type==PropType::ScaledFloat) { auto& d=std::get<PropScaledFloat>(row.data); d.value=newVal; if (d.onChange) d.onChange(d.value); }

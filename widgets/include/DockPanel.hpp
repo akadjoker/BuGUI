@@ -89,6 +89,10 @@ public:
     /// @brief Move a panel tab into the same leaf as another named panel.
     void moveTabToLeaf(const std::string& sourceName, const std::string& targetName);
 
+    /// @brief Return the logical fraction of dock space taken by the named panel.
+    /// Use this to persist split ratios. Returns -1 if panel not found or not split.
+    float getPanelRatio(const std::string& panelName) const;
+
     /// @brief Set the tab bar height.
     void  setTabBarHeight(float h) { tabBarH_ = h; markDirty(); }
     /// @brief Get the tab bar height.

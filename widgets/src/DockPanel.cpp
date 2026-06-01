@@ -157,6 +157,39 @@ void DockPanel::closePanel(const std::string& name)
     markDirty();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  getPanelRatio - returns the logical fraction of space taken by a panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace {
+// Walk the tree and find the split node whose first or second child contains `target`.
+DockNode* findParentSplit(DockNode* node, DockNode* target, bool* outIsFirst)
+{
+    if (!node || !node->isSplit) return nullptr;
+    if (node->first  == target) { *outIsFirst = true;  return node; }
+    if (node->second == target) { *outIsFirst = false; return node; }
+    DockNode* r = findParentSplit(node->first,  target, outIsFirst);
+    if (r) return r;
+    return           findParentSplit(node->second, target, outIsFirst);
+}
+} // anon
+
+float DockPanel::getPanelRatio(const std::string& name) const
+{
+    if (!root_) return -1.f;
+    DockNode* leaf = root_->findTab(name);
+    if (!leaf) return -1.f;
+
+    bool isFirst = false;
+    DockNode* parent = findParentSplit(root_, leaf, &isFirst);
+    if (!parent) return -1.f;
+
+    // split->ratio = fraction for the FIRST child.
+    // If the panel is in first: logical ratio == split->ratio
+    // If the panel is in second: logical ratio == 1 - split->ratio
+    return isFirst ? parent->ratio : (1.f - parent->ratio);
+}
+
 void DockPanel::moveTabToLeaf(const std::string& sourceName, const std::string& targetName)
 {
     ensureRoot();

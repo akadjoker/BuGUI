@@ -82,10 +82,11 @@ void FloatWindow::layout()
 
     if (content_ && !minimized_)
     {
-        const float pad = 2.0f;
+        const float pad  = 2.0f;
+        const float grip = resizable_ ? kResizeGrip : 0.0f;
         content_->setRect({pad, titleBarH_ + pad,
-                           floatW_ - pad * 2.0f,
-                           floatH_ - titleBarH_ - pad * 2.0f});
+                           floatW_ - pad * 2.0f - grip,
+                           floatH_ - titleBarH_ - pad * 2.0f - grip});
         content_->layout();
     }
 }
