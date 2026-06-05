@@ -279,6 +279,7 @@ void TextInput::onMouseMove(MouseEvent& e)
 
 void TextInput::onKeyPress(KeyEvent& e)
 {
+    if (!isFocused()) return;
     if (mode_ == Mode::ReadOnly && !(e.ctrl && e.key == BuGUI::Key::C)) return;
 
     int len = utf8Length(text_);
@@ -379,6 +380,7 @@ void TextInput::onKeyPress(KeyEvent& e)
 
 void TextInput::onTextInput(KeyEvent& e)
 {
+    if (!isFocused()) return;
     if (mode_ == Mode::ReadOnly) { e.consumed = true; return; }
     std::string t(e.text);
     if (t.empty()) return;
@@ -1362,6 +1364,7 @@ void TextEdit::onMouseScroll(MouseEvent& e)
 
 void TextEdit::onKeyPress(KeyEvent& e)
 {
+    if (!isFocused()) return;
     if (readOnly_ && !e.ctrl) return;
     blinkTimer_ = 0;
     int lc = static_cast<int>(lines_.size());
@@ -1472,6 +1475,7 @@ void TextEdit::onKeyPress(KeyEvent& e)
 
 void TextEdit::onTextInput(KeyEvent& e)
 {
+    if (!isFocused()) return;
     if (readOnly_) { e.consumed = true; return; }
     std::string t(e.text);
     if (t.empty()) return;

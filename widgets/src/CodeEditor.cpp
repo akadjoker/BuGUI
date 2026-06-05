@@ -2295,6 +2295,8 @@ void CodeEditor::paint(PaintContext& ctx)
 
 void CodeEditor::onKeyPress(KeyEvent& e)
 {
+    if (!isFocused()) return;
+
     // Multi-cursor: Ctrl+D = add cursor for next occurrence
     if (e.ctrl && e.key == BuGUI::Key::D) {
         addCursorForNextOccurrence();
@@ -2535,6 +2537,7 @@ void CodeEditor::onKeyPress(KeyEvent& e)
 
 void CodeEditor::onTextInput(KeyEvent& e)
 {
+    if (!isFocused()) return;
     if (readOnly_) { e.consumed = true; return; }
 
     TextPos before = cursor_;
