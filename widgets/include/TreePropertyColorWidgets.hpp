@@ -49,6 +49,11 @@ public:
     /// @brief Get the parent node.
     TreeNode*                      parent()            { return parent_; }
 
+    /// @brief Set per-node label color (used instead of theme textColor when not selected).
+    void         setLabelColor(const Color& c) { labelColor_ = c; }
+    /// @brief Get the per-node label color.
+    const Color& labelColor()             const { return labelColor_; }
+
 private:
     std::string           text_;
     std::string           iconStr_;
@@ -56,6 +61,7 @@ private:
     TreeNode*             parent_   = nullptr;
     std::vector<TreeNode*> children_;
     bool                  expanded_ = true;
+    Color                 labelColor_ = {220, 220, 220, 255};
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -101,6 +107,9 @@ public:
 
     /// @brief Enable or disable drag & drop reordering.
     void setDragEnabled(bool e) { dragEnabled_ = e; }
+
+    /// @brief Force rebuild of the flat row cache (call after externally changing expand state).
+    void markFlatDirty() { flatDirty_ = true; markDirty(); }
 
     Vec2f sizeHint()                   const override;
     void  paint(PaintContext& ctx)           override;

@@ -407,7 +407,8 @@ void TreeView::paint(PaintContext& ctx)
             indX += isz + 3.f;
         }
 
-        ctx.font.SetColor(row.node == selected_ ? Color(255,255,255,255) : t.textColor);
+        Color textCol = (row.node == selected_) ? Color(255,255,255,255) : row.node->labelColor();
+        ctx.font.SetColor(textCol);
         float ty = rowY + (rowHeight_ - t.fontSize) * 0.5f + asc;
         ctx.font.Print(row.node->text().c_str(), indX, ty);
     }
