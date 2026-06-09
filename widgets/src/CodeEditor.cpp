@@ -2297,6 +2297,30 @@ void CodeEditor::onKeyPress(KeyEvent& e)
 {
     if (!isFocused()) return;
 
+    // CodeEditor always consumes key events to prevent leaking to
+    // other shortcut handlers (scene undo, transform modes, etc.)
+    e.consumed = true;
+
+    // Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
+    if (e.ctrl && !e.alt && e.key == BuGUI::Key::Z) {
+        if (e.shift) redo(); else undo();
+        return;
+    }
+    if (e.ctrl && !e.alt && e.key == BuGUI::Key::Y) {
+        redo();
+        return;
+    }
+
+    // Ctrl+F = find, Ctrl+H = replace
+    if (e.ctrl && e.key == BuGUI::Key::F) {
+        showSearchBar();
+        return;
+    }
+    if (e.ctrl && e.key == BuGUI::Key::H) {
+        showReplaceBar();
+        return;
+    }
+
     // Multi-cursor: Ctrl+D = add cursor for next occurrence
     if (e.ctrl && e.key == BuGUI::Key::D) {
         addCursorForNextOccurrence();

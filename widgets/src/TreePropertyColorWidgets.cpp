@@ -737,6 +737,22 @@ int PropertyGrid::addScaledFloat(const std::string& name, float value, bool allo
     return static_cast<int>(rows_.size()) - 1;
 }
 
+int PropertyGrid::addCheckboxGrid(const std::string& name,
+                                   const std::vector<std::pair<std::string, bool>>& items,
+                                   int columns,
+                                   std::function<void(int, bool)> onChange,
+                                   const std::string& desc)
+{
+    PropCheckboxGrid g;
+    g.columns = columns;
+    g.onChange = std::move(onChange);
+    for (auto& [label, val] : items)
+        g.items.push_back({label, val});
+    PropRow r{PropType::CheckboxGrid, name, desc, std::move(g)};
+    rows_.push_back(std::move(r)); visDirty_=true; markDirty();
+    return static_cast<int>(rows_.size()) - 1;
+}
+
 void PropertyGrid::setString(int row, const std::string& v)
 { if (row>=0&&row<(int)rows_.size()&&rows_[row].type==PropType::String) std::get<PropString>(rows_[row].data).value=v; markDirty(); }
 void PropertyGrid::setFloat(int row, float v)
@@ -771,7 +787,21 @@ std::vector<int> PropertyGrid::visibleRows() const
     return cachedVisibleRows_;
 }
 
-float PropertyGrid::visibleTotalHeight() const { return static_cast<float>(visibleRows().size()) * rowHeight_; }
+float PropertyGrid::rowHeightFor(int idx) const {
+    if (idx >= 0 && idx < (int)rows_.size() && rows_[idx].type == PropType::CheckboxGrid) {
+        auto& g = std::get<PropCheckboxGrid>(rows_[idx].data);
+        int nRows = ((int)g.items.size() + g.columns - 1) / g.columns;
+        return rowHeight_ * std::max(1, nRows);
+    }
+    return rowHeight_;
+}
+
+float PropertyGrid::visibleTotalHeight() const {
+    float total = 0;
+    for (int idx : visibleRows())
+        total += rowHeightFor(idx);
+    return total;
+}
 float PropertyGrid::totalHeight()        const { return visibleTotalHeight(); }
 float PropertyGrid::gridHeight()         const { return rect_.h - (descHeight_ > 0 ? descHeight_ : 0); }
 float PropertyGrid::maxScroll()          const { float t=totalHeight(),v=gridHeight(); return (t>v)?t-v:0.f; }
@@ -779,9 +809,14 @@ float PropertyGrid::maxScroll()          const { float t=totalHeight(),v=gridHei
 int PropertyGrid::hitRow(float localY) const
 {
     auto vis = visibleRows();
-    int vi = static_cast<int>((localY + scrollOffset_) / rowHeight_);
-    if (vi < 0 || vi >= (int)vis.size()) return -1;
-    return vis[vi];
+    float accum = 0;
+    for (int i = 0; i < (int)vis.size(); ++i) {
+        float rh = rowHeightFor(vis[i]);
+        if (localY + scrollOffset_ < accum + rh)
+            return vis[i];
+        accum += rh;
+    }
+    return -1;
 }
 
 Widget::Vec2f PropertyGrid::sizeHint() const
@@ -884,12 +919,15 @@ void PropertyGrid::paintRow(PaintContext& ctx, const Rect& abs, int idx, float y
     }
 
     // Row highlight
-    if (idx == selectedRow_)      { ctx.fill.SetColor(t.selectionColor.r,t.selectionColor.g,t.selectionColor.b,t.selectionColor.a); ctx.fillRect(abs.x,y,abs.w,rowHeight_); }
-    else if (idx == hoveredRow_)  { ctx.fill.SetColor(t.buttonHover.r,t.buttonHover.g,t.buttonHover.b,30); ctx.fillRect(abs.x,y,abs.w,rowHeight_); }
-    if (idx%2==0 && idx!=selectedRow_) { ctx.fill.SetColor(0,0,0,10); ctx.fillRect(abs.x,y,abs.w,rowHeight_); }
+    float rh = rowHeightFor(idx);
+    if (idx == selectedRow_)      { ctx.fill.SetColor(t.selectionColor.r,t.selectionColor.g,t.selectionColor.b,t.selectionColor.a); ctx.fillRect(abs.x,y,abs.w,rh); }
+    else if (idx == hoveredRow_)  { ctx.fill.SetColor(t.buttonHover.r,t.buttonHover.g,t.buttonHover.b,30); ctx.fillRect(abs.x,y,abs.w,rh); }
+    if (idx%2==0 && idx!=selectedRow_) { ctx.fill.SetColor(0,0,0,10); ctx.fillRect(abs.x,y,abs.w,rh); }
 
-    // Label
-    ctx.font.SetColor(idx==selectedRow_ ? Color(255,255,255,255) : t.textColor);
+    // Label (dimmed if disabled)
+    Color labelColor = idx==selectedRow_ ? Color(255,255,255,255) : t.textColor;
+    if (!row.enabled) labelColor = Color(labelColor.r/2, labelColor.g/2, labelColor.b/2, 120);
+    ctx.font.SetColor(labelColor);
     ctx.font.Print(row.name.c_str(), abs.x+8.f, textY);
 
     // Column separator
@@ -1055,6 +1093,39 @@ void PropertyGrid::paintRow(PaintContext& ctx, const Rect& abs, int idx, float y
         drawSliderBar(slX, by2, slW, bh2, d.value, mn2, d.scale, buf, bc);
         break;
     }
+    case PropType::CheckboxGrid: {
+        auto& g = std::get<PropCheckboxGrid>(row.data);
+        int cols = g.columns;
+        int n = (int)g.items.size();
+        float cellW = valW / (float)cols;
+        float bs = 14.f;
+        bool dim = !row.enabled;
+        for (int i = 0; i < n; ++i) {
+            int col = i % cols;
+            int r2  = i / cols;
+            float cx = valTextX + col * cellW;
+            float cy = y + r2 * rowHeight_ + (rowHeight_ - bs) * 0.5f;
+            // checkbox
+            if (dim) ctx.fill.SetColor(t.inputBg.r/2, t.inputBg.g/2, t.inputBg.b/2, 100);
+            else     ctx.fill.SetColor(t.inputBg.r, t.inputBg.g, t.inputBg.b, t.inputBg.a);
+            ctx.fillRect(cx, cy, bs, bs);
+            if (dim) ctx.line.SetColor(t.inputBorder.r/2, t.inputBorder.g/2, t.inputBorder.b/2, 80);
+            else     ctx.line.SetColor(t.inputBorder.r, t.inputBorder.g, t.inputBorder.b, t.inputBorder.a);
+            ctx.lineRect(cx, cy, bs, bs);
+            if (g.items[i].value) {
+                if (dim) ctx.line.SetColor(t.checkMark.r/2, t.checkMark.g/2, t.checkMark.b/2, 80);
+                else     ctx.line.SetColor(t.checkMark.r, t.checkMark.g, t.checkMark.b, t.checkMark.a);
+                ctx.drawLine(cx+3, cy+bs*0.5f, cx+bs*0.4f, cy+bs-3);
+                ctx.drawLine(cx+bs*0.4f, cy+bs-3, cx+bs-3, cy+3);
+            }
+            // label
+            float lblY = cy + (bs - t.fontSize) * 0.5f + ctx.font.GetAscender();
+            if (dim) ctx.font.SetColor(Color(t.textColor.r/2, t.textColor.g/2, t.textColor.b/2, 120));
+            else     ctx.font.SetColor(t.textColor);
+            ctx.font.Print(g.items[i].label.c_str(), cx + bs + 3.f, lblY);
+        }
+        break;
+    }
     default: break;
     }
 }
@@ -1091,17 +1162,41 @@ void PropertyGrid::paint(PaintContext& ctx)
 
     auto vis = visibleRows();
     int count = (int)vis.size();
-    int first = static_cast<int>(scrollOffset_ / rowHeight_);
-    int last  = std::min(first + static_cast<int>(gh / rowHeight_) + 2, count);
 
+    // Compute cumulative Y offsets for variable-height rows
+    float accumY = 0;
+    int first = -1, last = count;
+    for (int vi = 0; vi < count; ++vi) {
+        float rh = rowHeightFor(vis[vi]);
+        if (first < 0 && accumY + rh > scrollOffset_)
+            first = vi;
+        if (accumY - scrollOffset_ > gh) {
+            last = vi;
+            break;
+        }
+        accumY += rh;
+    }
+    if (first < 0) first = 0;
+
+    // Paint rows
+    accumY = 0;
+    for (int vi = 0; vi < first; ++vi)
+        accumY += rowHeightFor(vis[vi]);
     for (int vi = first; vi < last; ++vi) {
-        float rowY = abs.y + vi * rowHeight_ - scrollOffset_;
+        float rowY = abs.y + accumY - scrollOffset_;
+        float rh = rowHeightFor(vis[vi]);
         paintRow(ctx, abs, vis[vi], rowY);
+        accumY += rh;
     }
 
+    // Separating lines
+    accumY = 0;
+    for (int vi = 0; vi < first; ++vi)
+        accumY += rowHeightFor(vis[vi]);
     ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, 40);
     for (int vi = first; vi < last; ++vi) {
-        float ry = abs.y + (vi+1)*rowHeight_ - scrollOffset_;
+        accumY += rowHeightFor(vis[vi]);
+        float ry = abs.y + accumY - scrollOffset_;
         ctx.drawLine(abs.x, ry, abs.x+abs.w, ry);
     }
 
@@ -1128,6 +1223,7 @@ void PropertyGrid::onMousePress(MouseEvent& e)
 
     if (row.type == PropType::Section) { std::get<PropSection>(row.data).expanded=!std::get<PropSection>(row.data).expanded; visDirty_=true; markDirty(); return; }
     if (row.type == PropType::Separator) return;
+    if (!row.enabled) return;
 
     if (selectedRow_ != idx) { if (editing_) commitEdit(); selectedRow_=idx; markDirty(); }
 
@@ -1232,6 +1328,30 @@ void PropertyGrid::onMousePress(MouseEvent& e)
         if (popY < 0.f) popY = 0.f;
         auto* popup=new ColorPickerPopup_(this,idx); popup->setRect({popX,popY,popW,popH});
         WidgetApp::instance().showPopup(popup,nullptr); e.consumed=true; break;
+    }
+    case PropType::CheckboxGrid: {
+        auto& g = std::get<PropCheckboxGrid>(row.data);
+        int cols = g.columns;
+        float cellW = valW / (float)cols;
+        // Compute row Y offset for this grid row
+        auto vis2 = visibleRows();
+        float rowY = abs.y;
+        float acc = 0;
+        for (int vi2 = 0; vi2 < (int)vis2.size(); ++vi2) {
+            if (vis2[vi2] == idx) { rowY = abs.y + acc - scrollOffset_; break; }
+            acc += rowHeightFor(vis2[vi2]);
+        }
+        float localX = e.x - valTextX;
+        float localY = e.y - rowY;
+        int col = clamp((int)(localX / cellW), 0, cols - 1);
+        int r2  = clamp((int)(localY / rowHeight_), 0, ((int)g.items.size() + cols - 1) / cols - 1);
+        int hitIdx = r2 * cols + col;
+        if (hitIdx >= 0 && hitIdx < (int)g.items.size()) {
+            g.items[hitIdx].value = !g.items[hitIdx].value;
+            if (g.onChange) g.onChange(hitIdx, g.items[hitIdx].value);
+            propertyChanged.emit(idx);
+        }
+        markDirty(); break;
     }
     default: break;
     }

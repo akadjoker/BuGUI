@@ -218,6 +218,12 @@ public:
     int addScaledFloat (const std::string& name, float value, bool allowNeg = false,
                         std::function<void(float)> onChange = nullptr,
                         const std::string& desc = "");
+    /// @brief Add a grid of labeled checkboxes rendered in N columns.
+    int addCheckboxGrid(const std::string& name,
+                        const std::vector<std::pair<std::string, bool>>& items,
+                        int columns = 3,
+                        std::function<void(int, bool)> onChange = nullptr,
+                        const std::string& desc = "");
 
     /// @brief Set a string property value by row.
     void setString (int row, const std::string& v);
@@ -255,7 +261,8 @@ public:
     // Public for ColorPickerPopup_ internal access
     enum class PropType {
         Section, String, Float, Int, Bool, Color,
-        Combo, Vec2, Vec3, Vec4, Button, Separator, Range, ScaledFloat
+        Combo, Vec2, Vec3, Vec4, Button, Separator, Range, ScaledFloat,
+        CheckboxGrid
     };
 
     // ── Per-type value structs ───────────────────────────────────────────
@@ -276,27 +283,38 @@ public:
     // ScaledFloat: slider whose range scales ×10/÷10 via − and + buttons.
     struct PropScaledFloat { float value = 0.f, scale = 1.f; bool allowNeg = false;
                              std::function<void(float)> onChange; };
+    struct PropCheckboxGrid {
+        struct Item { std::string label; bool value = false; };
+        std::vector<Item> items;
+        int columns = 3;
+        std::function<void(int, bool)> onChange; // (index, newValue)
+    };
 
     using PropData = std::variant<PropSection, PropString, PropFloat, PropInt,
                                   PropBool, PropColor, PropCombo, PropVec,
-                                  PropButton, PropSeparator, PropRange, PropScaledFloat>;
+                                  PropButton, PropSeparator, PropRange, PropScaledFloat,
+                                  PropCheckboxGrid>;
 
     struct PropRow {
         PropType    type;
         std::string name;
         std::string description;
         PropData    data;
+        bool        enabled = true;
     };
 
     // ── Typed accessors (convenience) ────────────────────────────────────
     template<typename T> T&       propData(int row)       { return std::get<T>(rows_[row].data); }
     template<typename T> const T& propData(int row) const { return std::get<T>(rows_[row].data); }
 
+    void setRowEnabled(int row, bool e) { if (row>=0&&row<(int)rows_.size()) { rows_[row].enabled = e; markDirty(); } }
+
     std::vector<PropRow> rows_;  // accessible by ColorPickerPopup_
     /// @brief Set the description panel height.
     void setDescHeight(float h) { descHeight_ = h; markDirty(); }
 
 private:
+    float rowHeightFor(int idx) const;
     void  spinStep(int row, int dir);
     void  startEdit(int row);
     void  commitEdit();
