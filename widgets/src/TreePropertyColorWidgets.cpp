@@ -354,6 +354,30 @@ float TreeView::maxScroll() const
     return (total > visible) ? total - visible : 0.f;
 }
 
+bool TreeView::scrollbarRects(const Rect& abs, Rect& track, Rect& thumb) const
+{
+    const float ms = maxScroll();
+    if (ms <= 0.f) return false;   // content fits, no scrollbar
+
+    const float total = static_cast<float>(flatRows_.size()) * rowHeight_;
+
+    track.x = abs.x + abs.w - kScrollbarWidth;
+    track.y = abs.y;
+    track.w = kScrollbarWidth;
+    track.h = abs.h;
+
+    float thumbH = abs.h * (abs.h / total);
+    if (thumbH < 24.f)   thumbH = 24.f;
+    if (thumbH > abs.h)  thumbH = abs.h;
+
+    const float t = scrollOffset_ / ms;              // 0..1
+    thumb.x = track.x + 1.f;
+    thumb.y = abs.y + t * (abs.h - thumbH);
+    thumb.w = kScrollbarWidth - 2.f;
+    thumb.h = thumbH;
+    return true;
+}
+
 void TreeView::paint(PaintContext& ctx)
 {
     if (!visible_) return;
@@ -438,6 +462,20 @@ void TreeView::paint(PaintContext& ctx)
         }
     }
 
+    // ── Vertical scrollbar ──────────────────────────────────────────────
+    {
+        Rect track, thumb;
+        if (scrollbarRects(abs, track, thumb)) {
+            // track
+            ctx.fill.SetColor(0, 0, 0, 60);
+            ctx.fillRect(track.x, track.y, track.w, track.h);
+            // thumb (brighter while dragging)
+            if (draggingScrollbar_) ctx.fill.SetColor(200, 200, 200, 230);
+            else                    ctx.fill.SetColor(140, 140, 140, 200);
+            ctx.fillRect(thumb.x, thumb.y, thumb.w, thumb.h);
+        }
+    }
+
     ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
     ctx.lineRect(abs.x, abs.y, abs.w, abs.h);
     ctx.popClip();
@@ -451,6 +489,27 @@ void TreeView::onMousePress(MouseEvent& e)
     e.consumed = true;
 
     rebuildFlat();
+
+    // ── Scrollbar interaction (left button only) ────────────────────────
+    if (e.button == 0) {
+        Rect track, thumb;
+        if (scrollbarRects(abs, track, thumb)) {
+            if (thumb.contains(e.x, e.y)) {
+                draggingScrollbar_  = true;
+                dragScrollStartY_   = e.y;
+                dragScrollStartOff_ = scrollOffset_;
+                return;
+            }
+            if (track.contains(e.x, e.y)) {
+                // page up/down towards the click
+                scrollOffset_ = clamp(scrollOffset_ + ((e.y < thumb.y) ? -abs.h : abs.h),
+                                      0.f, maxScroll());
+                markDirty();
+                return;
+            }
+        }
+    }
+
     float localY = e.y - abs.y + scrollOffset_;
     int idx = static_cast<int>(localY / rowHeight_);
     if (idx < 0 || idx >= static_cast<int>(flatRows_.size())) return;
@@ -484,6 +543,25 @@ void TreeView::onMousePress(MouseEvent& e)
 
 void TreeView::onMouseMove(MouseEvent& e)
 {
+    // ── Scrollbar thumb dragging ────────────────────────────────────────
+    if (draggingScrollbar_) {
+        Rect abs = absoluteRect();
+        rebuildFlat();
+        const float total = static_cast<float>(flatRows_.size()) * rowHeight_;
+        float thumbH = abs.h * (abs.h / total);
+        if (thumbH < 24.f)  thumbH = 24.f;
+        if (thumbH > abs.h) thumbH = abs.h;
+        const float trackRange = abs.h - thumbH;
+        if (trackRange > 0.f) {
+            const float dy = e.y - dragScrollStartY_;
+            scrollOffset_ = clamp(dragScrollStartOff_ + (dy / trackRange) * maxScroll(),
+                                  0.f, maxScroll());
+        }
+        e.consumed = true;
+        markDirty();
+        return;
+    }
+
     if (!visible_ || !enabled_ || !dragEnabled_ || !dragNode_) return;
     Rect abs = absoluteRect();
 
@@ -569,6 +647,10 @@ void TreeView::onDropReceive(const DragPayload& p)
 
 void TreeView::onMouseRelease(MouseEvent& e)
 {
+    if (draggingScrollbar_) {
+        draggingScrollbar_ = false;
+        markDirty();
+    }
     if (dragNode_) {
         dragNode_          = nullptr;
         showDropIndicator_ = false;

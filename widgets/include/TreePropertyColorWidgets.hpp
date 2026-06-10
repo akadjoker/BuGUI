@@ -133,6 +133,10 @@ private:
     void  flattenNode(TreeNode* n, int depth);
     float maxScroll() const;
 
+    // Vertical scrollbar geometry / hit-test. Returns false when no scrollbar
+    // is needed (content fits). Fills track + thumb rects in absolute coords.
+    bool  scrollbarRects(const Rect& abs, Rect& track, Rect& thumb) const;
+
     std::vector<TreeNode*> roots_;
     std::vector<FlatRow>   flatRows_;
     TreeNode*              selected_      = nullptr;
@@ -141,6 +145,12 @@ private:
     float                  rowHeight_     = 24.0f;
     float                  indent_        = 16.0f;
     bool                   flatDirty_     = true;
+
+    // Vertical scrollbar drag state
+    bool                   draggingScrollbar_  = false;
+    float                  dragScrollStartY_   = 0.0f;
+    float                  dragScrollStartOff_ = 0.0f;
+    static constexpr float kScrollbarWidth     = 10.0f;
 
     // Drag & drop state
     bool                   dragEnabled_   = false;
