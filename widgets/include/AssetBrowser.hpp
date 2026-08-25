@@ -1,19 +1,16 @@
 #pragma once
 
 #include "Widget.hpp"
-#include "Signal.hpp"
 #include "IconAtlas.hpp"
-#include <string>
-#include <vector>
-#include <functional>
-#include <cstdint>
 
+namespace BuGUI
+{
 // ═════════════════════════════════════════════════════════════════════════════
 //  AssetBrowser — thumbnail grid (or list) file/asset browser
 //
 //  No real filesystem I/O — items are added programmatically.
-//  Thumbnails are colored rectangles + icon; a custom thumbnail
-//  (Texture*) can be set per item for real content.
+//  Thumbnails are colored rectangles + icon; real texture thumbnails
+//  can be extended via TextureHandle.
 //
 //  Usage:
 //    auto* ab = parent->createChild<AssetBrowser>();
@@ -28,10 +25,12 @@ enum class AssetType { Folder, Image, Audio, Mesh, Script, Material, Scene, Gene
 struct AssetItem
 {
     std::string name;
-    AssetType   type      = AssetType::Generic;
-    Color       thumbColor= Color(60, 64, 72, 255);  // fallback thumbnail bg
-    // Extend: Texture* thumbTex = nullptr;           // set for real thumbnails
-    bool        selected  = false;
+    AssetType   type       = AssetType::Generic;
+    Color       thumbColor = Color(60, 64, 72, 255);
+    bool        selected   = false;
+    TextureHandle thumb;          // optional thumbnail texture
+    int           thumbW = 0;     // original image width  (for aspect ratio)
+    int           thumbH = 0;     // original image height
 };
 
 class AssetBrowser : public Widget
@@ -39,52 +38,81 @@ class AssetBrowser : public Widget
 public:
     AssetBrowser();
 
-    // ── Items ─────────────────────────────────────────────────────────────
+    /// @brief Add an asset item.
     void addItem(const AssetItem& item);
+    /// @brief Remove all items.
     void clearItems();
-    int  itemCount() const { return (int)items_.size(); }
+    /// @brief Get the number of items.
+    int  itemCount() const { return static_cast<int>(items_.size()); }
 
-    // ── Navigation ────────────────────────────────────────────────────────
+    /// @brief Set the displayed path.
     void setPath(const std::string& path) { path_ = path; markDirty(); }
+    /// @brief Get the current path.
     const std::string& path() const       { return path_; }
 
-    // ── View mode ─────────────────────────────────────────────────────────
     enum class ViewMode { Grid, List };
+    /// @brief Set the view mode (Grid or List).
     void     setViewMode(ViewMode m) { viewMode_ = m; markDirty(); }
+    /// @brief Get the current view mode.
     ViewMode viewMode() const        { return viewMode_; }
 
-    void  setThumbSize(float s)  { thumbSize_ = std::max(24.f, s); markDirty(); }
+    /// @brief Set the thumbnail cell size.
+    void  setThumbSize(float s)  { thumbSize_ = max2(24.f, s); markDirty(); }
+    /// @brief Get the thumbnail cell size.
     float thumbSize() const      { return thumbSize_; }
 
-    // ── Signals ───────────────────────────────────────────────────────────
-    Signal<AssetItem>  onSelect;   // single click
-    Signal<AssetItem>  onOpen;     // double-click
+    /// @brief Emitted when an item is selected.
+    Signal<AssetItem> onSelect;
+    /// @brief Emitted when an item is opened (double-click).
+    Signal<AssetItem> onOpen;
+    /// @brief Emitted when an item is right-clicked (for context menus).
+    Signal<AssetItem> onRightClick;
 
-    // ── Widget overrides ──────────────────────────────────────────────────
+    /// @brief Set the type filter (Generic = show all).
+    void setFilter(AssetType f) { filter_ = f; rebuildFiltered(); markDirty(); }
+    /// @brief Get the current filter.
+    AssetType filter() const    { return filter_; }
+
     void paint(PaintContext& ctx) override;
     void onMousePress(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onMouseLeave() override;
     void onMouseScroll(MouseEvent& e) override;
 
 private:
     std::vector<AssetItem> items_;
-    std::string            path_       = "/";
-    ViewMode               viewMode_   = ViewMode::Grid;
-    float                  thumbSize_  = 64.f;
-    float                  scrollY_    = 0.f;
-    int                    selected_   = -1;
-    int                    lastClick_  = -1;
-    uint32_t               lastClickMs_= 0;
+    std::vector<int>       filtered_;   // indices into items_ (or all if no filter)
+    AssetType              filter_      = AssetType::Generic; // Generic = show all
+    std::string            path_        = "/";
+    ViewMode               viewMode_    = ViewMode::Grid;
+    float                  thumbSize_   = 64.f;
+    float                  scrollY_     = 0.f;
+    int                    selected_    = -1;
+    int                    lastClick_   = -1;
+    float                  lastClickT_  = 0.f;
+    float                  timeAcc_     = 0.f;
+    int                    hovered_     = -1;
+    float                  hoverX_      = 0.f;
+    float                  hoverY_      = 0.f;
 
-    IconId  typeToIcon(AssetType t) const;
-    Color   typeToColor(AssetType t) const;
-    int     hitItem(float mx, float my) const;
+    void rebuildFiltered();
+    const AssetItem& filteredItem(int i) const { return items_[filtered_[i]]; }
+    int filteredCount() const { return static_cast<int>(filtered_.size()); }
 
-    // Grid layout helpers (computed inside paint)
+    struct FilterBtn { float x, y, w, h; AssetType type; };
+    std::vector<FilterBtn> filterBtnRects_;
+
+    IconId typeToIcon(AssetType t) const;
+    Color  typeToColor(AssetType t) const;
+    int    hitItem(float mx, float my) const;
+
     struct GridLayout {
-        int cols = 1;
+        int   cols = 1;
         float cellW = 64, cellH = 80;
         float startX = 0, startY = 0;
         float totalH = 0;
     };
     GridLayout computeGrid(const Rect& b) const;
 };
+
+} // namespace BuGUI

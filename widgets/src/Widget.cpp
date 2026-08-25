@@ -1,128 +1,251 @@
-#include "Widget.hpp"
-#include "WidgetApp.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
-#include <algorithm>
-#include <cmath>
+#include "pch.hpp"
+#include "MenuWidgets.hpp"   // Menu — complete type needed for delete contextMenu_
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  PaintContext — clip stack
+//  ColorProxy — bridges ctx.fill.* / ctx.line.* to BuGUI::DrawList
+//  The bool doFill parameter mirrors the old RenderBatch API.
 // ═════════════════════════════════════════════════════════════════════════════
 
-PaintContext::PaintContext(RenderBatch& f, RenderBatch& l, RenderBatch& t, Font& fn,
-                           IconAtlas* ico)
-    : fill(f), line(l), text(t), font(fn), icons(ico)
+void ColorProxy::Rectangle(float x, float y, float w, float h, bool doFill)
 {
-    fill.ClearClipRects();
-    line.ClearClipRects();
-    text.ClearClipRects();
+    if (!ctx) return;
+    if (doFill) ctx->drawList.addRect({x, y, w, h}, current);
+    else        ctx->drawList.addRectOutline({x, y, w, h}, current);
 }
+
+void ColorProxy::RoundedRectangle(float x, float y, float w, float h,
+                                  float r, int seg, bool doFill)
+{
+    if (!ctx) return;
+    if (doFill) ctx->drawList.addRoundRectFilled({x, y, w, h}, r, current, seg);
+    else        ctx->drawList.addRoundRect({x, y, w, h}, r, current, 1.0f, seg);
+}
+
+void ColorProxy::Circle(float cx, float cy, float radius, bool doFill)
+{
+    if (!ctx) return;
+    if (doFill) ctx->drawList.addCircleFilled({cx, cy}, radius, current);
+    else        ctx->drawList.addCircle({cx, cy}, radius, current);
+}
+
+void ColorProxy::Triangle(float x0, float y0, float x1, float y1,
+                          float x2, float y2, bool doFill)
+{
+    if (!ctx) return;
+    if (doFill) ctx->drawList.addTriangleFilled({x0, y0}, {x1, y1}, {x2, y2}, current);
+    else        ctx->drawList.addTriangle({x0, y0}, {x1, y1}, {x2, y2}, current);
+}
+
+void ColorProxy::Line2D(float x1, float y1, float x2, float y2)
+{
+    if (ctx) ctx->drawList.addLine({x1, y1}, {x2, y2}, current);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FontProxy — bridges ctx.font.* to BuGUI::DrawList
+// ═════════════════════════════════════════════════════════════════════════════
+
+void FontProxy::SetColor(const Color& c)
+{
+    if (ctx) ctx->textColor_ = c;
+}
+
+void FontProxy::SetColor(u8 r, u8 g, u8 b, u8 a)
+{
+    if (ctx) ctx->textColor_ = {r, g, b, a};
+}
+
+float FontProxy::GetAscender() const
+{
+    if (!ctx || !ctx->buFont) return 12.0f * scale;
+    return ctx->buFont->ascender() * scale;
+}
+
+float FontProxy::GetTextWidth(const char* text) const
+{
+    if (!ctx || !ctx->buFont || !text) return 0.0f;
+    return ctx->drawList.calcTextSize(*ctx->buFont, text, scale).x;
+}
+
+void FontProxy::Print(const char* text, float x, float y, const void* /*clipHint*/)
+{
+    if (!ctx || !ctx->buFont || !text) return;
+    ctx->drawList.addText(*ctx->buFont, {x, y}, ctx->textColor_, text, scale);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PaintContext — wraps BuGUI::DrawList, zero backend dependencies
+// ═════════════════════════════════════════════════════════════════════════════
+
+PaintContext::PaintContext(BuGUI::DrawList& dl,
+                           const BuGUI::Font* f,
+                           IconAtlas* ico)
+    : drawList(dl), buFont(f), icons(ico)
+{
+    fill.ctx = this;
+    line.ctx = this;
+    text.ctx = this;
+    font.ctx = this;
+}
+
+// ── Font stack ────────────────────────────────────────────────────────────
+
+void PaintContext::pushFont(const BuGUI::Font* f)
+{
+    fontStack_.push_back(buFont);
+    buFont = f;
+}
+
+void PaintContext::popFont()
+{
+    if (!fontStack_.empty()) {
+        buFont = fontStack_.back();
+        fontStack_.pop_back();
+    }
+}
+
+// ── Clip stack ────────────────────────────────────────────────────────────
 
 void PaintContext::pushClip(const Rect& r)
 {
-    fill.PushClipRect(r.x, r.y, r.w, r.h);
-    line.PushClipRect(r.x, r.y, r.w, r.h);
-    text.PushClipRect(r.x, r.y, r.w, r.h);
+    drawList.pushClip({r.x, r.y, r.w, r.h});
+    clipStack_.push_back(r);
 }
 
 void PaintContext::popClip()
 {
-    fill.PopClipRect();
-    line.PopClipRect();
-    text.PopClipRect();
+    drawList.popClip();
+    if (!clipStack_.empty())
+        clipStack_.pop_back();
 }
 
 const Rect& PaintContext::clipRect() const
 {
-    float c[4];
-    fill.GetClipRect(c);
-    cachedClip_ = {c[0], c[1], c[2], c[3]};
+    if (!clipStack_.empty())
+    {
+        cachedClip_ = clipStack_.back();
+        return cachedClip_;
+    }
+    cachedClip_ = {0.f, 0.f, 99999.f, 99999.f};
     return cachedClip_;
 }
 
 bool PaintContext::hasClip() const
 {
-    return fill.HasClipRect();
+    return !clipStack_.empty();
 }
 
 bool PaintContext::isClipped(const Rect& r) const
 {
-    return fill.IsRectOutsideClip(r.x, r.y, r.w, r.h);
+    if (clipStack_.empty()) return false;
+    const Rect& c = clipStack_.back();
+    return (r.x >= c.x + c.w || r.x + r.w <= c.x ||
+            r.y >= c.y + c.h || r.y + r.h <= c.y);
 }
 
 bool PaintContext::clipRectIntersect(const Rect& in, Rect& out) const
 {
-    float c[4];
-    if (!fill.IntersectClipRect(in.x, in.y, in.w, in.h, c)) return false;
-    out = {c[0], c[1], c[2], c[3]};
+    const Rect& c = clipRect();
+    float x0 = std::max(in.x, c.x);
+    float y0 = std::max(in.y, c.y);
+    float x1 = std::min(in.x + in.w, c.x + c.w);
+    float y1 = std::min(in.y + in.h, c.y + c.h);
+    if (x1 <= x0 || y1 <= y0) return false;
+    out = {x0, y0, x1 - x0, y1 - y0};
     return true;
 }
 
 void PaintContext::fontClip(float out[4]) const
 {
-    fill.GetClipRect(out);
+    const Rect& c = clipRect();
+    out[0] = c.x; out[1] = c.y; out[2] = c.w; out[3] = c.h;
 }
 
-// ── Clip-aware drawing helpers ────────────────────────────────────────────
+// ── Fill helpers ──────────────────────────────────────────────────────────
 
 void PaintContext::fillRect(float x, float y, float w, float h)
 {
-    fill.RectangleClipped(x, y, w, h, true);
-}
-
-void PaintContext::lineRect(float x, float y, float w, float h)
-{
-    line.RectangleClipped(x, y, w, h, false);
+    drawList.addRect({x, y, w, h}, fill.current);
 }
 
 void PaintContext::fillRoundedRect(float x, float y, float w, float h, float r, int seg)
 {
-    fill.RoundedRectangleClipped(x, y, w, h, r, seg, true);
-}
-
-void PaintContext::lineRoundedRect(float x, float y, float w, float h, float r, int seg)
-{
-    line.RoundedRectangleClipped(x, y, w, h, r, seg, false);
+    drawList.addRoundRectFilled({x, y, w, h}, r, fill.current, seg);
 }
 
 void PaintContext::fillCircle(float cx, float cy, float radius)
 {
-    fill.CircleClipped(cx, cy, radius, true);
-}
-
-void PaintContext::lineCircle(float cx, float cy, float radius)
-{
-    line.CircleClipped(cx, cy, radius, false);
-}
-
-void PaintContext::drawLine(float x1, float y1, float x2, float y2)
-{
-    line.Line2DClipped(x1, y1, x2, y2);
+    drawList.addCircleFilled({cx, cy}, radius, fill.current);
 }
 
 void PaintContext::fillTriangle(float x1, float y1, float x2, float y2, float x3, float y3)
 {
-    fill.TriangleClipped(x1, y1, x2, y2, x3, y3);
+    drawList.addTriangleFilled({x1, y1}, {x2, y2}, {x3, y3}, fill.current);
 }
 
-// ── Icon drawing via atlas texture ───────────────────────────────────────
+// ── Line helpers ──────────────────────────────────────────────────────────
+
+void PaintContext::lineRect(float x, float y, float w, float h)
+{
+    drawList.addRectOutline({x, y, w, h}, line.current);
+}
+
+void PaintContext::lineRoundedRect(float x, float y, float w, float h, float r, int seg)
+{
+    drawList.addRoundRect({x, y, w, h}, r, line.current, 1.0f, seg);
+}
+
+void PaintContext::lineCircle(float cx, float cy, float radius)
+{
+    drawList.addCircle({cx, cy}, radius, line.current);
+}
+
+void PaintContext::drawLine(float x1, float y1, float x2, float y2)
+{
+    drawList.addLine({x1, y1}, {x2, y2}, line.current);
+}
+
+// ── Text helpers ──────────────────────────────────────────────────────────
+
+void PaintContext::drawText(float x, float y, const char* text)
+{
+    if (!buFont || !text) return;
+    drawList.addText(*buFont, {x, y}, textColor_, text);
+}
+
+void PaintContext::drawTextAligned(const Rect& bounds, const char* text,
+                                   BuGUI::AlignX ax, BuGUI::AlignY ay)
+{
+    if (!buFont || !text) return;
+    drawList.addTextAligned(*buFont,
+                            {bounds.x, bounds.y, bounds.w, bounds.h},
+                            textColor_, text, ax, ay);
+}
+
+float PaintContext::textWidth(const char* text) const
+{
+    if (!buFont || !text) return 0.0f;
+    return drawList.calcTextSize(*buFont, text).x;
+}
+
+float PaintContext::textHeight() const
+{
+    return buFont ? buFont->lineHeight() : 16.0f;
+}
+
+// ── Image ─────────────────────────────────────────────────────────────────
+
+void PaintContext::drawImage(BuGUI::TextureHandle tex, const Rect& dst,
+                             BuGUI::Rect uv, Color tint)
+{
+    drawList.addImage(tex, {dst.x, dst.y, dst.w, dst.h}, uv, tint);
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────
 
 void PaintContext::drawIcon(IconId id, float x, float y, float size)
 {
-    if (!icons || !icons->ready() || id == IconId::None) return;
-
-    Rect bb{x, y, size, size};
-    if (isClipped(bb)) return;
-
-    FloatRect src = icons->srcRect(id);
-    const Rect& c = clipRect();
-    float clip4[4] = {c.x, c.y, c.w, c.h};
-    fill.SetColor(255, 255, 255, 255);
-    fill.DrawImageRegion(icons->texture(),
-                         src.x, src.y, src.width, src.height,
-                         x, y, size, size,
-                         0.0f, 0.0f, 0.0f,
-                         &clip4[0]);
+    drawIcon(id, x, y, size, Color(255, 255, 255, 255));
 }
 
 void PaintContext::drawIcon(IconId id, float x, float y, float size, const Color& tint)
@@ -133,15 +256,21 @@ void PaintContext::drawIcon(IconId id, float x, float y, float size, const Color
     if (isClipped(bb)) return;
 
     FloatRect src = icons->srcRect(id);
-    const Rect& c = clipRect();
-    float clip4[4] = {c.x, c.y, c.w, c.h};
-    fill.SetColor(tint.r, tint.g, tint.b, tint.a);
-    fill.DrawImageRegion(icons->texture(),
-                         src.x, src.y, src.width, src.height,
-                         x, y, size, size,
-                         0.0f, 0.0f, 0.0f,
-                         &clip4[0]);
+    int tw = icons->textureWidth();
+    int th = icons->textureHeight();
+    if (tw <= 0 || th <= 0) return;
+
+    BuGUI::TextureHandle tex = icons->texture();
+
+    BuGUI::Rect uv{
+        src.x     / static_cast<float>(tw),
+        src.y     / static_cast<float>(th),
+        src.width / static_cast<float>(tw),
+        src.height/ static_cast<float>(th)
+    };
+    drawList.addImage(tex, {x, y, size, size}, uv, tint);
 }
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  Widget — tree / geometry / paint
@@ -149,9 +278,21 @@ void PaintContext::drawIcon(IconId id, float x, float y, float size, const Color
 
 Widget::~Widget()
 {
+    // Delete owned context menu (not in children_)
+    delete contextMenu_;
+    contextMenu_ = nullptr;
+
     for (Widget* c : children_)
         delete c;
     children_.clear();
+}
+
+void Widget::setContextMenu(Menu* m)
+{
+    if (m != contextMenu_) {
+        delete contextMenu_;
+        contextMenu_ = m;
+    }
 }
 
 void Widget::removeChild(Widget* child)
@@ -215,14 +356,13 @@ void Widget::layout()
 void Widget::paint(PaintContext& ctx)
 {
     if (!visible_) return;
+    if (children_.empty()) return;
 
     Rect abs = absoluteRect();
     if (ctx.isClipped(abs)) return;
 
-    ctx.pushClip(abs);
     for (auto& c : children_)
         c->paint(ctx);
-    ctx.popClip();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

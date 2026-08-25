@@ -1,20 +1,29 @@
-#include "Widgets.hpp"
+#include "FileDialog.hpp"
+#include "BasicWidgets.hpp"
+#include "LayoutWidgets.hpp"
+#include "TextInputWidgets.hpp"
 #include "WidgetApp.hpp"
-#include "IconAtlas.hpp"
-#include "Batch.hpp"
-#include "Font.hpp"
-#include "Texture.hpp"
-#include "Pixmap.hpp"
-#include "FileSystem.hpp"
-#include <SDL2/SDL.h>
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <cstdio>
+#include "BuImage.hpp"
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Helpers
+// ═════════════════════════════════════════════════════════════════════════════
 
 namespace {
-    inline Font::ClipRect toFontClipFD(const Rect& r)
-    { return {r.x, r.y, r.w, r.h}; }
+    inline float setupFont(PaintContext& ctx, const Color& color, float size)
+    {
+        ctx.font.SetFontSize(size);
+        ctx.font.SetBatch(&ctx.text);
+        ctx.font.SetColor(color);
+        return ctx.font.GetAscender();
+    }
+
+    inline std::string toLowerStr(const std::string& s)
+    {
+        std::string r = s;
+        for (auto& c : r) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return r;
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -28,18 +37,13 @@ FileDialog::FileDialog(const std::string& title)
     setResizable(true);
     setMinimizable(false);
 
-    listColumns_ = {
-        {"Name", 300, SortField::Name},
-        {"Size",  90, SortField::Size},
-        {"Modified", 150, SortField::Date},
-    };
-
     bookmarks_.push_back({"Home", FileSystem::homePath()});
 #if !defined(_WIN32)
     bookmarks_.push_back({"/", "/"});
 #endif
 
     currentPath_ = FileSystem::homePath();
+    dirCache_.setRoot(currentPath_);
 
     buildUI();
     refreshDir();
@@ -59,29 +63,22 @@ void FileDialog::setMode(Mode m)
     mode_ = m;
     if (okButton_) {
         switch (m) {
-        case Mode::Open:         okButton_->setText("Open"); break;
-        case Mode::Save:         okButton_->setText("Save"); break;
+        case Mode::Open:         okButton_->setText("Open");   break;
+        case Mode::Save:         okButton_->setText("Save");   break;
         case Mode::SelectFolder: okButton_->setText("Select"); break;
-        case Mode::OpenImage:    okButton_->setText("Open"); break;
-        case Mode::SaveImage:    okButton_->setText("Save"); break;
+        case Mode::OpenImage:    okButton_->setText("Open");   break;
         }
     }
     bool hideFile = (m == Mode::SelectFolder);
     if (fileNameInput_) fileNameInput_->setVisible(!hideFile);
-    if (fileLabel_)     fileLabel_->setVisible(!hideFile);
-    if (hiddenToggle_)  hiddenToggle_->setVisible(!hideFile);
-    if (bottomSpacer_)  bottomSpacer_->setVisible(hideFile);
 
-    bool imageMode = (m == Mode::OpenImage || m == Mode::SaveImage);
-    if (previewLayout_) previewLayout_->setVisible(imageMode);
+    bool imageMode = (m == Mode::OpenImage);
+    if (previewPanel_) previewPanel_->setVisible(imageMode);
     if (imageMode) {
         setFloatSize(850, 520);
-        if (filter_.empty())
-            setFilter("*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.gif;*.psd;*.hdr");
-        if (viewMode_ == ViewMode::Detail)
-            setViewMode(ViewMode::Icon);
+        if (filter_.empty()) setFilter("*.png;*.jpg;*.jpeg;*.bmp;*.tga;*.gif");
+        if (viewMode_ == ViewMode::Detail) setViewMode(ViewMode::Icon);
     }
-
     refreshDir();
 }
 
@@ -89,14 +86,11 @@ void FileDialog::setViewMode(ViewMode vm)
 {
     viewMode_ = vm;
     scrollY_ = 0;
-    updateViewButtons();
+    updateViewModeButtons();
     markDirty();
 }
 
-void FileDialog::setPath(const std::string& path)
-{
-    navigateTo(path);
-}
+void FileDialog::setPath(const std::string& path) { navigateTo(path); }
 
 void FileDialog::setFilter(const std::string& f)
 {
@@ -108,18 +102,16 @@ void FileDialog::setFilter(const std::string& f)
 void FileDialog::setShowHidden(bool show)
 {
     showHidden_ = show;
-    if (hiddenToggle_)
-        hiddenToggle_->setText(show ? "H*" : "H");
-    refreshDir();
-}
-
-void FileDialog::setMultiSelect(bool ms)
-{
-    multiSelect_ = ms;
-    if (!ms) {
-        selectedIndices_.clear();
-        markDirty();
+    dirCache_.setShowHidden(show);
+    dirCache_.clearCache();
+    dirCache_.setRoot(currentPath_);
+    // Update hidden toggle icon
+    if (iconsBound_ && btnHidden_) {
+        auto& atlas = WidgetApp::instance().iconAtlas();
+        if (atlas.ready())
+            btnHidden_->setSrcRect(atlas.srcRect(show ? IconId::Eye : IconId::EyeOff));
     }
+    refreshDir();
 }
 
 void FileDialog::addBookmark(const std::string& name, const std::string& path)
@@ -127,41 +119,6 @@ void FileDialog::addBookmark(const std::string& name, const std::string& path)
     bookmarks_.push_back({name, path});
     buildSidebar();
     markDirty();
-}
-
-void FileDialog::clearBookmarks()
-{
-    bookmarks_.clear();
-    buildSidebar();
-    markDirty();
-}
-
-void FileDialog::addRecent(const std::string& path)
-{
-    auto it = std::find(recentFiles_.begin(), recentFiles_.end(), path);
-    if (it != recentFiles_.end()) recentFiles_.erase(it);
-    recentFiles_.insert(recentFiles_.begin(), path);
-    if (static_cast<int>(recentFiles_.size()) > kMaxRecent)
-        recentFiles_.resize(kMaxRecent);
-}
-
-void FileDialog::clearRecent()
-{
-    recentFiles_.clear();
-}
-
-std::vector<std::string> FileDialog::selectedPaths() const
-{
-    std::vector<std::string> result;
-    if (multiSelect_) {
-        for (int idx : selectedIndices_) {
-            if (idx >= 0 && idx < static_cast<int>(entries_.size()))
-                result.push_back(entries_[idx].path);
-        }
-    } else if (selectedIndex_ >= 0 && selectedIndex_ < static_cast<int>(entries_.size())) {
-        result.push_back(entries_[selectedIndex_].path);
-    }
-    return result;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -176,11 +133,9 @@ void FileDialog::parseFilter()
     while (pos < filter_.size()) {
         size_t semi = filter_.find(';', pos);
         if (semi == std::string::npos) semi = filter_.size();
-        std::string token = filter_.substr(pos, semi - pos);
-        if (token.size() >= 2 && token[0] == '*' && token[1] == '.')
-            token = token.substr(1);
-        if (!token.empty())
-            filterExts_.push_back(token);
+        std::string tok = filter_.substr(pos, semi - pos);
+        if (tok.size() >= 2 && tok[0] == '*' && tok[1] == '.') tok = tok.substr(1);
+        if (!tok.empty()) filterExts_.push_back(tok);
         pos = semi + 1;
     }
 }
@@ -188,74 +143,62 @@ void FileDialog::parseFilter()
 bool FileDialog::matchesFilter(const std::string& name) const
 {
     if (filterExts_.empty()) return true;
-    std::string ext = FileSystem::extension(name);
-    std::string extLow = ext;
-    for (auto& c : extLow) c = static_cast<char>(tolower(c));
+    std::string ext = toLowerStr(FileSystem::extension(name));
     for (auto& fe : filterExts_) {
-        std::string feLow = fe;
-        for (auto& c : feLow) c = static_cast<char>(tolower(c));
-        if (extLow == feLow) return true;
+        if (ext == toLowerStr(fe)) return true;
     }
     return false;
 }
 
-bool FileDialog::isImageExtension(const std::string& ext)
+bool FileDialog::isImageExt(const std::string& ext)
 {
-    std::string e = ext;
-    for (auto& c : e) c = static_cast<char>(tolower(c));
+    std::string e = toLowerStr(ext);
     return e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".bmp" ||
-           e == ".tga" || e == ".gif" || e == ".psd" || e == ".hdr";
+           e == ".tga" || e == ".gif" || e == ".hdr";
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Directory listing
+//  Directory listing — uses DirCache
 // ═════════════════════════════════════════════════════════════════════════════
 
 void FileDialog::refreshDir()
 {
     entries_.clear();
     selectedIndex_ = -1;
-    selectedIndices_.clear();
+    hoveredIndex_ = -1;
+    multiSel_.clear();
     scrollY_ = 0;
 
-    auto rawEntries = FileSystem::listDir(currentPath_);
-    for (auto& e : rawEntries) {
-        if (!showHidden_ && e.hidden) continue;
-        bool isDir = (e.type == FileSystem::EntryType::Directory);
-        if (!isDir && mode_ == Mode::SelectFolder) continue;
-        if (!isDir && !matchesFilter(e.name)) continue;
+    // Navigate DirCache to current path
+    DirCache::DirNode* node = dirCache_.navigate(currentPath_);
+    if (!node) {
+        // Path changed outside root — reset cache
+        dirCache_.clearCache();
+        dirCache_.setRoot(currentPath_);
+        node = dirCache_.root();
+    }
+    if (!node) { buildBreadcrumbs(); markDirty(); return; }
+
+    if (!node->scanned) dirCache_.expand(node);
+
+    for (int i = 0; i < node->kidCount; ++i) {
+        auto* kid = node->kids[i];
+        if (!showHidden_ && kid->hidden) continue;
+        if (!kid->isDir && mode_ == Mode::SelectFolder) continue;
+        if (!kid->isDir && !matchesFilter(kid->name)) continue;
 
         FileEntry fe;
-        fe.name = e.name;
-        fe.path = e.path;
-        fe.isDir = isDir;
-        fe.size = e.size;
-        fe.mtime = e.mtime;
-        fe.hidden = e.hidden;
-        fe.selected = false;
-
-        if (isDir)
-            fe.icon = IconId::Folder;
-        else {
-            std::string ext = FileSystem::extension(e.name);
-            for (auto& c : ext) c = static_cast<char>(tolower(c));
-            if (ext == ".cpp" || ext == ".c" || ext == ".hpp" || ext == ".h" ||
-                ext == ".py" || ext == ".js" || ext == ".ts" || ext == ".java")
-                fe.icon = IconId::FileCode;
-            else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" ||
-                     ext == ".tga" || ext == ".gif" || ext == ".psd" || ext == ".hdr" ||
-                     ext == ".svg" || ext == ".ico" || ext == ".webp")
-                fe.icon = IconId::FileImage;
-            else if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".bz2" ||
-                     ext == ".xz" || ext == ".7z" || ext == ".rar" || ext == ".deb" ||
-                     ext == ".rpm")
-                fe.icon = IconId::FileArchive;
-            else
-                fe.icon = IconId::File;
-        }
-        entries_.push_back(std::move(fe));
+        fe.name  = kid->name;
+        fe.path  = kid->path;
+        fe.isDir = kid->isDir;
+        fe.size  = kid->size;
+        fe.mtime = kid->mtime;
+        fe.icon  = kid->isDir ? IconId::Folder : iconForExt(kid->ext);
+        entries_.push_back(fe);
     }
+
     sortEntries();
+    multiSel_.resize(entries_.size(), false);
     buildBreadcrumbs();
     clearPreview();
     markDirty();
@@ -272,9 +215,7 @@ void FileDialog::sortEntries()
             return sortAscending_ ? a.mtime < b.mtime : a.mtime > b.mtime;
         case SortField::Name:
         default: {
-            std::string na = a.name, nb = b.name;
-            for (auto& c : na) c = static_cast<char>(tolower(c));
-            for (auto& c : nb) c = static_cast<char>(tolower(c));
+            std::string na = toLowerStr(a.name), nb = toLowerStr(b.name);
             return sortAscending_ ? na < nb : na > nb;
         }
         }
@@ -290,34 +231,7 @@ void FileDialog::navigateTo(const std::string& path)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Multi-select helpers
-// ═════════════════════════════════════════════════════════════════════════════
-
-bool FileDialog::isSelected(int idx) const
-{
-    if (!multiSelect_) return idx == selectedIndex_;
-    return selectedIndices_.count(idx) > 0;
-}
-
-void FileDialog::toggleSelect(int idx)
-{
-    if (selectedIndices_.count(idx))
-        selectedIndices_.erase(idx);
-    else
-        selectedIndices_.insert(idx);
-}
-
-void FileDialog::selectRange(int from, int to)
-{
-    if (from > to) std::swap(from, to);
-    for (int i = from; i <= to; ++i) {
-        if (i >= 0 && i < static_cast<int>(entries_.size()))
-            selectedIndices_.insert(i);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  Preview (image modes)
+//  Preview
 // ═════════════════════════════════════════════════════════════════════════════
 
 void FileDialog::loadPreview(const std::string& path)
@@ -325,19 +239,76 @@ void FileDialog::loadPreview(const std::string& path)
     if (path == previewPath_) return;
     clearPreview();
     previewPath_ = path;
-    std::string ext = FileSystem::extension(path);
-    if (!isImageExtension(ext)) return;
-    previewTex_ = LoadTextureFromFile("fd_preview", path.c_str(), false);
+    if (!isImageExt(FileSystem::extension(path))) return;
+
+    auto& app = WidgetApp::instance();
+    previewTex_ = app.loadImageTexture(path.c_str(), previewW_, previewH_);
     markDirty();
 }
 
 void FileDialog::clearPreview()
 {
     if (previewTex_) {
-        delete previewTex_;
-        previewTex_ = nullptr;
+        WidgetApp::instance().destroyTexture(previewTex_);
+        previewTex_ = {0};
     }
+    previewW_ = previewH_ = 0;
     previewPath_.clear();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Icon mapping
+// ═════════════════════════════════════════════════════════════════════════════
+
+IconId FileDialog::iconForExt(const std::string& ext)
+{
+    if (ext == ".cpp" || ext == ".c" || ext == ".hpp" || ext == ".h" ||
+        ext == ".py" || ext == ".js" || ext == ".ts" || ext == ".java" ||
+        ext == ".rs" || ext == ".go" || ext == ".lua")
+        return IconId::FileCode;
+    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" ||
+        ext == ".tga" || ext == ".gif" || ext == ".svg" || ext == ".hdr" || ext == ".webp")
+        return IconId::FileImage;
+    if (ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".bz2" ||
+        ext == ".xz" || ext == ".7z" || ext == ".rar")
+        return IconId::FileArchive;
+    return IconId::File;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Bind toolbar ImageButtons to icon atlas (called once when atlas available)
+// ═════════════════════════════════════════════════════════════════════════════
+
+void FileDialog::bindToolbarIcons(IconAtlas* atlas)
+{
+    if (!atlas || !atlas->ready()) return;
+    iconsBound_ = true;
+
+    auto tex = atlas->texture();
+    int tw = atlas->textureWidth();
+    int th = atlas->textureHeight();
+
+    auto bind = [&](ImageButton* btn, IconId id) {
+        if (!btn) return;
+        btn->setTexture(tex, tw, th);
+        btn->setSrcRect(atlas->srcRect(id));
+    };
+
+    bind(btnViewDetail_, IconId::ViewDetail);
+    bind(btnViewList_,   IconId::ViewList);
+    bind(btnViewGrid_,   IconId::ViewGrid);
+    bind(btnHidden_,     showHidden_ ? IconId::Eye : IconId::EyeOff);
+
+    updateViewModeButtons();
+}
+
+void FileDialog::updateViewModeButtons()
+{
+    Color active(60, 100, 160, 255);
+    Color normal(0, 0, 0, 0);  // transparent = use theme default
+    if (btnViewDetail_) btnViewDetail_->setBgColor(viewMode_ == ViewMode::Detail ? active : normal);
+    if (btnViewList_)   btnViewList_->setBgColor(viewMode_ == ViewMode::List   ? active : normal);
+    if (btnViewGrid_)   btnViewGrid_->setBgColor(viewMode_ == ViewMode::Icon   ? active : normal);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -350,41 +321,30 @@ void FileDialog::buildUI()
     mainLayout_->setSpacing(4);
     mainLayout_->setPadding(4);
 
-    // ── Toolbar: breadcrumbs + view mode buttons ─────────────────────────
+    // ── Toolbar: breadcrumbs ─────────────────────────────────────────────
     toolBar_ = mainLayout_->createChild<BoxLayout>(LayoutDir::Horizontal);
     toolBar_->setSize(0, 26);
     toolBar_->setSpacing(2);
-    toolBar_->setPadding(0, 0, 2, 2);
 
     breadcrumbBar_ = toolBar_->createChild<BoxLayout>(LayoutDir::Horizontal);
     breadcrumbBar_->setStretch(1);
     breadcrumbBar_->setSpacing(2);
 
-    auto& atlas = WidgetApp::instance().iconAtlas();
-    Texture* atlasTex = atlas.texture();
+    btnViewDetail_ = toolBar_->createChild<ImageButton>();
+    btnViewDetail_->setSize(24, 22); btnViewDetail_->setTooltip("Detail view");
+    btnViewDetail_->clicked.connect([this] { setViewMode(ViewMode::Detail); });
 
-    viewDetailBtn_ = toolBar_->createChild<ImageButton>();
-    viewDetailBtn_->setSize(24, 22);
-    viewDetailBtn_->setTexture(atlasTex);
-    viewDetailBtn_->setSrcRect(atlas.srcRect(IconId::ViewDetail));
-    viewDetailBtn_->setTooltip("Detail view");
-    viewDetailBtn_->clicked.connect([this] { setViewMode(ViewMode::Detail); });
+    btnViewList_ = toolBar_->createChild<ImageButton>();
+    btnViewList_->setSize(24, 22); btnViewList_->setTooltip("List view");
+    btnViewList_->clicked.connect([this] { setViewMode(ViewMode::List); });
 
-    viewListBtn_ = toolBar_->createChild<ImageButton>();
-    viewListBtn_->setSize(24, 22);
-    viewListBtn_->setTexture(atlasTex);
-    viewListBtn_->setSrcRect(atlas.srcRect(IconId::ViewList));
-    viewListBtn_->setTooltip("List view");
-    viewListBtn_->clicked.connect([this] { setViewMode(ViewMode::List); });
+    btnViewGrid_ = toolBar_->createChild<ImageButton>();
+    btnViewGrid_->setSize(24, 22); btnViewGrid_->setTooltip("Grid view");
+    btnViewGrid_->clicked.connect([this] { setViewMode(ViewMode::Icon); });
 
-    viewIconBtn_ = toolBar_->createChild<ImageButton>();
-    viewIconBtn_->setSize(24, 22);
-    viewIconBtn_->setTexture(atlasTex);
-    viewIconBtn_->setSrcRect(atlas.srcRect(IconId::ViewGrid));
-    viewIconBtn_->setTooltip("Icon view");
-    viewIconBtn_->clicked.connect([this] { setViewMode(ViewMode::Icon); });
-
-    updateViewButtons();
+    btnHidden_ = toolBar_->createChild<ImageButton>();
+    btnHidden_->setSize(24, 22); btnHidden_->setTooltip("Toggle hidden files");
+    btnHidden_->clicked.connect([this] { setShowHidden(!showHidden_); });
 
     // ── Body: sidebar + file list + preview ──────────────────────────────
     bodyLayout_ = mainLayout_->createChild<BoxLayout>(LayoutDir::Horizontal);
@@ -392,7 +352,7 @@ void FileDialog::buildUI()
     bodyLayout_->setSpacing(4);
 
     sidebarLayout_ = bodyLayout_->createChild<BoxLayout>(LayoutDir::Vertical);
-    sidebarLayout_->setSize(130, 0);
+    sidebarLayout_->setSize(120, 0);
     sidebarLayout_->setSpacing(2);
     sidebarLayout_->setPadding(2);
     buildSidebar();
@@ -400,31 +360,21 @@ void FileDialog::buildUI()
     fileListLayout_ = bodyLayout_->createChild<BoxLayout>(LayoutDir::Vertical);
     fileListLayout_->setStretch(1);
 
-    previewLayout_ = bodyLayout_->createChild<Widget>();
-    previewLayout_->setSize(180, 0);
-    previewLayout_->setVisible(false);
+    previewPanel_ = bodyLayout_->createChild<Widget>();
+    previewPanel_->setSize(180, 0);
+    previewPanel_->setVisible(false);
 
     // ── Bottom bar ───────────────────────────────────────────────────────
     bottomBar_ = mainLayout_->createChild<BoxLayout>(LayoutDir::Horizontal);
     bottomBar_->setSize(0, 30);
     bottomBar_->setSpacing(6);
-    bottomBar_->setPadding(0, 0, 2, 2);
 
-    fileLabel_ = bottomBar_->createChild<Label>("File:");
-    fileLabel_->setSize(30, 0);
+    auto* fileLabel = bottomBar_->createChild<Label>("File:");
+    fileLabel->setSize(30, 0);
 
     fileNameInput_ = bottomBar_->createChild<TextInput>();
     fileNameInput_->setStretch(1);
     fileNameInput_->setPlaceholder("filename");
-
-    bottomSpacer_ = bottomBar_->createChild<Widget>();
-    bottomSpacer_->setStretch(1);
-    bottomSpacer_->setVisible(false);
-
-    hiddenToggle_ = bottomBar_->createChild<Button>("H");
-    hiddenToggle_->setSize(28, 0);
-    hiddenToggle_->setTooltip("Toggle hidden files");
-    hiddenToggle_->clicked.connect([this] { setShowHidden(!showHidden_); });
 
     cancelButton_ = bottomBar_->createChild<Button>("Cancel");
     cancelButton_->setSize(70, 0);
@@ -434,18 +384,9 @@ void FileDialog::buildUI()
     okButton_->setSize(70, 0);
     okButton_->clicked.connect([this] { onOk(); });
 
+    // Status
     statusLabel_ = mainLayout_->createChild<Label>("");
     statusLabel_->setSize(0, 16);
-    statusLabel_->setColor(Color(120, 120, 130, 255));
-}
-
-void FileDialog::updateViewButtons()
-{
-    Color active(40, 70, 120, 255);
-    Color normal(0, 0, 0, 0); // transparent = theme default
-    if (viewDetailBtn_) viewDetailBtn_->setBgColor(viewMode_ == ViewMode::Detail ? active : normal);
-    if (viewListBtn_)   viewListBtn_->setBgColor(viewMode_ == ViewMode::List ? active : normal);
-    if (viewIconBtn_)   viewIconBtn_->setBgColor(viewMode_ == ViewMode::Icon ? active : normal);
 }
 
 void FileDialog::buildBreadcrumbs()
@@ -453,7 +394,6 @@ void FileDialog::buildBreadcrumbs()
     while (!breadcrumbBar_->children().empty())
         breadcrumbBar_->removeChild(breadcrumbBar_->children().back());
 
-    std::string p = currentPath_;
     std::vector<std::pair<std::string, std::string>> parts;
 #if defined(_WIN32)
     parts.push_back({"C:", "C:\\"});
@@ -463,9 +403,9 @@ void FileDialog::buildBreadcrumbs()
     std::string accum;
 #endif
     size_t start = 1;
-    for (size_t i = start; i <= p.size(); ++i) {
-        if (i == p.size() || p[i] == '/' || p[i] == '\\') {
-            std::string seg = p.substr(start, i - start);
+    for (size_t i = start; i <= currentPath_.size(); ++i) {
+        if (i == currentPath_.size() || currentPath_[i] == '/') {
+            std::string seg = currentPath_.substr(start, i - start);
             if (!seg.empty()) {
                 accum += "/" + seg;
                 parts.push_back({seg, accum});
@@ -478,7 +418,6 @@ void FileDialog::buildBreadcrumbs()
         if (i > 0) {
             auto* sep = breadcrumbBar_->createChild<Label>(">");
             sep->setSize(12, 0);
-            sep->setColor(Color(120, 120, 130, 255));
         }
         std::string target = parts[i].second;
         auto* btn = breadcrumbBar_->createChild<Button>(parts[i].first);
@@ -494,27 +433,13 @@ void FileDialog::buildSidebar()
         sidebarLayout_->removeChild(sidebarLayout_->children().back());
 
     auto* bookLabel = sidebarLayout_->createChild<Label>("Bookmarks");
-    bookLabel->setColor(Color(100, 160, 255, 255));
+    (void)bookLabel;
 
     for (size_t i = 0; i < bookmarks_.size(); ++i) {
-        int idx = static_cast<int>(i);
+        std::string target = bookmarks_[i].path;
         auto* btn = sidebarLayout_->createChild<Button>(bookmarks_[i].name);
         btn->setSize(0, 22);
-        btn->clicked.connect([this, idx] { onBookmarkClick(idx); });
-    }
-
-    if (!recentFiles_.empty()) {
-        sidebarLayout_->createChild<Label>("")->setSize(0, 4);
-        auto* recLabel = sidebarLayout_->createChild<Label>("Recent");
-        recLabel->setColor(Color(100, 160, 255, 255));
-        for (size_t i = 0; i < recentFiles_.size() && i < 8; ++i) {
-            int idx = static_cast<int>(i);
-            std::string name = FileSystem::fileName(recentFiles_[i]);
-            auto* btn = sidebarLayout_->createChild<Button>(name);
-            btn->setSize(0, 20);
-            btn->setTooltip(recentFiles_[i]);
-            btn->clicked.connect([this, idx] { onRecentClick(idx); });
-        }
+        btn->clicked.connect([this, target] { navigateTo(target); });
     }
 }
 
@@ -528,20 +453,24 @@ void FileDialog::layout()
         std::string nav = std::move(pendingNav_);
         pendingNav_.clear();
         currentPath_ = nav;
+        // Update DirCache root if path outside current root
+        if (nav.find(dirCache_.rootPath()) != 0 || dirCache_.rootPath().empty()) {
+            dirCache_.clearCache();
+            // Set root to parent of target for broader caching
+            std::string rootDir = FileSystem::parentPath(nav);
+            if (rootDir.empty() || rootDir == nav) rootDir = nav;
+            dirCache_.setRoot(rootDir);
+        }
         refreshDir();
     }
 
     FloatWindow::layout();
 
     if (statusLabel_) {
-        char buf[128];
-        int dirs = 0, files = 0, sel = 0;
-        for (auto& e : entries_) { if (e.isDir) dirs++; else files++; }
-        if (multiSelect_) sel = static_cast<int>(selectedIndices_.size());
-        if (multiSelect_ && sel > 0)
-            snprintf(buf, sizeof(buf), "%d folders, %d files  |  %d selected", dirs, files, sel);
-        else
-            snprintf(buf, sizeof(buf), "%d folders, %d files", dirs, files);
+        int dirs = 0, files = 0;
+        for (auto& e : entries_) { if (e.isDir) ++dirs; else ++files; }
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%d folders, %d files", dirs, files);
         statusLabel_->setText(buf);
     }
 }
@@ -552,161 +481,160 @@ void FileDialog::layout()
 
 void FileDialog::paint(PaintContext& ctx)
 {
+    // Lazily bind toolbar icons when atlas becomes available
+    if (!iconsBound_ && ctx.icons && ctx.icons->ready())
+        bindToolbarIcons(ctx.icons);
+
     FloatWindow::paint(ctx);
 
     if (!fileListLayout_) return;
     Rect area = fileListLayout_->absoluteRect();
     if (area.w < 10 || area.h < 10) return;
 
-    const auto& t = Theme::instance();
+    paintFileArea(ctx, area);
 
-    ctx.fill.SetColor(t.panelColor.r - 5, t.panelColor.g - 5, t.panelColor.b - 5, 255);
-    ctx.fillRect(area.x, area.y, area.w, area.h);
-
-    switch (viewMode_) {
-    case ViewMode::Detail: {
-        float headerH = 22.0f;
-        paintFileListHeader(ctx, {area.x, area.y, area.w, headerH});
-        Rect bodyArea = {area.x, area.y + headerH, area.w, area.h - headerH};
-        ctx.pushClip(bodyArea);
-        paintFileListDetail(ctx, bodyArea);
-        ctx.popClip();
-        break;
-    }
-    case ViewMode::List:
-        ctx.pushClip(area);
-        paintFileListCompact(ctx, area);
-        ctx.popClip();
-        break;
-    case ViewMode::Icon:
-        ctx.pushClip(area);
-        paintFileListIcons(ctx, area);
-        ctx.popClip();
-        break;
-    }
-
-    ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
-    ctx.lineRect(area.x, area.y, area.w, area.h);
-
+    // Sidebar separator
     if (sidebarLayout_) {
         Rect sr = sidebarLayout_->absoluteRect();
-        ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, 60);
+        ctx.line.SetColor(60, 62, 66, 255);
         ctx.drawLine(sr.x + sr.w, sr.y, sr.x + sr.w, sr.y + sr.h);
     }
 
-    bool imageMode = (mode_ == Mode::OpenImage || mode_ == Mode::SaveImage);
-    if (imageMode && previewLayout_ && previewLayout_->isVisible()) {
-        Rect pr = previewLayout_->absoluteRect();
-        // Debug: draw visible background so we can see the panel area
+    // Preview
+    if (mode_ == Mode::OpenImage && previewPanel_ && previewPanel_->isVisible()) {
+        Rect pr = previewPanel_->absoluteRect();
+        auto& t = Theme::instance();
         ctx.fill.SetColor(t.panelColor.r + 15, t.panelColor.g + 15, t.panelColor.b + 15, 255);
         ctx.fillRect(pr.x, pr.y, pr.w, pr.h);
-        ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, 60);
+        ctx.line.SetColor(60, 62, 66, 255);
         ctx.drawLine(pr.x, pr.y, pr.x, pr.y + pr.h);
         paintPreview(ctx, pr);
     }
 }
 
-void FileDialog::paintFileListHeader(PaintContext& ctx, const Rect& area)
+void FileDialog::paintFileArea(PaintContext& ctx, const Rect& area)
 {
-    const auto& t = Theme::instance();
+    auto& t = Theme::instance();
+    ctx.fill.SetColor(t.panelColor.r - 5, t.panelColor.g - 5, t.panelColor.b - 5, 255);
+    ctx.fillRect(area.x, area.y, area.w, area.h);
+
+    switch (viewMode_) {
+    case ViewMode::Detail: {
+        float hdrH = 22.f;
+        paintHeader(ctx, {area.x, area.y, area.w, hdrH});
+        Rect body = {area.x, area.y + hdrH, area.w, area.h - hdrH};
+        ctx.pushClip(body);
+        paintDetail(ctx, body);
+        ctx.popClip();
+        break;
+    }
+    case ViewMode::List:
+        ctx.pushClip(area);
+        paintCompact(ctx, area);
+        ctx.popClip();
+        break;
+    case ViewMode::Icon:
+        ctx.pushClip(area);
+        paintIcons(ctx, area);
+        ctx.popClip();
+        break;
+    }
+
+    ctx.line.SetColor(55, 58, 65, 255);
+    ctx.lineRect(area.x, area.y, area.w, area.h);
+}
+
+void FileDialog::paintHeader(PaintContext& ctx, const Rect& area)
+{
+    auto& t = Theme::instance();
     ctx.fill.SetColor(t.panelColor.r + 10, t.panelColor.g + 10, t.panelColor.b + 10, 255);
     ctx.fillRect(area.x, area.y, area.w, area.h);
 
-    ctx.font.SetFontSize(t.fontSize * 0.9f);
-    ctx.font.SetBatch(&ctx.text);
-    auto fc = toFontClipFD(area);
-
+    float asc = setupFont(ctx, t.textColor, t.fontSize * 0.9f);
     float x = area.x;
-    for (auto& col : listColumns_) {
-        ctx.font.SetColor(t.textColor);
-        ctx.font.Print(col.name.c_str(), x + 4, area.y + 3, &fc);
-        if (sortField_ == col.field) {
-            float arrowX = x + col.width - 14;
-            float arrowY = area.y + area.h * 0.5f;
+    for (int c = 0; c < kColCount; ++c) {
+        ctx.font.Print(columns_[c].name, x + 4, area.y + (area.h - t.fontSize * 0.9f) * 0.5f + asc);
+        if (sortField_ == columns_[c].field) {
+            float ax = x + columns_[c].width - 14;
+            float ay = area.y + area.h * 0.5f;
             ctx.fill.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, t.textColor.a);
             if (sortAscending_)
-                ctx.fillTriangle(arrowX, arrowY + 3, arrowX + 6, arrowY + 3, arrowX + 3, arrowY - 3);
+                ctx.fillTriangle(ax, ay + 3, ax + 6, ay + 3, ax + 3, ay - 3);
             else
-                ctx.fillTriangle(arrowX, arrowY - 3, arrowX + 6, arrowY - 3, arrowX + 3, arrowY + 3);
+                ctx.fillTriangle(ax, ay - 3, ax + 6, ay - 3, ax + 3, ay + 3);
         }
-        x += col.width;
-        ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, 60);
+        x += columns_[c].width;
+        ctx.line.SetColor(55, 58, 65, 60);
         ctx.drawLine(x, area.y + 2, x, area.y + area.h - 2);
     }
-    ctx.line.SetColor(t.borderColor.r, t.borderColor.g, t.borderColor.b, t.borderColor.a);
+    ctx.line.SetColor(55, 58, 65, 255);
     ctx.drawLine(area.x, area.y + area.h, area.x + area.w, area.y + area.h);
 }
 
-// ── Detail view ─────────────────────────────────────────────────────────
-
-void FileDialog::paintFileListDetail(PaintContext& ctx, const Rect& area)
+void FileDialog::paintDetail(PaintContext& ctx, const Rect& area)
 {
-    const auto& t = Theme::instance();
-    ctx.font.SetFontSize(t.fontSize * 0.9f);
-    ctx.font.SetBatch(&ctx.text);
-    auto fc = toFontClipFD(area);
-
+    auto& t = Theme::instance();
     int total = static_cast<int>(entries_.size());
     int first = static_cast<int>(scrollY_ / rowHeight_);
-    int last = first + static_cast<int>(area.h / rowHeight_) + 2;
+    int last  = first + static_cast<int>(area.h / rowHeight_) + 2;
     if (first < 0) first = 0;
     if (last > total) last = total;
+
+    float asc = setupFont(ctx, t.textColor, t.fontSize * 0.9f);
 
     for (int i = first; i < last; ++i) {
         auto& fe = entries_[i];
         float ry = area.y + i * rowHeight_ - scrollY_;
         if (ry + rowHeight_ < area.y || ry > area.y + area.h) continue;
 
+        // Zebra
         if (i % 2 == 1) {
             ctx.fill.SetColor(t.panelColor.r + 3, t.panelColor.g + 3, t.panelColor.b + 3, 255);
             ctx.fillRect(area.x, ry, area.w, rowHeight_);
         }
-        if (isSelected(i)) {
-            ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g, t.selectionColor.b, t.selectionColor.a);
+        // Selection
+        bool sel = (i == selectedIndex_) || (multiSelect_ && i < static_cast<int>(multiSel_.size()) && multiSel_[i]);
+        if (sel) {
+            ctx.fill.SetColor(40, 70, 120, 200);
             ctx.fillRect(area.x, ry, area.w, rowHeight_);
         } else if (i == hoveredIndex_) {
-            ctx.fill.SetColor(t.buttonHover.r, t.buttonHover.g, t.buttonHover.b, 50);
+            ctx.fill.SetColor(50, 55, 65, 100);
             ctx.fillRect(area.x, ry, area.w, rowHeight_);
         }
 
-        float textY = ry + (rowHeight_ - t.fontSize * 0.9f) * 0.5f;
+        float textY = ry + (rowHeight_ - t.fontSize * 0.9f) * 0.5f + asc;
         float cx = area.x;
 
-        // Name
-        {
-            float nameW = listColumns_[0].width;
-            if (ctx.icons && fe.icon != IconId::None) {
-                float isz = rowHeight_ - 6;
-                ctx.drawIcon(fe.icon, cx + 2, ry + 3, isz);
-                cx += isz + 4;
-            } else cx += 4;
+        // Icon + Name
+        float nameW = columns_[0].width;
+        if (fe.icon != IconId::None) {
+            float isz = rowHeight_ - 6;
+            ctx.drawIcon(fe.icon, cx + 2, ry + 3, isz);
+            cx += isz + 4;
+        } else cx += 4;
 
-            ctx.font.SetColor(fe.isDir ? Color(120, 180, 255, 255)
-                                       : (isSelected(i) ? Color(255, 255, 255, 255) : t.textColor));
-            ctx.font.Print(fe.name.c_str(), cx, textY, &fc);
-            cx = area.x + nameW;
-        }
+        ctx.font.SetColor(fe.isDir ? Color(120, 180, 255, 255) :
+                           (sel ? Color(255, 255, 255, 255) : t.textColor));
+        ctx.font.Print(fe.name.c_str(), cx, textY);
+        cx = area.x + nameW;
+
         // Size
-        {
-            float w = listColumns_[1].width;
-            if (!fe.isDir) {
-                ctx.font.SetColor(Color(160, 160, 165, 255));
-                ctx.font.Print(FileSystem::humanSize(fe.size).c_str(), cx + 4, textY, &fc);
-            }
-            cx += w;
+        if (!fe.isDir) {
+            ctx.font.SetColor(Color(160, 160, 165, 255));
+            ctx.font.Print(FileSystem::humanSize(fe.size).c_str(), cx + 4, textY);
         }
+        cx += columns_[1].width;
+
         // Date
-        {
-            ctx.font.SetColor(Color(140, 140, 145, 255));
-            ctx.font.Print(FileSystem::humanDate(fe.mtime).c_str(), cx + 4, textY, &fc);
-        }
+        ctx.font.SetColor(Color(140, 140, 145, 255));
+        ctx.font.Print(FileSystem::humanDate(fe.mtime).c_str(), cx + 4, textY);
     }
 
     // Scrollbar
     float contentH = total * rowHeight_;
     if (contentH > area.h) {
         float sbW = 6, sbX = area.x + area.w - sbW;
-        float thumbH = std::max(20.0f, (area.h / contentH) * area.h);
+        float thumbH = std::max(20.f, (area.h / contentH) * area.h);
         float maxSY = contentH - area.h;
         float thumbY = area.y + (maxSY > 0 ? (scrollY_ / maxSY) * (area.h - thumbH) : 0);
         ctx.fill.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, 60);
@@ -714,19 +642,15 @@ void FileDialog::paintFileListDetail(PaintContext& ctx, const Rect& area)
     }
 }
 
-// ── List view (compact multi-column) ────────────────────────────────────
-
-void FileDialog::paintFileListCompact(PaintContext& ctx, const Rect& area)
+void FileDialog::paintCompact(PaintContext& ctx, const Rect& area)
 {
-    const auto& t = Theme::instance();
+    auto& t = Theme::instance();
     float rh = rowHeight_;
-    float colW = 200.0f;
+    float colW = 200.f;
     int rowsPerCol = std::max(1, static_cast<int>(area.h / rh));
     int total = static_cast<int>(entries_.size());
 
-    ctx.font.SetFontSize(t.fontSize * 0.9f);
-    ctx.font.SetBatch(&ctx.text);
-    auto fc = toFontClipFD(area);
+    float asc = setupFont(ctx, t.textColor, t.fontSize * 0.9f);
 
     for (int i = 0; i < total; ++i) {
         int col = i / rowsPerCol;
@@ -736,89 +660,75 @@ void FileDialog::paintFileListCompact(PaintContext& ctx, const Rect& area)
         if (rx + colW < area.x || rx > area.x + area.w) continue;
 
         auto& fe = entries_[i];
-        if (isSelected(i)) {
-            ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g, t.selectionColor.b, t.selectionColor.a);
+        bool sel = (i == selectedIndex_) || (multiSelect_ && i < static_cast<int>(multiSel_.size()) && multiSel_[i]);
+        if (sel) {
+            ctx.fill.SetColor(40, 70, 120, 200);
             ctx.fillRect(rx, ry, colW, rh);
         } else if (i == hoveredIndex_) {
-            ctx.fill.SetColor(t.buttonHover.r, t.buttonHover.g, t.buttonHover.b, 50);
+            ctx.fill.SetColor(50, 55, 65, 100);
             ctx.fillRect(rx, ry, colW, rh);
         }
 
         float cx = rx;
-        if (ctx.icons && fe.icon != IconId::None) {
+        if (fe.icon != IconId::None) {
             float isz = rh - 6;
             ctx.drawIcon(fe.icon, cx + 2, ry + 3, isz);
             cx += isz + 4;
         } else cx += 4;
 
-        float textY = ry + (rh - t.fontSize * 0.9f) * 0.5f;
+        float textY = ry + (rh - t.fontSize * 0.9f) * 0.5f + asc;
         ctx.font.SetColor(fe.isDir ? Color(120, 180, 255, 255) : t.textColor);
-        ctx.font.Print(fe.name.c_str(), cx, textY, &fc);
-    }
-
-    // Horizontal scrollbar
-    int cols = std::max(1, (total + rowsPerCol - 1) / rowsPerCol);
-    float totalW = cols * colW;
-    if (totalW > area.w) {
-        float sbH = 6, sbY = area.y + area.h - sbH;
-        float thumbW = std::max(20.0f, (area.w / totalW) * area.w);
-        float maxSX = totalW - area.w;
-        float thumbX = area.x + (maxSX > 0 ? (scrollY_ / maxSX) * (area.w - thumbW) : 0);
-        ctx.fill.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, 60);
-        ctx.fillRect(thumbX, sbY + 1, thumbW, sbH - 2);
+        ctx.font.Print(fe.name.c_str(), cx, textY);
     }
 }
 
-// ── Icon view (grid) ────────────────────────────────────────────────────
-
-void FileDialog::paintFileListIcons(PaintContext& ctx, const Rect& area)
+void FileDialog::paintIcons(PaintContext& ctx, const Rect& area)
 {
-    const auto& t = Theme::instance();
+    auto& t = Theme::instance();
     float cell = iconCellSize_;
-    int colsPerRow = std::max(1, static_cast<int>(area.w / cell));
+    int cols = std::max(1, static_cast<int>(area.w / cell));
     int total = static_cast<int>(entries_.size());
 
-    ctx.font.SetFontSize(t.fontSize * 0.8f);
-    ctx.font.SetBatch(&ctx.text);
-    auto fc = toFontClipFD(area);
+    float asc = setupFont(ctx, t.textColor, t.fontSize * 0.8f);
 
     for (int i = 0; i < total; ++i) {
-        int c = i % colsPerRow;
-        int r = i / colsPerRow;
+        int c = i % cols;
+        int r = i / cols;
         float cx = area.x + c * cell;
         float cy = area.y + r * cell - scrollY_;
         if (cy + cell < area.y || cy > area.y + area.h) continue;
 
         auto& fe = entries_[i];
-        if (isSelected(i)) {
-            ctx.fill.SetColor(t.selectionColor.r, t.selectionColor.g, t.selectionColor.b, t.selectionColor.a);
+        bool sel = (i == selectedIndex_) || (multiSelect_ && i < static_cast<int>(multiSel_.size()) && multiSel_[i]);
+        if (sel) {
+            ctx.fill.SetColor(40, 70, 120, 200);
             ctx.fillRect(cx + 2, cy + 2, cell - 4, cell - 4);
         } else if (i == hoveredIndex_) {
-            ctx.fill.SetColor(t.buttonHover.r, t.buttonHover.g, t.buttonHover.b, 40);
+            ctx.fill.SetColor(50, 55, 65, 80);
             ctx.fillRect(cx + 2, cy + 2, cell - 4, cell - 4);
         }
 
         float isz = cell * 0.45f;
         float ix = cx + (cell - isz) * 0.5f;
         float iy = cy + 6;
-        if (ctx.icons && fe.icon != IconId::None)
-            ctx.drawIcon(fe.icon, ix, iy, isz);
+        if (fe.icon != IconId::None) ctx.drawIcon(fe.icon, ix, iy, isz);
 
+        // Truncated label
         std::string disp = fe.name;
         if (disp.size() > 12) disp = disp.substr(0, 10) + "..";
         float tw = ctx.font.GetTextWidth(disp.c_str());
         float tx = cx + (cell - tw) * 0.5f;
-        float ty = cy + cell - 20;
+        float ty = cy + cell - 20 + asc;
         ctx.font.SetColor(fe.isDir ? Color(120, 180, 255, 255) : t.textColor);
-        ctx.font.Print(disp.c_str(), tx, ty, &fc);
+        ctx.font.Print(disp.c_str(), tx, ty);
     }
 
-    // Vertical scrollbar
-    int totalRows = (total + colsPerRow - 1) / colsPerRow;
+    // Scrollbar
+    int totalRows = (total + cols - 1) / cols;
     float contentH = totalRows * cell;
     if (contentH > area.h) {
         float sbW = 6, sbX = area.x + area.w - sbW;
-        float thumbH = std::max(20.0f, (area.h / contentH) * area.h);
+        float thumbH = std::max(20.f, (area.h / contentH) * area.h);
         float maxSY = contentH - area.h;
         float thumbY = area.y + (maxSY > 0 ? (scrollY_ / maxSY) * (area.h - thumbH) : 0);
         ctx.fill.SetColor(t.textColor.r, t.textColor.g, t.textColor.b, 60);
@@ -826,180 +736,163 @@ void FileDialog::paintFileListIcons(PaintContext& ctx, const Rect& area)
     }
 }
 
-// ── Preview panel ───────────────────────────────────────────────────────
-
 void FileDialog::paintPreview(PaintContext& ctx, const Rect& area)
 {
-    const auto& t = Theme::instance();
-    if (!previewTex_ || !previewTex_->id) {
-        ctx.font.SetFontSize(t.fontSize * 0.8f);
-        ctx.font.SetBatch(&ctx.text);
-        ctx.font.SetColor(Color(100, 100, 110, 255));
-        auto fc = toFontClipFD(area);
-        ctx.font.Print("No preview", area.x + 10, area.y + area.h * 0.5f, &fc);
+    auto& t = Theme::instance();
+    if (!previewTex_) {
+        float asc = setupFont(ctx, Color(100, 100, 110, 255), t.fontSize * 0.8f);
+        ctx.font.Print("No preview", area.x + 10, area.y + area.h * 0.5f + asc);
         return;
     }
 
-    float imgW = static_cast<float>(previewTex_->width);
-    float imgH = static_cast<float>(previewTex_->height);
+    float imgW = static_cast<float>(previewW_);
+    float imgH = static_cast<float>(previewH_);
     float maxW = area.w - 8, maxH = area.h - 30;
     float scale = std::min(maxW / imgW, maxH / imgH);
-    if (scale > 1.0f) scale = 1.0f;
+    if (scale > 1.f) scale = 1.f;
     float dw = imgW * scale, dh = imgH * scale;
     float dx = area.x + (area.w - dw) * 0.5f;
     float dy = area.y + 4;
 
-    ctx.fill.SetColor(255, 255, 255, 255);
-    ctx.fill.DrawImage(previewTex_, dx, dy, dw, dh);
+    ctx.drawImage(previewTex_, {dx, dy, dw, dh});
 
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%dx%d", previewTex_->width, previewTex_->height);
-    ctx.font.SetFontSize(t.fontSize * 0.75f);
-    ctx.font.SetBatch(&ctx.text);
-    ctx.font.SetColor(Color(130, 130, 140, 255));
-    auto fc = toFontClipFD(area);
-    ctx.font.Print(buf, area.x + 6, dy + dh + 4, &fc);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%dx%d", previewW_, previewH_);
+    float asc = setupFont(ctx, Color(130, 130, 140, 255), t.fontSize * 0.75f);
+    ctx.font.Print(buf, area.x + 6, dy + dh + 4 + asc);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  Mouse - helper to compute index from position per view mode
+//  Hit test
 // ═════════════════════════════════════════════════════════════════════════════
 
-static int hitIndexForView(FileDialog::ViewMode vm, const Rect& area,
-                           float mx, float my, float scrollY,
-                           float rowH, float iconCell, int total)
+int FileDialog::hitIndex(float mx, float my, const Rect& area) const
 {
-    switch (vm) {
-    case FileDialog::ViewMode::Detail: {
-        float headerH = 22.0f;
-        float localY = my - (area.y + headerH) + scrollY;
-        return static_cast<int>(localY / rowH);
+    int total = static_cast<int>(entries_.size());
+    switch (viewMode_) {
+    case ViewMode::Detail: {
+        float hdrH = 22.f;
+        float localY = my - (area.y + hdrH) + scrollY_;
+        return static_cast<int>(localY / rowHeight_);
     }
-    case FileDialog::ViewMode::List: {
-        int rowsPerCol = std::max(1, static_cast<int>(area.h / rowH));
-        float colW = 200.0f;
-        float localX = mx - area.x + scrollY;
-        float localY = my - area.y;
-        int col = static_cast<int>(localX / colW);
-        int row = static_cast<int>(localY / rowH);
-        return col * rowsPerCol + row;
+    case ViewMode::List: {
+        int rowsPerCol = std::max(1, static_cast<int>(area.h / rowHeight_));
+        float colW = 200.f;
+        int col = static_cast<int>((mx - area.x + scrollY_) / colW);
+        int row = static_cast<int>((my - area.y) / rowHeight_);
+        int idx = col * rowsPerCol + row;
+        return (idx >= 0 && idx < total) ? idx : -1;
     }
-    case FileDialog::ViewMode::Icon: {
-        int colsPerRow = std::max(1, static_cast<int>(area.w / iconCell));
-        float localX = mx - area.x;
-        float localY = my - area.y + scrollY;
-        int col = static_cast<int>(localX / iconCell);
-        int row = static_cast<int>(localY / iconCell);
-        return row * colsPerRow + col;
+    case ViewMode::Icon: {
+        int cols = std::max(1, static_cast<int>(area.w / iconCellSize_));
+        int col = static_cast<int>((mx - area.x) / iconCellSize_);
+        int row = static_cast<int>((my - area.y + scrollY_) / iconCellSize_);
+        int idx = row * cols + col;
+        return (idx >= 0 && idx < total) ? idx : -1;
     }
     }
     return -1;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  Mouse events
+// ═════════════════════════════════════════════════════════════════════════════
+
 void FileDialog::onMousePress(MouseEvent& e)
 {
-    if (!visible_ || !enabled_) { FloatWindow::onMousePress(e); return; }
+    if (!fileListLayout_) { FloatWindow::onMousePress(e); return; }
 
-    if (fileListLayout_) {
-        Rect area = fileListLayout_->absoluteRect();
+    Rect area = fileListLayout_->absoluteRect();
 
-        // Header click (detail mode only) → sort
-        if (viewMode_ == ViewMode::Detail) {
-            float headerH = 22.0f;
-            Rect headerArea = {area.x, area.y, area.w, headerH};
-            if (headerArea.contains(e.x, e.y)) {
-                e.consumed = true;
-                float cx = area.x;
-                for (auto& col : listColumns_) {
-                    if (e.x >= cx && e.x < cx + col.width) {
-                        if (sortField_ == col.field) sortAscending_ = !sortAscending_;
-                        else { sortField_ = col.field; sortAscending_ = true; }
-                        sortEntries();
-                        markDirty();
-                        return;
-                    }
-                    cx += col.width;
-                }
-                return;
-            }
-        }
-
-        // Body click in any view
-        bool inBody = false;
-        if (viewMode_ == ViewMode::Detail) {
-            float headerH = 22.0f;
-            Rect bodyArea = {area.x, area.y + headerH, area.w, area.h - headerH};
-            inBody = bodyArea.contains(e.x, e.y);
-        } else {
-            inBody = area.contains(e.x, e.y);
-        }
-
-        if (inBody) {
+    // Header click → sort (detail mode)
+    if (viewMode_ == ViewMode::Detail) {
+        Rect hdr = {area.x, area.y, area.w, 22.f};
+        if (hdr.contains(e.x, e.y)) {
             e.consumed = true;
-            int total = static_cast<int>(entries_.size());
-            int idx = hitIndexForView(viewMode_, area, e.x, e.y, scrollY_, rowHeight_, iconCellSize_, total);
-            if (idx < 0 || idx >= total) return;
-
-            // Double-click detection
-            static Uint32 lastClick = 0;
-            static int lastIdx = -1;
-            Uint32 now = SDL_GetTicks();
-            bool dblClick = (idx == lastIdx && (now - lastClick) < 400);
-            lastClick = now;
-            lastIdx = idx;
-
-            // Modifier keys from SDL
-            auto mod = SDL_GetModState();
-            bool ctrl  = (mod & KMOD_CTRL) != 0;
-            bool shift = (mod & KMOD_SHIFT) != 0;
-
-            // Selection
-            if (multiSelect_ && ctrl) {
-                toggleSelect(idx);
-                lastClickedIndex_ = idx;
-                selectedIndex_ = idx;
-            } else if (multiSelect_ && shift && lastClickedIndex_ >= 0) {
-                selectedIndices_.clear();
-                selectRange(lastClickedIndex_, idx);
-                selectedIndex_ = idx;
-            } else {
-                selectedIndices_.clear();
-                selectedIndex_ = idx;
-                selectedIndices_.insert(idx);
-                lastClickedIndex_ = idx;
-            }
-
-            auto& fe = entries_[idx];
-            if (fileNameInput_ && !fe.isDir)
-                fileNameInput_->setText(fe.name);
-
-            // Preview for image modes
-            bool imageMode = (mode_ == Mode::OpenImage || mode_ == Mode::SaveImage);
-            if (imageMode && !fe.isDir)
-                loadPreview(fe.path);
-
-            // Double-click action
-            if (dblClick) {
-                if (fe.isDir) {
-                    navigateTo(fe.path);
-                } else {
-                    selectedPath_ = fe.path;
-                    addRecent(fe.path);
-                    accepted.emit(selectedPath_);
-                    WidgetApp::instance().removeFloat(this);
+            float cx = area.x;
+            for (int c = 0; c < kColCount; ++c) {
+                if (e.x >= cx && e.x < cx + columns_[c].width) {
+                    if (sortField_ == columns_[c].field) sortAscending_ = !sortAscending_;
+                    else { sortField_ = columns_[c].field; sortAscending_ = true; }
+                    sortEntries(); markDirty();
+                    return;
                 }
+                cx += columns_[c].width;
             }
-            markDirty();
             return;
         }
     }
 
-    FloatWindow::onMousePress(e);
-}
+    // Body click
+    bool inBody = false;
+    if (viewMode_ == ViewMode::Detail) {
+        Rect body = {area.x, area.y + 22.f, area.w, area.h - 22.f};
+        inBody = body.contains(e.x, e.y);
+    } else {
+        inBody = area.contains(e.x, e.y);
+    }
 
-void FileDialog::onMouseRelease(MouseEvent& e)
-{
-    FloatWindow::onMouseRelease(e);
+    if (inBody && e.button == 0) {
+        e.consumed = true;
+        int total = static_cast<int>(entries_.size());
+        int idx = hitIndex(e.x, e.y, area);
+        if (idx < 0 || idx >= total) return;
+
+        // Modifiers from IO
+        auto& io = BuGUI::GetIO();
+        bool ctrl  = io.keyCtrl;
+        bool shift = io.keyShift;
+
+        // Double-click detection (simple: same index within 400ms)
+        static float lastClickTime = 0;
+        static int   lastIdx = -1;
+        float now = lastClickTime + WidgetApp::instance().deltaTime();
+        // Simple: track via frame-accumulated time
+        bool dblClick = (idx == lastIdx && (now - lastClickTime) < 0.4f);
+        lastClickTime = now;
+        lastIdx = idx;
+
+        // Selection
+        if (multiSelect_ && ctrl) {
+            if (idx < static_cast<int>(multiSel_.size()))
+                multiSel_[idx] = !multiSel_[idx];
+            lastClickIdx_ = idx;
+            selectedIndex_ = idx;
+        } else if (multiSelect_ && shift && lastClickIdx_ >= 0) {
+            std::fill(multiSel_.begin(), multiSel_.end(), false);
+            int lo = std::min(lastClickIdx_, idx), hi = std::max(lastClickIdx_, idx);
+            for (int i = lo; i <= hi; ++i)
+                if (i < static_cast<int>(multiSel_.size())) multiSel_[i] = true;
+            selectedIndex_ = idx;
+        } else {
+            std::fill(multiSel_.begin(), multiSel_.end(), false);
+            selectedIndex_ = idx;
+            if (idx < static_cast<int>(multiSel_.size())) multiSel_[idx] = true;
+            lastClickIdx_ = idx;
+        }
+
+        auto& fe = entries_[idx];
+        if (fileNameInput_ && !fe.isDir)
+            fileNameInput_->setText(fe.name);
+
+        if (mode_ == Mode::OpenImage && !fe.isDir)
+            loadPreview(fe.path);
+
+        // Double-click action
+        if (dblClick) {
+            if (fe.isDir) {
+                navigateTo(fe.path);
+            } else {
+                selectedPath_ = fe.path;
+                accepted.emit(selectedPath_);
+                WidgetApp::instance().removeFloat(this);
+            }
+        }
+        markDirty();
+        return;
+    }
+
+    FloatWindow::onMousePress(e);
 }
 
 void FileDialog::onMouseMove(MouseEvent& e)
@@ -1008,17 +901,15 @@ void FileDialog::onMouseMove(MouseEvent& e)
         Rect area = fileListLayout_->absoluteRect();
         bool inBody = false;
         if (viewMode_ == ViewMode::Detail) {
-            float headerH = 22.0f;
-            Rect bodyArea = {area.x, area.y + headerH, area.w, area.h - headerH};
-            inBody = bodyArea.contains(e.x, e.y);
+            Rect body = {area.x, area.y + 22.f, area.w, area.h - 22.f};
+            inBody = body.contains(e.x, e.y);
         } else {
             inBody = area.contains(e.x, e.y);
         }
 
         if (inBody) {
-            int total = static_cast<int>(entries_.size());
-            int idx = hitIndexForView(viewMode_, area, e.x, e.y, scrollY_, rowHeight_, iconCellSize_, total);
-            if (idx >= 0 && idx < total && hoveredIndex_ != idx) {
+            int idx = hitIndex(e.x, e.y, area);
+            if (idx >= 0 && idx < static_cast<int>(entries_.size()) && hoveredIndex_ != idx) {
                 hoveredIndex_ = idx;
                 markDirty();
             }
@@ -1030,16 +921,35 @@ void FileDialog::onMouseMove(MouseEvent& e)
     FloatWindow::onMouseMove(e);
 }
 
+void FileDialog::onMouseRelease(MouseEvent& e) { FloatWindow::onMouseRelease(e); }
+
 void FileDialog::onMouseScroll(MouseEvent& e)
 {
     if (fileListLayout_) {
         Rect area = fileListLayout_->absoluteRect();
         if (area.contains(e.x, e.y)) {
             e.consumed = true;
-            if (viewMode_ == ViewMode::Icon)
-                fileListScroll(-e.scrollY * iconCellSize_);
-            else
-                fileListScroll(-e.scrollY * rowHeight_ * 3.0f);
+            float step = (viewMode_ == ViewMode::Icon) ? iconCellSize_ : rowHeight_ * 3.f;
+            scrollY_ -= e.scrollY * step;
+
+            // Clamp
+            int total = static_cast<int>(entries_.size());
+            float contentH = 0;
+            if (viewMode_ == ViewMode::Icon) {
+                int cols = std::max(1, static_cast<int>(area.w / iconCellSize_));
+                contentH = ((total + cols - 1) / cols) * iconCellSize_;
+            } else if (viewMode_ == ViewMode::List) {
+                int rowsPerCol = std::max(1, static_cast<int>(area.h / rowHeight_));
+                contentH = ((total + rowsPerCol - 1) / rowsPerCol) * 200.f; // horizontal scroll
+            } else {
+                contentH = total * rowHeight_;
+                float bodyH = area.h - 22.f;
+                scrollY_ = std::clamp(scrollY_, 0.f, std::max(0.f, contentH - bodyH));
+                markDirty();
+                return;
+            }
+            scrollY_ = std::clamp(scrollY_, 0.f, std::max(0.f, contentH - area.h));
+            markDirty();
             return;
         }
     }
@@ -1048,92 +958,43 @@ void FileDialog::onMouseScroll(MouseEvent& e)
 
 void FileDialog::onKeyPress(KeyEvent& e)
 {
-    if (e.key == SDLK_ESCAPE) { e.consumed = true; onCancel(); return; }
-    if (e.key == SDLK_RETURN || e.key == SDLK_KP_ENTER) { e.consumed = true; onOk(); return; }
-    if (e.key == SDLK_BACKSPACE && e.alt) { e.consumed = true; navigateTo(FileSystem::parentPath(currentPath_)); return; }
-
-    if (e.key == SDLK_a && e.ctrl && multiSelect_) {
+    // Escape → cancel
+    if (e.key == 27) { e.consumed = true; onCancel(); return; }
+    // Enter → ok
+    if (e.key == 13) { e.consumed = true; onOk(); return; }
+    // Alt+Backspace → parent
+    if (e.key == 8 && e.alt) {
         e.consumed = true;
-        selectedIndices_.clear();
-        for (int i = 0; i < static_cast<int>(entries_.size()); ++i)
-            selectedIndices_.insert(i);
+        navigateTo(FileSystem::parentPath(currentPath_));
+        return;
+    }
+    // Ctrl+A → select all
+    if (e.key == 'a' && e.ctrl && multiSelect_) {
+        e.consumed = true;
+        std::fill(multiSel_.begin(), multiSel_.end(), true);
         markDirty();
         return;
     }
-
-    if (e.key == SDLK_UP && selectedIndex_ > 0) {
+    // Arrow keys
+    if (e.key == 0x40000052 && selectedIndex_ > 0) { // UP
         e.consumed = true;
         selectedIndex_--;
-        selectedIndices_.clear();
-        selectedIndices_.insert(selectedIndex_);
-        lastClickedIndex_ = selectedIndex_;
-        if (fileNameInput_ && selectedIndex_ < static_cast<int>(entries_.size()) && !entries_[selectedIndex_].isDir)
+        std::fill(multiSel_.begin(), multiSel_.end(), false);
+        if (selectedIndex_ < static_cast<int>(multiSel_.size())) multiSel_[selectedIndex_] = true;
+        if (fileNameInput_ && !entries_[selectedIndex_].isDir)
             fileNameInput_->setText(entries_[selectedIndex_].name);
         markDirty();
-    } else if (e.key == SDLK_DOWN && selectedIndex_ < static_cast<int>(entries_.size()) - 1) {
+    } else if (e.key == 0x40000051 && selectedIndex_ < static_cast<int>(entries_.size()) - 1) { // DOWN
         e.consumed = true;
         selectedIndex_++;
-        selectedIndices_.clear();
-        selectedIndices_.insert(selectedIndex_);
-        lastClickedIndex_ = selectedIndex_;
-        if (fileNameInput_ && selectedIndex_ < static_cast<int>(entries_.size()) && !entries_[selectedIndex_].isDir)
+        std::fill(multiSel_.begin(), multiSel_.end(), false);
+        if (selectedIndex_ < static_cast<int>(multiSel_.size())) multiSel_[selectedIndex_] = true;
+        if (fileNameInput_ && !entries_[selectedIndex_].isDir)
             fileNameInput_->setText(entries_[selectedIndex_].name);
         markDirty();
     }
 
     FloatWindow::onKeyPress(e);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  File list helpers (kept for internal use)
-// ═════════════════════════════════════════════════════════════════════════════
-
-void FileDialog::fileListMousePress(float, float localY, bool dblClick, bool ctrl, bool shift)
-{
-    int idx = static_cast<int>(localY / rowHeight_);
-    if (idx < 0 || idx >= static_cast<int>(entries_.size())) return;
-
-    if (multiSelect_ && ctrl) { toggleSelect(idx); lastClickedIndex_ = idx; selectedIndex_ = idx; }
-    else if (multiSelect_ && shift && lastClickedIndex_ >= 0) { selectedIndices_.clear(); selectRange(lastClickedIndex_, idx); selectedIndex_ = idx; }
-    else { selectedIndices_.clear(); selectedIndex_ = idx; selectedIndices_.insert(idx); lastClickedIndex_ = idx; }
-
-    auto& fe = entries_[idx];
-    if (dblClick) {
-        if (fe.isDir) navigateTo(fe.path);
-        else { selectedPath_ = fe.path; addRecent(fe.path); accepted.emit(selectedPath_); WidgetApp::instance().removeFloat(this); }
-    } else {
-        if (fileNameInput_ && !fe.isDir) fileNameInput_->setText(fe.name);
-        bool imageMode = (mode_ == Mode::OpenImage || mode_ == Mode::SaveImage);
-        if (imageMode && !fe.isDir) loadPreview(fe.path);
-    }
-    markDirty();
-}
-
-void FileDialog::fileListMouseMove(float, float localY)
-{
-    int idx = static_cast<int>(localY / rowHeight_);
-    if (idx != hoveredIndex_) { hoveredIndex_ = idx; markDirty(); }
-}
-
-void FileDialog::fileListScroll(float dy)
-{
-    Rect area = fileListLayout_ ? fileListLayout_->absoluteRect() : Rect{0, 0, 100, 100};
-    if (viewMode_ == ViewMode::Icon) {
-        int colsPerRow = std::max(1, static_cast<int>(area.w / iconCellSize_));
-        int totalRows = (static_cast<int>(entries_.size()) + colsPerRow - 1) / colsPerRow;
-        float contentH = totalRows * iconCellSize_;
-        scrollY_ = Clamp(scrollY_ + dy, 0.0f, std::max(0.0f, contentH - area.h));
-    } else if (viewMode_ == ViewMode::List) {
-        int rowsPerCol = std::max(1, static_cast<int>(area.h / rowHeight_));
-        int cols = (static_cast<int>(entries_.size()) + rowsPerCol - 1) / rowsPerCol;
-        float totalW = cols * 200.0f;
-        scrollY_ = Clamp(scrollY_ + dy, 0.0f, std::max(0.0f, totalW - area.w));
-    } else {
-        float contentH = static_cast<float>(entries_.size()) * rowHeight_;
-        float bodyH = area.h - 22.0f;
-        scrollY_ = Clamp(scrollY_ + dy, 0.0f, std::max(0.0f, contentH - bodyH));
-    }
-    markDirty();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1147,23 +1008,6 @@ void FileDialog::onOk()
         accepted.emit(selectedPath_);
         WidgetApp::instance().removeFloat(this);
         return;
-    }
-
-    // Multi-select emit
-    if (multiSelect_ && !selectedIndices_.empty()) {
-        std::vector<std::string> paths;
-        for (int idx : selectedIndices_) {
-            if (idx >= 0 && idx < static_cast<int>(entries_.size()) && !entries_[idx].isDir)
-                paths.push_back(entries_[idx].path);
-        }
-        if (!paths.empty()) {
-            for (auto& p : paths) addRecent(p);
-            selectedPath_ = paths.front();
-            acceptedMulti.emit(paths);
-            accepted.emit(selectedPath_);
-            WidgetApp::instance().removeFloat(this);
-            return;
-        }
     }
 
     std::string fname;
@@ -1180,7 +1024,6 @@ void FileDialog::onOk()
     bool needsExist = (mode_ == Mode::Open || mode_ == Mode::OpenImage);
     if (needsExist && !FileSystem::exists(selectedPath_)) return;
 
-    addRecent(selectedPath_);
     accepted.emit(selectedPath_);
     WidgetApp::instance().removeFloat(this);
 }
@@ -1189,30 +1032,4 @@ void FileDialog::onCancel()
 {
     cancelled.emit();
     WidgetApp::instance().removeFloat(this);
-}
-
-void FileDialog::onBookmarkClick(int idx)
-{
-    if (idx >= 0 && idx < static_cast<int>(bookmarks_.size()))
-        navigateTo(bookmarks_[idx].path);
-}
-
-void FileDialog::onRecentClick(int idx)
-{
-    if (idx >= 0 && idx < static_cast<int>(recentFiles_.size())) {
-        std::string dir = FileSystem::parentPath(recentFiles_[idx]);
-        navigateTo(dir);
-        std::string name = FileSystem::fileName(recentFiles_[idx]);
-        if (fileNameInput_) fileNameInput_->setText(name);
-        for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
-            if (entries_[i].name == name) { selectedIndex_ = i; break; }
-        }
-        markDirty();
-    }
-}
-
-// ── Compat shim ─────────────────────────────────────────────────────────
-void FileDialog::paintFileList(PaintContext& ctx, const Rect& area)
-{
-    paintFileListDetail(ctx, area);
 }

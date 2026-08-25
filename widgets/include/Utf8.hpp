@@ -2,6 +2,8 @@
 #include <string>
 #include <cstddef>
 
+namespace BuGUI
+{
 // ── UTF-8 helpers (inline) ──────────────────────────────────────────────
 inline int utf8CharLen(const char* p)
 {
@@ -37,3 +39,5 @@ inline std::string utf8Substr(const std::string& s, int cpStart, int cpEnd)
     size_t byteEnd   = utf8ByteOffset(s, cpEnd);
     return s.substr(byteStart, byteEnd - byteStart);
 }
+
+} // namespace BuGUI
